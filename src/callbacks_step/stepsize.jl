@@ -74,7 +74,8 @@ end
 
     dt = @trixi_timeit timer() "calculate dt" cfl_number * max_dt(u, t, mesh,
                                                                   have_constant_speed(equations), equations,
-                                                                  solver, cache)
+                                                                  semi, solver, cache, solver.volume_integral)
+
     set_proposed_dt!(integrator, dt)
     integrator.opts.dtmax = dt
     integrator.dtcache = dt
@@ -83,6 +84,19 @@ end
   # avoid re-evaluating possible FSAL stages
   u_modified!(integrator, false)
   return nothing
+end
+
+max_dt(u, t, mesh, constant_speed, equations, semi, dg, cache, volume_integral::AbstractVolumeIntegral) =
+    max_dt(u, t, mesh, constant_speed, equations, dg, cache)
+
+@inline function max_dt(u, t, mesh,
+                        constant_speed, equations, semi, dg, cache, volume_integral::VolumeIntegralShockCapturingSubcell)
+  @unpack indicator = volume_integral
+  if indicator isa IndicatorIDP && !indicator.BarStates
+    return max_dt(u, t, mesh, constant_speed, equations, dg, cache)
+  else
+    return max_dt(u, t, mesh, constant_speed, equations, semi, dg, cache, indicator)
+  end
 end
 
 

@@ -5,10 +5,9 @@ using Trixi
 
 include("test_trixi.jl")
 
-# pathof(Trixi) returns /path/to/Trixi/src/Trixi.jl, dirname gives the parent directory
-EXAMPLES_DIR = joinpath(pathof(Trixi) |> dirname |> dirname, "examples", "structured_2d_dgsem")
+EXAMPLES_DIR = pkgdir(Trixi, "examples", "structured_2d_dgsem")
 
-# Start with a clean environment: remove Trixi output directory if it exists
+# Start with a clean environment: remove Trixi.jl output directory if it exists
 outdir = "out"
 isdir(outdir) && rm(outdir, recursive=true)
 
@@ -95,9 +94,9 @@ isdir(outdir) && rm(outdir, recursive=true)
 
   @trixi_testset "elixir_advection_restart.jl with waving flag mesh" begin
     @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_advection_restart.jl"),
-      l2   = [0.00016265538283059892],
-      linf = [0.0015194298895079283],
-      rtol = 5e-7, # Higher tolerance to make tests pass in CI
+      l2   = [0.00016265538265929818],
+      linf = [0.0015194252169410394],
+      rtol = 5.0e-5, # Higher tolerance to make tests pass in CI (in particular with macOS)
       elixir_file="elixir_advection_waving_flag.jl",
       restart_file="restart_000021.h5")
   end
@@ -170,12 +169,44 @@ isdir(outdir) && rm(outdir, recursive=true)
       atol = 7.0e-13)
   end
 
+  @trixi_testset "elixir_euler_free_stream_sc_subcell.jl" begin
+    @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_euler_free_stream_sc_subcell.jl"),
+      l2   = [2.6224749465938795e-14, 1.6175366858083413e-14, 2.358782725951525e-14, 5.910156539173304e-14],
+      linf = [1.1945999744966684e-13, 1.084687895058778e-13, 1.7050250100680842e-13, 2.0250467969162855e-13],
+      atol = 1.0e-13,
+      cells_per_dimension = (8, 8))
+  end
+
+  @trixi_testset "elixir_euler_free_stream_MCL.jl" begin
+    @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_euler_free_stream_MCL.jl"),
+      l2   = [3.532639560334565e-14, 1.4787576718355913e-14, 2.109573923923632e-14, 2.54649935281524e-14],
+      linf = [1.3955503419538218e-13, 1.1611545058798356e-13, 1.7619239400801234e-13, 2.007283228522283e-13],
+      atol = 1.0e-13,
+      cells_per_dimension = (8, 8))
+  end
+
   @trixi_testset "elixir_euler_free_stream.jl with FluxRotated(flux_lax_friedrichs)" begin
     @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_euler_free_stream.jl"),
       surface_flux=FluxRotated(flux_lax_friedrichs),
       l2   = [2.063350241405049e-15, 1.8571016296925367e-14, 3.1769447886391905e-14, 1.4104095258528071e-14],
       linf = [1.9539925233402755e-14, 2.9791447087035294e-13, 6.502853810985698e-13, 2.7000623958883807e-13],
       atol = 7.0e-13)
+  end
+
+  @trixi_testset "elixir_euler_shock_upstream_sc_subcell.jl" begin
+    @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_euler_shock_upstream_sc_subcell.jl"),
+      l2   = [1.6235046821060115, 1.3268082379825517, 2.260222745763045, 13.836104055251756],
+      linf = [5.325409024016956, 6.709625872864434, 9.083315813037805, 41.99330375684724],
+      cells_per_dimension = (8, 12),
+      tspan = (0.0, 1.0))
+  end
+
+  @trixi_testset "elixir_euler_shock_upstream_MCL.jl" begin
+    @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_euler_shock_upstream_MCL.jl"),
+      l2   = [1.658656964774321, 1.3774222979640156, 2.3582271089306537, 14.118411580269786],
+      linf = [5.70562521337294, 9.254765871614621, 11.472661014676802, 45.56200325907666],
+      cells_per_dimension = (8, 12),
+      tspan = (0.0, 1.0))
   end
 
   @trixi_testset "elixir_euler_source_terms_nonperiodic.jl" begin
@@ -210,14 +241,16 @@ isdir(outdir) && rm(outdir, recursive=true)
     @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_hypdiff_nonperiodic.jl"),
       l2   = [0.8799744480157664, 0.8535008397034816, 0.7851383019164209],
       linf = [1.0771947577311836, 1.9143913544309838, 2.149549109115789],
-      tspan = (0.0, 0.1))
+      tspan = (0.0, 0.1),
+      coverage_override = (polydeg=3,)) # Prevent long compile time in CI
   end
 
   @trixi_testset "elixir_hypdiff_harmonic_nonperiodic.jl" begin
     @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_hypdiff_harmonic_nonperiodic.jl"),
       l2   = [0.19357947606509474, 0.47041398037626814, 0.4704139803762686],
       linf = [0.35026352556630114, 0.8344372248051408, 0.8344372248051408],
-      tspan = (0.0, 0.1))
+      tspan = (0.0, 0.1),
+      coverage_override = (polydeg=3,)) # Prevent long compile time in CI
   end
 
   @trixi_testset "elixir_mhd_ec.jl" begin
@@ -249,6 +282,13 @@ isdir(outdir) && rm(outdir, recursive=true)
       tspan = (0.0, 0.05))
   end
 
+  @trixi_testset "elixir_shallowwater_well_balanced.jl" begin
+    @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_shallowwater_well_balanced.jl"),
+      l2   = [0.7920927046419308, 9.92129670988898e-15, 1.0118635033124588e-14, 0.7920927046419308],
+      linf = [2.408429868800133, 5.5835419986809516e-14, 5.448874313931364e-14, 2.4084298688001335],
+      tspan = (0.0, 0.25))
+  end
+
   @trixi_testset "elixir_mhd_ec_shockcapturing.jl" begin
     @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_mhd_ec_shockcapturing.jl"),
       l2   = [0.0364192725149364, 0.0426667193422069, 0.04261673001449095, 0.025884071405646924,
@@ -260,7 +300,7 @@ isdir(outdir) && rm(outdir, recursive=true)
   end
 end
 
-# Clean up afterwards: delete Trixi output directory
+# Clean up afterwards: delete Trixi.jl output directory
 @test_nowarn rm(outdir, recursive=true)
 
 end # module

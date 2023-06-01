@@ -10,13 +10,12 @@
 
 
 # TODO: MPI dimension agnostic
-# TODO: MPI, adapt to different real types (and AD!)
-mutable struct MPICache
+mutable struct MPICache{uEltype <: Real}
   mpi_neighbor_ranks::Vector{Int}
   mpi_neighbor_interfaces::Vector{Vector{Int}}
   mpi_neighbor_mortars::Vector{Vector{Int}}
-  mpi_send_buffers::Vector{Vector{Float64}}
-  mpi_recv_buffers::Vector{Vector{Float64}}
+  mpi_send_buffers::Vector{Vector{uEltype}}
+  mpi_recv_buffers::Vector{Vector{uEltype}}
   mpi_send_requests::Vector{MPI.Request}
   mpi_recv_requests::Vector{MPI.Request}
   n_elements_by_rank::OffsetArray{Int, 1, Array{Int, 1}}
@@ -25,24 +24,29 @@ mutable struct MPICache
 end
 
 
-function MPICache()
+function MPICache(uEltype)
+  # MPI communication "just works" for bitstypes only
+  if !isbitstype(uEltype)
+    throw(ArgumentError("MPICache only supports bitstypes, $uEltype is not a bitstype."))
+  end
   mpi_neighbor_ranks = Vector{Int}(undef, 0)
   mpi_neighbor_interfaces = Vector{Vector{Int}}(undef, 0)
   mpi_neighbor_mortars = Vector{Vector{Int}}(undef, 0)
-  mpi_send_buffers = Vector{Vector{Float64}}(undef, 0)
-  mpi_recv_buffers = Vector{Vector{Float64}}(undef, 0)
+  mpi_send_buffers = Vector{Vector{uEltype}}(undef, 0)
+  mpi_recv_buffers = Vector{Vector{uEltype}}(undef, 0)
   mpi_send_requests = Vector{MPI.Request}(undef, 0)
   mpi_recv_requests = Vector{MPI.Request}(undef, 0)
   n_elements_by_rank = OffsetArray(Vector{Int}(undef, 0), 0:-1)
   n_elements_global = 0
   first_element_global_id = 0
 
-  MPICache(mpi_neighbor_ranks, mpi_neighbor_interfaces, mpi_neighbor_mortars,
-           mpi_send_buffers, mpi_recv_buffers,
-           mpi_send_requests, mpi_recv_requests,
-           n_elements_by_rank, n_elements_global,
-           first_element_global_id)
+  MPICache{uEltype}(mpi_neighbor_ranks, mpi_neighbor_interfaces, mpi_neighbor_mortars,
+                    mpi_send_buffers, mpi_recv_buffers,
+                    mpi_send_requests, mpi_recv_requests,
+                    n_elements_by_rank, n_elements_global,
+                    first_element_global_id)
 end
+@inline Base.eltype(::MPICache{uEltype}) where uEltype = uEltype
 
 
 # TODO: MPI dimension agnostic
@@ -99,7 +103,7 @@ function start_mpi_send!(mpi_cache::MPICache, mesh, equations, dg, cache)
          index_base + 4 * data_size),
       )
 
-      for position in cache.mpi_mortars.local_element_positions[mortar]
+      for position in cache.mpi_mortars.local_neighbor_positions[mortar]
         # Determine whether the data belongs to the left or right side
         if cache.mpi_mortars.large_sides[mortar] == 1 # large element on left side
           if position in (1, 2) # small element
@@ -142,7 +146,7 @@ end
 
 # TODO: MPI dimension agnostic
 function finish_mpi_send!(mpi_cache::MPICache)
-  MPI.Waitall!(mpi_cache.mpi_send_requests)
+  MPI.Waitall(mpi_cache.mpi_send_requests, MPI.Status)
 end
 
 
@@ -151,8 +155,8 @@ function finish_mpi_receive!(mpi_cache::MPICache, mesh, equations, dg, cache)
   data_size = nvariables(equations) * nnodes(dg)^(ndims(mesh) - 1)
 
   # Start receiving and unpack received data until all communication is finished
-  d, _ = MPI.Waitany!(mpi_cache.mpi_recv_requests)
-  while d != 0
+  d = MPI.Waitany(mpi_cache.mpi_recv_requests)
+  while d !== nothing
     recv_buffer = mpi_cache.mpi_recv_buffers[d]
 
     for (index, interface) in enumerate(mpi_cache.mpi_neighbor_interfaces[d])
@@ -221,7 +225,7 @@ function finish_mpi_receive!(mpi_cache::MPICache, mesh, equations, dg, cache)
       end
     end
 
-    d, _ = MPI.Waitany!(mpi_cache.mpi_recv_requests)
+    d = MPI.Waitany(mpi_cache.mpi_recv_requests)
   end
 
   return nothing
@@ -232,7 +236,7 @@ end
 # It constructs the basic `cache` used throughout the simulation to compute
 # the RHS etc.
 function create_cache(mesh::ParallelTreeMesh{2}, equations,
-                      dg::DG, RealT, uEltype)
+                      dg::DG, RealT, ::Type{uEltype}) where {uEltype<:Real}
   # Get cells for which an element needs to be created (i.e. all leaf cells)
   leaf_cell_ids = local_leaf_cells(mesh.tree)
 
@@ -249,7 +253,7 @@ function create_cache(mesh::ParallelTreeMesh{2}, equations,
   mpi_mortars = init_mpi_mortars(leaf_cell_ids, mesh, elements, dg.mortar)
 
   mpi_cache = init_mpi_cache(mesh, elements, mpi_interfaces, mpi_mortars,
-                             nvariables(equations), nnodes(dg))
+                             nvariables(equations), nnodes(dg), uEltype)
 
   cache = (; elements, interfaces, mpi_interfaces, boundaries, mortars, mpi_mortars,
              mpi_cache)
@@ -262,20 +266,20 @@ function create_cache(mesh::ParallelTreeMesh{2}, equations,
 end
 
 
-function init_mpi_cache(mesh, elements, mpi_interfaces, mpi_mortars, nvars, nnodes)
-  mpi_cache = MPICache()
+function init_mpi_cache(mesh, elements, mpi_interfaces, mpi_mortars, nvars, nnodes, uEltype)
+  mpi_cache = MPICache(uEltype)
 
-  init_mpi_cache!(mpi_cache, mesh, elements, mpi_interfaces, mpi_mortars, nvars, nnodes)
+  init_mpi_cache!(mpi_cache, mesh, elements, mpi_interfaces, mpi_mortars, nvars, nnodes, uEltype)
   return mpi_cache
 end
 
 
-function init_mpi_cache!(mpi_cache, mesh, elements, mpi_interfaces, mpi_mortars, nvars, nnodes)
+function init_mpi_cache!(mpi_cache, mesh, elements, mpi_interfaces, mpi_mortars, nvars, nnodes, uEltype)
   mpi_neighbor_ranks, mpi_neighbor_interfaces, mpi_neighbor_mortars =
     init_mpi_neighbor_connectivity(elements, mpi_interfaces, mpi_mortars, mesh)
 
   mpi_send_buffers, mpi_recv_buffers, mpi_send_requests, mpi_recv_requests =
-    init_mpi_data_structures(mpi_neighbor_interfaces, mpi_neighbor_mortars, ndims(mesh), nvars, nnodes)
+    init_mpi_data_structures(mpi_neighbor_interfaces, mpi_neighbor_mortars, ndims(mesh), nvars, nnodes, uEltype)
 
   # Determine local and total number of elements
   n_elements_by_rank = Vector{Int}(undef, mpi_nranks())
@@ -329,8 +333,8 @@ function init_mpi_neighbor_connectivity(elements, mpi_interfaces, mpi_mortars, m
         direction = 4
       end
     end
-    local_element_id = mpi_interfaces.local_element_ids[interface_id]
-    local_cell_id = elements.cell_ids[local_element_id]
+    local_neighbor_id = mpi_interfaces.local_neighbor_ids[interface_id]
+    local_cell_id = elements.cell_ids[local_neighbor_id]
     remote_cell_id = tree.neighbor_ids[direction, local_cell_id]
     neighbor_ranks_interface[interface_id] = tree.mpi_ranks[remote_cell_id]
     if local_cell_id < remote_cell_id
@@ -357,13 +361,13 @@ function init_mpi_neighbor_connectivity(elements, mpi_interfaces, mpi_mortars, m
     large_side = mpi_mortars.large_sides[mortar]
     direction = (orientation - 1) * 2 + large_side
 
-    local_element_ids = mpi_mortars.local_element_ids[mortar]
-    local_element_positions = mpi_mortars.local_element_positions[mortar]
-    if 3 in local_element_positions # large element is on this rank
-      large_element_id = local_element_ids[findfirst(pos -> pos == 3, local_element_positions)]
+    local_neighbor_ids = mpi_mortars.local_neighbor_ids[mortar]
+    local_neighbor_positions = mpi_mortars.local_neighbor_positions[mortar]
+    if 3 in local_neighbor_positions # large element is on this rank
+      large_element_id = local_neighbor_ids[findfirst(pos -> pos == 3, local_neighbor_positions)]
       large_cell_id = elements.cell_ids[large_element_id]
     else # large element is remote
-      cell_id = elements.cell_ids[first(local_element_ids)]
+      cell_id = elements.cell_ids[first(local_neighbor_ids)]
       large_cell_id = tree.neighbor_ids[direction, tree.parent_ids[cell_id]]
     end
 
@@ -422,30 +426,11 @@ function init_mpi_neighbor_connectivity(elements, mpi_interfaces, mpi_mortars, m
 end
 
 
-# TODO: MPI dimension agnostic
-# Initialize MPI data structures
-function init_mpi_data_structures(mpi_neighbor_interfaces, mpi_neighbor_mortars, ndims, nvars, n_nodes)
-  data_size = nvars * n_nodes^(ndims - 1)
-  mpi_send_buffers = Vector{Vector{Float64}}(undef, length(mpi_neighbor_interfaces))
-  mpi_recv_buffers = Vector{Vector{Float64}}(undef, length(mpi_neighbor_interfaces))
-  for index in 1:length(mpi_neighbor_interfaces)
-    mpi_send_buffers[index] = Vector{Float64}(undef, length(mpi_neighbor_interfaces[index]) * data_size +
-                                                     length(mpi_neighbor_mortars[index]) * 4 * data_size)
-    mpi_recv_buffers[index] = Vector{Float64}(undef, length(mpi_neighbor_interfaces[index]) * data_size +
-                                                     length(mpi_neighbor_mortars[index]) * 4 * data_size)
-  end
-
-  mpi_send_requests = Vector{MPI.Request}(undef, length(mpi_neighbor_interfaces))
-  mpi_recv_requests = Vector{MPI.Request}(undef, length(mpi_neighbor_interfaces))
-
-  return mpi_send_buffers, mpi_recv_buffers, mpi_send_requests, mpi_recv_requests
-end
-
 
 function rhs!(du, u, t,
-              mesh::ParallelTreeMesh{2}, equations,
-              initial_condition, boundary_conditions, source_terms,
-              dg::DG, cache)
+              mesh::Union{ParallelTreeMesh{2}, ParallelP4estMesh{2}}, equations,
+              initial_condition, boundary_conditions, source_terms::Source,
+              dg::DG, cache) where {Source}
   # Start to receive MPI data
   @trixi_timeit timer() "start MPI receive" start_mpi_receive!(cache.mpi_cache)
 
@@ -540,7 +525,7 @@ function prolong2mpiinterfaces!(cache, u,
   @unpack mpi_interfaces = cache
 
   @threaded for interface in eachmpiinterface(dg, cache)
-    local_element = mpi_interfaces.local_element_ids[interface]
+    local_element = mpi_interfaces.local_neighbor_ids[interface]
 
     if mpi_interfaces.orientations[interface] == 1 # interface in x-direction
       if mpi_interfaces.remote_sides[interface] == 1 # local element in positive direction
@@ -575,10 +560,10 @@ function prolong2mpimortars!(cache, u,
   @unpack mpi_mortars = cache
 
   @threaded for mortar in eachmpimortar(dg, cache)
-    local_elements = mpi_mortars.local_element_ids[mortar]
-    local_element_positions = mpi_mortars.local_element_positions[mortar]
+    local_neighbor_ids = mpi_mortars.local_neighbor_ids[mortar]
+    local_neighbor_positions = mpi_mortars.local_neighbor_positions[mortar]
 
-    for (element, position) in zip(local_elements, local_element_positions)
+    for (element, position) in zip(local_neighbor_ids, local_neighbor_positions)
       if position in (1, 2) # Current element is small
         # Copy solution small to small
         if mpi_mortars.large_sides[mortar] == 1 # -> small elements on right side
@@ -681,14 +666,14 @@ end
 
 function calc_mpi_interface_flux!(surface_flux_values,
                                   mesh::ParallelTreeMesh{2},
-                                  nonconservative_terms::Val{false}, equations,
+                                  nonconservative_terms::False, equations,
                                   surface_integral, dg::DG, cache)
   @unpack surface_flux = surface_integral
-  @unpack u, local_element_ids, orientations, remote_sides = cache.mpi_interfaces
+  @unpack u, local_neighbor_ids, orientations, remote_sides = cache.mpi_interfaces
 
   @threaded for interface in eachmpiinterface(dg, cache)
     # Get local neighboring element
-    element = local_element_ids[interface]
+    element = local_neighbor_ids[interface]
 
     # Determine interface direction with respect to element:
     if orientations[interface] == 1 # interface in x-direction
@@ -723,7 +708,7 @@ end
 
 function calc_mpi_mortar_flux!(surface_flux_values,
                                mesh::ParallelTreeMesh{2},
-                               nonconservative_terms::Val{false}, equations,
+                               nonconservative_terms::False, equations,
                                mortar_l2::LobattoLegendreMortarL2,
                                surface_integral, dg::DG, cache)
   @unpack surface_flux = surface_integral
@@ -753,10 +738,10 @@ end
                                                 mortar_l2::LobattoLegendreMortarL2,
                                                 dg::DGSEM, cache,
                                                 mortar, fstar_upper, fstar_lower)
-  local_element_ids = cache.mpi_mortars.local_element_ids[mortar]
-  local_element_positions = cache.mpi_mortars.local_element_positions[mortar]
+  local_neighbor_ids = cache.mpi_mortars.local_neighbor_ids[mortar]
+  local_neighbor_positions = cache.mpi_mortars.local_neighbor_positions[mortar]
 
-  for (element, position) in zip(local_element_ids, local_element_positions)
+  for (element, position) in zip(local_neighbor_ids, local_neighbor_positions)
     if position in (1, 2) # Current element is small
       # Copy flux small to small
       if cache.mpi_mortars.large_sides[mortar] == 1 # -> small elements on right side

@@ -29,9 +29,9 @@ end
 initial_condition = initial_condition_BM_vortex
 
 cells_per_dimension = (16, 16)
-vertex_coordinates, EToV = StartUpDG.uniform_mesh(dg.basis.elementType, cells_per_dimension...)
-vertex_coordinates = map(x -> 0.5 .* x, vertex_coordinates) # map domain to [-0.5, 0.5]^2
-mesh = VertexMappedMesh(vertex_coordinates, EToV, dg, is_periodic=(true, true))
+mesh = DGMultiMesh(dg, cells_per_dimension,
+                   coordinates_min=(-0.5, -0.5), coordinates_max=(0.5, 0.5),
+                   periodicity=true)
 semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, dg)
 
 tspan = (0.0, 1.0)
@@ -47,7 +47,7 @@ callbacks = CallbackSet(summary_callback, analysis_callback, alive_callback)
 # run the simulation
 
 tol = 1.0e-8
-sol = solve(ode, RDPK3SpFSAL49(), abstol=tol, reltol=tol,
-            save_everystep=false, callback=callbacks);
+sol = solve(ode, RDPK3SpFSAL49(); abstol=tol, reltol=tol,
+            ode_default_options()..., callback=callbacks);
 
 summary_callback() # print the timer summary

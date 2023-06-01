@@ -73,6 +73,13 @@ end
 # Return number of elements
 @inline nelements(elements::ElementContainer1D) = length(elements.cell_ids)
 # TODO: Taal performance, 1:nelements(elements) vs. Base.OneTo(nelements(elements))
+"""
+    eachelement(elements::ElementContainer1D)
+
+Return an iterator over the indices that specify the location in relevant data structures
+for the elements in `elements`. 
+In particular, not the elements themselves are returned.
+"""
 @inline eachelement(elements::ElementContainer1D) = Base.OneTo(nelements(elements))
 @inline Base.real(elements::ElementContainer1D) = eltype(elements.node_coordinates)
 
@@ -98,7 +105,7 @@ function init_elements!(elements, cell_ids, mesh::TreeMesh1D, basis)
   reference_length = integrate(one ∘ eltype, nodes, basis)
   # Compute the offset of the midpoint of the 1D reference interval
   # (its difference from zero)
-  reference_offset = first(nodes) + reference_length / 2
+  reference_offset = (first(nodes) + last(nodes)) / 2
 
   # Store cell ids
   elements.cell_ids .= cell_ids

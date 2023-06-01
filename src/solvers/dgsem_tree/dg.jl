@@ -27,13 +27,28 @@ function pure_and_blended_element_ids!(element_ids_dg, element_ids_dgfv, alpha, 
 
   for element in eachelement(dg, cache)
     # Clip blending factor for values close to zero (-> pure DG)
-    dg_only = isapprox(alpha[element], 0, atol=1e-12)
+    if dg.volume_integral isa VolumeIntegralShockCapturingSubcell
+      tol = dg.volume_integral.indicator.thr_smooth
+    else
+      tol = 1e-12
+    end
+    dg_only = isapprox(alpha[element], 0, atol=tol)
     if dg_only
       push!(element_ids_dg, element)
     else
       push!(element_ids_dgfv, element)
     end
   end
+
+  return nothing
+end
+
+
+@inline function IDP_checkBounds(u_ode, semi, time, iter, laststage, output_directory)
+  mesh, equations, solver, cache = mesh_equations_solver_cache(semi)
+  u = wrap_array(u_ode, mesh, equations, solver, cache)
+
+  IDP_checkBounds(u, mesh, equations, solver, cache, solver.volume_integral.indicator, time, iter, laststage, output_directory)
 
   return nothing
 end
@@ -54,18 +69,26 @@ include("indicators_3d.jl")
 # Container data structures
 include("containers.jl")
 
+# Dimension-agnostic parallel setup
+include("dg_parallel.jl")
+
 # 1D DG implementation
 include("dg_1d.jl")
+include("dg_1d_parabolic.jl")
 
 # 2D DG implementation
 include("dg_2d.jl")
 include("dg_2d_parallel.jl")
+include("dg_2d_parabolic.jl")
 
 # 3D DG implementation
 include("dg_3d.jl")
+include("dg_3d_parabolic.jl")
 
 # Auxiliary functions that are specialized on this solver
+# as well as specialized implementations used to improve performance
 include("dg_2d_compressible_euler.jl")
+include("dg_3d_compressible_euler.jl")
 
 
 end # @muladd

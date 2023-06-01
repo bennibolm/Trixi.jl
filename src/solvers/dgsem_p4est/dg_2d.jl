@@ -56,6 +56,7 @@ end
   end
 end
 
+# We pass the `surface_integral` argument solely for dispatch
 function prolong2interfaces!(cache, u,
                              mesh::P4estMesh{2},
                              equations, surface_integral, dg::DG)
@@ -173,7 +174,7 @@ end
 # Inlined version of the interface flux computation for conservation laws
 @inline function calc_interface_flux!(surface_flux_values,
                                       mesh::P4estMesh{2},
-                                      nonconservative_terms::Val{false}, equations,
+                                      nonconservative_terms::False, equations,
                                       surface_integral, dg::DG, cache,
                                       interface_index, normal_direction,
                                       primary_node_index, primary_direction_index, primary_element_index,
@@ -194,7 +195,7 @@ end
 # Inlined version of the interface flux computation for equations with conservative and nonconservative terms
 @inline function calc_interface_flux!(surface_flux_values,
                                       mesh::P4estMesh{2},
-                                      nonconservative_terms::Val{true}, equations,
+                                      nonconservative_terms::True, equations,
                                       surface_integral, dg::DG, cache,
                                       interface_index, normal_direction,
                                       primary_node_index, primary_direction_index, primary_element_index,
@@ -296,7 +297,7 @@ end
 # inlined version of the boundary flux calculation along a physical interface
 @inline function calc_boundary_flux!(surface_flux_values, t, boundary_condition,
                                      mesh::P4estMesh{2},
-                                     nonconservative_terms::Val{false}, equations,
+                                     nonconservative_terms::False, equations,
                                      surface_integral, dg::DG, cache,
                                      i_index, j_index,
                                      node_index, direction_index, element_index, boundary_index)
@@ -325,7 +326,7 @@ end
 # inlined version of the boundary flux with nonconservative terms calculation along a physical interface
 @inline function calc_boundary_flux!(surface_flux_values, t, boundary_condition,
                                      mesh::P4estMesh{2},
-                                     nonconservative_terms::Val{true}, equations,
+                                     nonconservative_terms::True, equations,
                                      surface_integral, dg::DG, cache,
                                      i_index, j_index,
                                      node_index, direction_index, element_index, boundary_index)
@@ -484,7 +485,7 @@ end
 # Inlined version of the mortar flux computation on small elements for conservation laws
 @inline function calc_mortar_flux!(fstar,
                                    mesh::P4estMesh{2},
-                                   nonconservative_terms::Val{false}, equations,
+                                   nonconservative_terms::False, equations,
                                    surface_integral, dg::DG, cache,
                                    mortar_index, position_index, normal_direction,
                                    node_index)
@@ -503,7 +504,7 @@ end
 # nonconservative terms
 @inline function calc_mortar_flux!(fstar,
                                    mesh::P4estMesh{2},
-                                   nonconservative_terms::Val{true}, equations,
+                                   nonconservative_terms::True, equations,
                                    surface_integral, dg::DG, cache,
                                    mortar_index, position_index, normal_direction,
                                    node_index)
@@ -595,22 +596,30 @@ function calc_surface_integral!(du, u,
   @unpack boundary_interpolation = dg.basis
   @unpack surface_flux_values = cache.elements
 
-  # Note that all fluxes have been computed with outward-pointing normal vectors
+  # Note that all fluxes have been computed with outward-pointing normal vectors.
+  # Access the factors only once before beginning the loop to increase performance.
+  # We also use explicit assignments instead of `+=` to let `@muladd` turn these
+  # into FMAs (see comment at the top of the file).
+  factor_1 = boundary_interpolation[1,          1]
+  factor_2 = boundary_interpolation[nnodes(dg), 2]
   @threaded for element in eachelement(dg, cache)
     for l in eachnode(dg)
       for v in eachvariable(equations)
         # surface at -x
-        du[v, 1,          l, element] += (surface_flux_values[v, l, 1, element]
-                                          * boundary_interpolation[1, 1])
+        du[v, 1,          l, element] = (
+          du[v, 1,          l, element] + surface_flux_values[v, l, 1, element] * factor_1)
+
         # surface at +x
-        du[v, nnodes(dg), l, element] += (surface_flux_values[v, l, 2, element]
-                                          * boundary_interpolation[nnodes(dg), 2])
+        du[v, nnodes(dg), l, element] = (
+          du[v, nnodes(dg), l, element] + surface_flux_values[v, l, 2, element] * factor_2)
+
         # surface at -y
-        du[v, l, 1,          element] += (surface_flux_values[v, l, 3, element]
-                                          * boundary_interpolation[1, 1])
+        du[v, l, 1,          element] = (
+          du[v, l, 1,          element] + surface_flux_values[v, l, 3, element] * factor_1)
+
         # surface at +y
-        du[v, l, nnodes(dg), element] += (surface_flux_values[v, l, 4, element]
-                                          * boundary_interpolation[nnodes(dg), 2])
+        du[v, l, nnodes(dg), element] = (
+          du[v, l, nnodes(dg), element] + surface_flux_values[v, l, 4, element] * factor_2)
       end
     end
   end

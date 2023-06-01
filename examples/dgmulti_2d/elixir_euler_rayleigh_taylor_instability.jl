@@ -66,14 +66,9 @@ dg = DGMulti(polydeg = 3, element_type = Quad(), approximation_type = Polynomial
 
 num_elements = 16
 cells_per_dimension = (num_elements, 4 * num_elements)
-vertex_coordinates, EToV = StartUpDG.uniform_mesh(dg.basis.elementType, cells_per_dimension...)
-
-# remap the domain by modifying `vertex_coordinates`
-vx, vy = vertex_coordinates
-vx = map(x-> 0.25 * 0.5*(1 + x), vx) # map [-1, 1] to [0, 0.25]
-vy = map(x-> 0.5 * (1+x), vy) # map [-1, 1] to [0, 1] for single mode RTI
-vertex_coordinates = (vx, vy)
-mesh = VertexMappedMesh(vertex_coordinates, EToV, dg; is_periodic=(true,false))
+mesh = DGMultiMesh(dg, cells_per_dimension,
+                   coordinates_min=(0.0, 0.0), coordinates_max=(0.25, 1.0),
+                   periodicity=(true, false))
 
 initial_condition = initial_condition_rayleigh_taylor_instability
 boundary_conditions = (; :entire_boundary => boundary_condition_slip_wall)
@@ -102,7 +97,7 @@ callbacks = CallbackSet(summary_callback,
 ###############################################################################
 # run the simulation
 
-sol = solve(ode, RDPK3SpFSAL49(), abstol=1.0e-6, reltol=1.0e-6,
-            save_everystep=false, callback=callbacks);
+sol = solve(ode, RDPK3SpFSAL49(); abstol=1.0e-6, reltol=1.0e-6,
+            ode_default_options()..., callback=callbacks);
 
 summary_callback() # print the timer summary

@@ -74,6 +74,13 @@ end
 # Return number of elements
 @inline nelements(elements::ElementContainer2D) = length(elements.cell_ids)
 # TODO: Taal performance, 1:nelements(elements) vs. Base.OneTo(nelements(elements))
+"""
+    eachelement(elements::ElementContainer2D)
+
+Return an iterator over the indices that specify the location in relevant data structures
+for the elements in `elements`.
+In particular, not the elements themselves are returned.
+"""
 @inline eachelement(elements::ElementContainer2D) = Base.OneTo(nelements(elements))
 @inline Base.real(elements::ElementContainer2D) = eltype(elements.node_coordinates)
 
@@ -99,7 +106,7 @@ function init_elements!(elements, cell_ids, mesh::TreeMesh2D, basis)
   reference_length = integrate(one ∘ eltype, nodes, basis)
   # Compute the offset of the midpoint of the 1D reference interval
   # (its difference from zero)
-  reference_offset = first(nodes) + reference_length / 2
+  reference_offset = (first(nodes) + last(nodes)) / 2
 
   # Store cell ids
   elements.cell_ids .= cell_ids
@@ -761,7 +768,7 @@ end
 # Container data structure (structure-of-arrays style) for DG MPI interfaces
 mutable struct MPIInterfaceContainer2D{uEltype<:Real} <: AbstractContainer
   u::Array{uEltype, 4}           # [leftright, variables, i, interfaces]
-  local_element_ids::Vector{Int} # [interfaces]
+  local_neighbor_ids::Vector{Int} # [interfaces]
   orientations::Vector{Int}      # [interfaces]
   remote_sides::Vector{Int}      # [interfaces]
   # internal `resize!`able storage
@@ -776,13 +783,13 @@ Base.eltype(mpi_interfaces::MPIInterfaceContainer2D) = eltype(mpi_interfaces.u)
 function Base.resize!(mpi_interfaces::MPIInterfaceContainer2D, capacity)
   n_nodes = nnodes(mpi_interfaces)
   n_variables = nvariables(mpi_interfaces)
-  @unpack _u, local_element_ids, orientations, remote_sides = mpi_interfaces
+  @unpack _u, local_neighbor_ids, orientations, remote_sides = mpi_interfaces
 
   resize!(_u, 2 * n_variables * n_nodes * capacity)
   mpi_interfaces.u = unsafe_wrap(Array, pointer(_u),
                                  (2, n_variables, n_nodes, capacity))
 
-  resize!(local_element_ids, capacity)
+  resize!(local_neighbor_ids, capacity)
 
   resize!(orientations, capacity)
 
@@ -800,14 +807,14 @@ function MPIInterfaceContainer2D{uEltype}(capacity::Integer, n_variables, n_node
   u = unsafe_wrap(Array, pointer(_u),
                   (2, n_variables, n_nodes, capacity))
 
-  local_element_ids = fill(typemin(Int), capacity)
+  local_neighbor_ids = fill(typemin(Int), capacity)
 
   orientations = fill(typemin(Int), capacity)
 
   remote_sides = fill(typemin(Int), capacity)
 
   return MPIInterfaceContainer2D{uEltype}(
-    u, local_element_ids, orientations, remote_sides,
+    u, local_neighbor_ids, orientations, remote_sides,
     _u)
 end
 
@@ -900,7 +907,7 @@ function init_mpi_interfaces!(mpi_interfaces, elements, mesh::TreeMesh2D)
 
       # Create interface between elements
       count += 1
-      mpi_interfaces.local_element_ids[count] = element
+      mpi_interfaces.local_neighbor_ids[count] = element
 
       if iseven(direction) # element is "left" of interface, remote cell is "right" of interface
         mpi_interfaces.remote_sides[count] = 2
@@ -935,8 +942,8 @@ end
 mutable struct MPIL2MortarContainer2D{uEltype<:Real} <: AbstractContainer
   u_upper::Array{uEltype, 4} # [leftright, variables, i, mortars]
   u_lower::Array{uEltype, 4} # [leftright, variables, i, mortars]
-  local_element_ids::Vector{Vector{Int}}       # [mortars]
-  local_element_positions::Vector{Vector{Int}} # [mortars]
+  local_neighbor_ids::Vector{Vector{Int}}       # [mortars]
+  local_neighbor_positions::Vector{Vector{Int}} # [mortars]
   # Large sides: left -> 1, right -> 2
   large_sides::Vector{Int}  # [mortars]
   orientations::Vector{Int} # [mortars]
@@ -953,7 +960,7 @@ Base.eltype(mpi_mortars::MPIL2MortarContainer2D) = eltype(mpi_mortars.u_upper)
 function Base.resize!(mpi_mortars::MPIL2MortarContainer2D, capacity)
   n_nodes = nnodes(mpi_mortars)
   n_variables = nvariables(mpi_mortars)
-  @unpack _u_upper, _u_lower, local_element_ids, local_element_positions,
+  @unpack _u_upper, _u_lower, local_neighbor_ids, local_neighbor_positions,
           large_sides, orientations = mpi_mortars
 
   resize!(_u_upper, 2 * n_variables * n_nodes * capacity)
@@ -964,8 +971,8 @@ function Base.resize!(mpi_mortars::MPIL2MortarContainer2D, capacity)
   mpi_mortars.u_lower = unsafe_wrap(Array, pointer(_u_lower),
                                     (2, n_variables, n_nodes, capacity))
 
-  resize!(local_element_ids, capacity)
-  resize!(local_element_positions, capacity)
+  resize!(local_neighbor_ids, capacity)
+  resize!(local_neighbor_positions, capacity)
 
   resize!(large_sides, capacity)
 
@@ -987,15 +994,15 @@ function MPIL2MortarContainer2D{uEltype}(capacity::Integer, n_variables, n_nodes
   u_lower = unsafe_wrap(Array, pointer(_u_lower),
                         (2, n_variables, n_nodes, capacity))
 
-  local_element_ids = fill(Vector{Int}(), capacity)
-  local_element_positions = fill(Vector{Int}(), capacity)
+  local_neighbor_ids = fill(Vector{Int}(), capacity)
+  local_neighbor_positions = fill(Vector{Int}(), capacity)
 
   large_sides = fill(typemin(Int), capacity)
 
   orientations = fill(typemin(Int), capacity)
 
   return MPIL2MortarContainer2D{uEltype}(
-    u_upper, u_lower, local_element_ids, local_element_positions, large_sides, orientations,
+    u_upper, u_lower, local_neighbor_ids, local_neighbor_positions, large_sides, orientations,
     _u_upper, _u_lower)
 end
 
@@ -1206,23 +1213,23 @@ function init_mpi_mortars!(mpi_mortars, elements, mesh::TreeMesh2D)
       # 3 -> large element
       count += 1
 
-      local_element_ids = Vector{Int}()
-      local_element_positions = Vector{Int}()
+      local_neighbor_ids = Vector{Int}()
+      local_neighbor_positions = Vector{Int}()
       if is_own_cell(mesh.tree, lower_cell_id)
-        push!(local_element_ids, c2e[lower_cell_id])
-        push!(local_element_positions, 1)
+        push!(local_neighbor_ids, c2e[lower_cell_id])
+        push!(local_neighbor_positions, 1)
       end
       if is_own_cell(mesh.tree, upper_cell_id)
-        push!(local_element_ids, c2e[upper_cell_id])
-        push!(local_element_positions, 2)
+        push!(local_neighbor_ids, c2e[upper_cell_id])
+        push!(local_neighbor_positions, 2)
       end
       if is_own_cell(mesh.tree, large_cell_id)
-        push!(local_element_ids, c2e[large_cell_id])
-        push!(local_element_positions, 3)
+        push!(local_neighbor_ids, c2e[large_cell_id])
+        push!(local_neighbor_positions, 3)
       end
 
-      mpi_mortars.local_element_ids[count] = local_element_ids
-      mpi_mortars.local_element_positions[count] = local_element_positions
+      mpi_mortars.local_neighbor_ids[count] = local_neighbor_ids
+      mpi_mortars.local_neighbor_positions[count] = local_neighbor_positions
 
       # Set large side, which denotes the direction (1 -> negative, 2 -> positive) of the large side
       # To prevent double counting, the mortars are always identified from the point of view of
@@ -1248,6 +1255,309 @@ function init_mpi_mortars!(mpi_mortars, elements, mesh::TreeMesh2D)
 end
 
 
+# Container data structure (structure-of-arrays style) for FCT-type antidiffusive fluxes
+#                            (i, j+1)
+#                               |
+#                          flux2(i, j+1)
+#                               |
+# (i-1, j) ---flux1(i, j)--- (i, j) ---flux1(i+1, j)--- (i+1, j)
+#                               |
+#                          flux2(i, j)
+#                               |
+#                            (i, j-1)
+mutable struct ContainerAntidiffusiveFlux2D{uEltype<:Real}
+  antidiffusive_flux1::Array{uEltype, 4} # [variables, i, j, elements]
+  antidiffusive_flux2::Array{uEltype, 4} # [variables, i, j, elements]
+   # internal `resize!`able storage
+  _antidiffusive_flux1::Vector{uEltype}
+  _antidiffusive_flux2::Vector{uEltype}
+end
+
+function ContainerAntidiffusiveFlux2D{uEltype}(capacity::Integer, n_variables, n_nodes) where uEltype<:Real
+  nan_uEltype = convert(uEltype, NaN)
+
+  # Initialize fields with defaults
+  _antidiffusive_flux1 = fill(nan_uEltype, n_variables * (n_nodes+1) * n_nodes * capacity)
+  antidiffusive_flux1 = unsafe_wrap(Array, pointer(_antidiffusive_flux1),
+                                    (n_variables, n_nodes+1, n_nodes, capacity))
+
+  _antidiffusive_flux2 = fill(nan_uEltype, n_variables * n_nodes * (n_nodes+1) * capacity)
+  antidiffusive_flux2 = unsafe_wrap(Array, pointer(_antidiffusive_flux2),
+                                    (n_variables, n_nodes, n_nodes+1, capacity))
+
+  return ContainerAntidiffusiveFlux2D{uEltype}(antidiffusive_flux1, antidiffusive_flux2,
+                                               _antidiffusive_flux1, _antidiffusive_flux2)
+end
+
+nvariables(fluxes::ContainerAntidiffusiveFlux2D) = size(fluxes.antidiffusive_flux1, 1)
+nnodes(fluxes::ContainerAntidiffusiveFlux2D) = size(fluxes.antidiffusive_flux1, 3)
+
+# Only one-dimensional `Array`s are `resize!`able in Julia.
+# Hence, we use `Vector`s as internal storage and `resize!`
+# them whenever needed. Then, we reuse the same memory by
+# `unsafe_wrap`ping multi-dimensional `Array`s around the
+# internal storage.
+function Base.resize!(fluxes::ContainerAntidiffusiveFlux2D, capacity)
+  n_nodes = nnodes(fluxes)
+  n_variables = nvariables(fluxes)
+
+  @unpack _antidiffusive_flux1, _antidiffusive_flux2 = fluxes
+
+  resize!(_antidiffusive_flux1, n_variables * (n_nodes+1) * n_nodes * capacity)
+  fluxes.antidiffusive_flux1 = unsafe_wrap(Array, pointer(_antidiffusive_flux1),
+                                           (n_variables, n_nodes+1, n_nodes, capacity))
+  resize!(_antidiffusive_flux2, n_variables * n_nodes * (n_nodes+1) * capacity)
+  fluxes.antidiffusive_flux2 = unsafe_wrap(Array, pointer(_antidiffusive_flux2),
+                                           (n_variables, n_nodes, n_nodes+1, capacity))
+
+  return nothing
+end
+
+
+mutable struct ContainerShockCapturingIndicatorIDP{uEltype<:Real}
+  alpha::Array{uEltype, 3}                  # [i, j, element]
+  alpha1::Array{uEltype, 3}
+  alpha2::Array{uEltype, 3}
+  var_bounds::Vector{Array{uEltype, 3}}
+  # internal `resize!`able storage
+  _alpha::Vector{uEltype}
+  _alpha1::Vector{uEltype}
+  _alpha2::Vector{uEltype}
+  _var_bounds::Vector{Vector{uEltype}}
+end
+
+function ContainerShockCapturingIndicatorIDP{uEltype}(capacity::Integer, n_nodes, length) where uEltype<:Real
+  nan_uEltype = convert(uEltype, NaN)
+
+  # Initialize fields with defaults
+  _alpha = fill(nan_uEltype, n_nodes * n_nodes * capacity)
+  alpha = unsafe_wrap(Array, pointer(_alpha), (n_nodes, n_nodes, capacity))
+  _alpha1 = fill(nan_uEltype, (n_nodes+1) * n_nodes * capacity)
+  alpha1 = unsafe_wrap(Array, pointer(_alpha1), (n_nodes+1, n_nodes, capacity))
+  _alpha2 = fill(nan_uEltype, n_nodes * (n_nodes+1) * capacity)
+  alpha2 = unsafe_wrap(Array, pointer(_alpha2), (n_nodes, n_nodes+1, capacity))
+
+  _var_bounds = Vector{Vector{uEltype}}(undef, length)
+  var_bounds  = Vector{Array{uEltype, 3}}(undef, length)
+  for i in 1:length
+    _var_bounds[i] = fill(nan_uEltype, n_nodes * n_nodes * capacity)
+    var_bounds[i] = unsafe_wrap(Array, pointer(_var_bounds[i]), (n_nodes, n_nodes, capacity))
+  end
+
+  return ContainerShockCapturingIndicatorIDP{uEltype}(alpha,  alpha1,  alpha2,  var_bounds,
+                                                      _alpha, _alpha1, _alpha2, _var_bounds)
+end
+
+nnodes(indicator::ContainerShockCapturingIndicatorIDP) = size(indicator.alpha, 1)
+
+# Only one-dimensional `Array`s are `resize!`able in Julia.
+# Hence, we use `Vector`s as internal storage and `resize!`
+# them whenever needed. Then, we reuse the same memory by
+# `unsafe_wrap`ping multi-dimensional `Array`s around the
+# internal storage.
+function Base.resize!(indicator::ContainerShockCapturingIndicatorIDP, capacity)
+  n_nodes = nnodes(indicator)
+
+  @unpack _alpha, _alpha1, _alpha2 = indicator
+  resize!(_alpha, n_nodes * n_nodes * capacity)
+  indicator.alpha = unsafe_wrap(Array, pointer(_alpha), (n_nodes, n_nodes, capacity))
+  resize!(_alpha1, (n_nodes + 1) * n_nodes * capacity)
+  indicator.alpha1 = unsafe_wrap(Array, pointer(_alpha1), (n_nodes + 1, n_nodes, capacity))
+  resize!(_alpha2, n_nodes * (n_nodes + 1) * capacity)
+  indicator.alpha2 = unsafe_wrap(Array, pointer(_alpha2), (n_nodes, n_nodes + 1, capacity))
+
+  @unpack _var_bounds = indicator
+  for i in 1:length(_var_bounds)
+    resize!(_var_bounds[i], n_nodes * n_nodes * capacity)
+    indicator.var_bounds[i] = unsafe_wrap(Array, pointer(_var_bounds[i]), (n_nodes, n_nodes, capacity))
+  end
+
+  return nothing
+end
+
+mutable struct ContainerShockCapturingIndicatorMCL{uEltype<:Real}
+  var_min::Array{uEltype, 4}                # [variable, i, j, element]
+  var_max::Array{uEltype, 4}                # [variable, i, j, element]
+  alpha::Array{uEltype, 4}                  # [variable, i, j, element]
+  alpha_pressure::Array{uEltype, 3}         # [i, j, element]
+  alpha_entropy::Array{uEltype, 3}          # [i, j, element]
+  alpha_eff::Array{uEltype, 4}              # [variable, i, j, element]
+  alpha_mean::Array{uEltype, 4}             # [variable, i, j, element]
+  alpha_mean_pressure::Array{uEltype, 3}             # [variable, i, j, element]
+  alpha_mean_entropy::Array{uEltype, 3}             # [variable, i, j, element]
+  # internal `resize!`able storage
+  _var_min::Vector{uEltype}
+  _var_max::Vector{uEltype}
+  _alpha::Vector{uEltype}
+  _alpha_pressure::Vector{uEltype}
+  _alpha_entropy::Vector{uEltype}
+  _alpha_eff::Vector{uEltype}
+  _alpha_mean::Vector{uEltype}
+  _alpha_mean_pressure::Vector{uEltype}
+  _alpha_mean_entropy::Vector{uEltype}
+end
+
+function ContainerShockCapturingIndicatorMCL{uEltype}(capacity::Integer, n_variables, n_nodes) where uEltype<:Real
+  nan_uEltype = convert(uEltype, NaN)
+
+  _var_min = Vector{uEltype}(undef, n_variables*n_nodes^2*capacity)
+  var_min  = unsafe_wrap(Array, pointer(_var_min), (n_variables, n_nodes, n_nodes, capacity))
+
+  _var_max = Vector{uEltype}(undef, n_variables*n_nodes^2*capacity)
+  var_max  = unsafe_wrap(Array, pointer(_var_max), (n_variables, n_nodes, n_nodes, capacity))
+
+  _alpha = fill(nan_uEltype, n_variables * n_nodes * n_nodes * capacity)
+  alpha = unsafe_wrap(Array, pointer(_alpha), (n_variables, n_nodes, n_nodes, capacity))
+
+  _alpha_pressure = fill(nan_uEltype, n_nodes * n_nodes * capacity)
+  alpha_pressure = unsafe_wrap(Array, pointer(_alpha_pressure), (n_nodes, n_nodes, capacity))
+
+  _alpha_entropy = fill(nan_uEltype, n_nodes * n_nodes * capacity)
+  alpha_entropy = unsafe_wrap(Array, pointer(_alpha_entropy), (n_nodes, n_nodes, capacity))
+
+  _alpha_eff = fill(nan_uEltype, n_variables * n_nodes * n_nodes * capacity)
+  alpha_eff = unsafe_wrap(Array, pointer(_alpha_eff), (n_variables, n_nodes, n_nodes, capacity))
+
+  _alpha_mean = fill(nan_uEltype, n_variables * n_nodes * n_nodes * capacity)
+  alpha_mean = unsafe_wrap(Array, pointer(_alpha_mean), (n_variables, n_nodes, n_nodes, capacity))
+
+  _alpha_mean_pressure = fill(nan_uEltype, n_nodes * n_nodes * capacity)
+  alpha_mean_pressure = unsafe_wrap(Array, pointer(_alpha_mean_pressure), (n_nodes, n_nodes, capacity))
+
+  _alpha_mean_entropy = fill(nan_uEltype, n_nodes * n_nodes * capacity)
+  alpha_mean_entropy = unsafe_wrap(Array, pointer(_alpha_mean_entropy), (n_nodes, n_nodes, capacity))
+
+  return ContainerShockCapturingIndicatorMCL{uEltype}(var_min, var_max, alpha, alpha_pressure, alpha_entropy, alpha_eff, alpha_mean, alpha_mean_pressure, alpha_mean_entropy,
+                                                      _var_min, _var_max, _alpha, _alpha_pressure, _alpha_entropy, _alpha_eff, _alpha_mean, _alpha_mean_pressure, _alpha_mean_entropy)
+end
+
+nvariables(container::ContainerShockCapturingIndicatorMCL) = size(container.var_min, 1)
+nnodes(container::ContainerShockCapturingIndicatorMCL) = size(container.var_min, 2)
+
+# Only one-dimensional `Array`s are `resize!`able in Julia.
+# Hence, we use `Vector`s as internal storage and `resize!`
+# them whenever needed. Then, we reuse the same memory by
+# `unsafe_wrap`ping multi-dimensional `Array`s around the
+# internal storage.
+function Base.resize!(container::ContainerShockCapturingIndicatorMCL, capacity)
+  n_variables = nvariables(container)
+  n_nodes = nnodes(container)
+
+  @unpack _var_min, _var_max = container
+  resize!(_var_min, n_variables * n_nodes * n_nodes * capacity)
+  container.var_min = unsafe_wrap(Array, pointer(_var_min), (n_variables, n_nodes, n_nodes, capacity))
+  resize!(_var_max, n_variables * n_nodes * n_nodes * capacity)
+  container.var_max = unsafe_wrap(Array, pointer(_var_max), (n_variables, n_nodes, n_nodes, capacity))
+
+  @unpack _alpha = container
+  resize!(_alpha, n_variables * n_nodes * n_nodes * capacity)
+  container.alpha = unsafe_wrap(Array, pointer(_alpha), (n_variables, n_nodes, n_nodes, capacity))
+
+  @unpack _alpha_pressure = container
+  resize!(_alpha_pressure, n_nodes * n_nodes * capacity)
+  container.alpha_pressure = unsafe_wrap(Array, pointer(_alpha_pressure), (n_nodes, n_nodes, capacity))
+
+  @unpack _alpha_entropy = container
+  resize!(_alpha_entropy, n_nodes * n_nodes * capacity)
+  container.alpha_entropy = unsafe_wrap(Array, pointer(_alpha_entropy), (n_nodes, n_nodes, capacity))
+
+  @unpack _alpha_eff = container
+  resize!(_alpha_eff, n_variables * n_nodes * n_nodes * capacity)
+  container.alpha_eff = unsafe_wrap(Array, pointer(_alpha_eff), (n_variables, n_nodes, n_nodes, capacity))
+
+  @unpack _alpha_mean = container
+  resize!(_alpha_mean, n_variables * n_nodes * n_nodes * capacity)
+  container.alpha_mean = unsafe_wrap(Array, pointer(_alpha_mean), (n_variables, n_nodes, n_nodes, capacity))
+
+  @unpack _alpha_mean_pressure = container
+  resize!(_alpha_mean_pressure, n_nodes * n_nodes * capacity)
+  container.alpha_mean_pressure = unsafe_wrap(Array, pointer(_alpha_mean_pressure), (n_nodes, n_nodes, capacity))
+
+  @unpack _alpha_mean_entropy = container
+  resize!(_alpha_mean_entropy, n_nodes * n_nodes * capacity)
+  container.alpha_mean_entropy = unsafe_wrap(Array, pointer(_alpha_mean_entropy), (n_nodes, n_nodes, capacity))
+
+  return nothing
+end
+
+mutable struct ContainerBarStates{uEltype<:Real}
+  bar_states1::Array{uEltype, 4}            # [variable, i, j, element]
+  bar_states2::Array{uEltype, 4}            # [variable, i, j, element]
+  lambda1::Array{uEltype, 3}                # [i, j, element]
+  lambda2::Array{uEltype, 3}
+  normal_direction_xi::Array{uEltype, 4}    # [index, i, j, elements]
+  normal_direction_eta::Array{uEltype, 4}   # [index, i, j, elements]
+  # internal `resize!`able storage
+  _bar_states1::Vector{uEltype}
+  _bar_states2::Vector{uEltype}
+  _lambda1::Vector{uEltype}
+  _lambda2::Vector{uEltype}
+  _normal_direction_xi::Vector{uEltype}
+  _normal_direction_eta::Vector{uEltype}
+end
+
+function ContainerBarStates{uEltype}(capacity::Integer, n_variables, n_nodes) where uEltype<:Real
+  nan_uEltype = convert(uEltype, NaN)
+
+  # Initialize fields with defaults
+  _bar_states1 = fill(nan_uEltype, n_variables * (n_nodes+1) * n_nodes * capacity)
+  bar_states1 = unsafe_wrap(Array, pointer(_bar_states1), (n_variables, n_nodes+1, n_nodes, capacity))
+  _bar_states2 = fill(nan_uEltype, n_variables * n_nodes * (n_nodes+1) * capacity)
+  bar_states2 = unsafe_wrap(Array, pointer(_bar_states2), (n_variables, n_nodes, n_nodes+1, capacity))
+
+  _lambda1 = fill(nan_uEltype, (n_nodes+1) * n_nodes * capacity)
+  lambda1 = unsafe_wrap(Array, pointer(_lambda1), (n_nodes+1, n_nodes, capacity))
+  _lambda2 = fill(nan_uEltype, n_nodes * (n_nodes+1) * capacity)
+  lambda2 = unsafe_wrap(Array, pointer(_lambda2), (n_nodes, n_nodes+1, capacity))
+
+  _normal_direction_xi = fill(nan_uEltype, (n_variables - 2) * (n_nodes - 1) * n_nodes * capacity)
+  normal_direction_xi = unsafe_wrap(Array, pointer(_normal_direction_xi),
+                                         (n_variables - 2, n_nodes - 1, n_nodes, capacity))
+
+  _normal_direction_eta = fill(nan_uEltype, (n_variables - 2) * n_nodes * (n_nodes - 1) * capacity)
+  normal_direction_eta = unsafe_wrap(Array, pointer(_normal_direction_eta),
+                                        (n_variables - 2, n_nodes, n_nodes - 1, capacity))
+
+  return ContainerBarStates{uEltype}(bar_states1, bar_states2, lambda1, lambda2,
+                                     normal_direction_xi, normal_direction_eta,
+                                     _bar_states1, _bar_states2, _lambda1, _lambda2,
+                                     _normal_direction_xi, _normal_direction_eta)
+end
+
+nvariables(container::ContainerBarStates) = size(container.bar_states1, 1)
+nnodes(container::ContainerBarStates) = size(container.bar_states1, 3)
+
+# Only one-dimensional `Array`s are `resize!`able in Julia.
+# Hence, we use `Vector`s as internal storage and `resize!`
+# them whenever needed. Then, we reuse the same memory by
+# `unsafe_wrap`ping multi-dimensional `Array`s around the
+# internal storage.
+function Base.resize!(container::ContainerBarStates, capacity)
+  n_variables = nvariables(container)
+  n_nodes = nnodes(container)
+
+  @unpack _bar_states1, _bar_states2 = container
+  resize!(_bar_states1, n_variables * (n_nodes+1) * n_nodes * capacity)
+  container.bar_states1 = unsafe_wrap(Array, pointer(_bar_states1), (n_variables, n_nodes+1, n_nodes, capacity))
+  resize!(_bar_states2, n_variables * n_nodes * (n_nodes+1) * capacity)
+  container.bar_states2 = unsafe_wrap(Array, pointer(_bar_states2), (n_variables, n_nodes, n_nodes+1, capacity))
+
+  @unpack _lambda1, _lambda2 = container
+  resize!(_lambda1, (n_nodes+1) * n_nodes * capacity)
+  container.lambda1 = unsafe_wrap(Array, pointer(_lambda1), (n_nodes+1, n_nodes, capacity))
+  resize!(_lambda2, n_nodes * (n_nodes+1) * capacity)
+  container.lambda2 = unsafe_wrap(Array, pointer(_lambda2), (n_nodes, n_nodes+1, capacity))
+
+  @unpack _normal_direction_xi, _normal_direction_eta = container
+  resize!(_normal_direction_xi, (n_variables - 2) * (n_nodes - 1) * n_nodes * capacity)
+  container.normal_direction_xi = unsafe_wrap(Array, pointer(_normal_direction_xi),
+                              (n_variables-2, n_nodes-1, n_nodes, capacity))
+  resize!(_normal_direction_eta, (n_variables - 2) * n_nodes * (n_nodes - 1) * capacity)
+  container.normal_direction_eta = unsafe_wrap(Array, pointer(_normal_direction_eta),
+                              (n_variables-2, n_nodes, n_nodes-1, capacity))
+
+  return nothing
+end
 
 
 end # @muladd

@@ -9,8 +9,8 @@
 # It constructs the basic `cache` used throughout the simulation to compute
 # the RHS etc.
 function create_cache(mesh::P4estMesh, equations::AbstractEquations, dg::DG, ::Any, ::Type{uEltype}) where {uEltype<:Real}
-  # Make sure to balance the p4est before creating any containers
-  # in case someone has tampered with the p4est after creating the mesh
+  # Make sure to balance the `p4est` before creating any containers
+  # in case someone has tampered with the `p4est` after creating the mesh
   balance!(mesh)
 
   elements   = init_elements(mesh, equations, dg.basis, uEltype)
@@ -48,6 +48,7 @@ end
 include("containers.jl")
 include("dg_2d.jl")
 include("dg_3d.jl")
+include("dg_parallel.jl")
 
 
 end # @muladd

@@ -83,6 +83,7 @@ end
   return (i1, i2)
 end
 
+# We pass the `surface_integral` argument solely for dispatch
 function prolong2interfaces!(cache, u,
                              mesh::P4estMesh{3},
                              equations, surface_integral, dg::DG)
@@ -226,7 +227,7 @@ end
 # Inlined function for interface flux computation for conservative flux terms
 @inline function calc_interface_flux!(surface_flux_values,
                                       mesh::P4estMesh{3},
-                                      nonconservative_terms::Val{false}, equations,
+                                      nonconservative_terms::False, equations,
                                       surface_integral, dg::DG, cache,
                                       interface_index, normal_direction,
                                       primary_i_node_index, primary_j_node_index,
@@ -251,7 +252,7 @@ end
 # Inlined function for interface flux computation for flux + nonconservative terms
 @inline function calc_interface_flux!(surface_flux_values,
                                       mesh::P4estMesh{3},
-                                      nonconservative_terms::Val{true}, equations,
+                                      nonconservative_terms::True, equations,
                                       surface_integral, dg::DG, cache,
                                       interface_index, normal_direction,
                                       primary_i_node_index, primary_j_node_index,
@@ -545,7 +546,7 @@ end
 # Inlined version of the mortar flux computation on small elements for conservation fluxes
 @inline function calc_mortar_flux!(fstar,
                                    mesh::P4estMesh{3},
-                                   nonconservative_terms::Val{false}, equations,
+                                   nonconservative_terms::False, equations,
                                    surface_integral, dg::DG, cache,
                                    mortar_index, position_index, normal_direction,
                                    i_node_index, j_node_index)
@@ -564,7 +565,7 @@ end
 # with nonconservative terms
 @inline function calc_mortar_flux!(fstar,
                                    mesh::P4estMesh{3},
-                                   nonconservative_terms::Val{true}, equations,
+                                   nonconservative_terms::True, equations,
                                    surface_integral, dg::DG, cache,
                                    mortar_index, position_index, normal_direction,
                                    i_node_index, j_node_index)
@@ -678,28 +679,38 @@ function calc_surface_integral!(du, u,
   @unpack boundary_interpolation = dg.basis
   @unpack surface_flux_values = cache.elements
 
-  # Note that all fluxes have been computed with outward-pointing normal vectors
+  # Note that all fluxes have been computed with outward-pointing normal vectors.
+  # Access the factors only once before beginning the loop to increase performance.
+  # We also use explicit assignments instead of `+=` to let `@muladd` turn these
+  # into FMAs (see comment at the top of the file).
+  factor_1 = boundary_interpolation[1,          1]
+  factor_2 = boundary_interpolation[nnodes(dg), 2]
   @threaded for element in eachelement(dg, cache)
     for m in eachnode(dg), l in eachnode(dg)
       for v in eachvariable(equations)
         # surface at -x
-        du[v, 1,          l, m, element] += (surface_flux_values[v, l, m, 1, element]
-                                             * boundary_interpolation[1, 1])
+        du[v, 1,          l, m, element] = (
+          du[v, 1,          l, m, element] + surface_flux_values[v, l, m, 1, element] * factor_1)
+
         # surface at +x
-        du[v, nnodes(dg), l, m, element] += (surface_flux_values[v, l, m, 2, element]
-                                             * boundary_interpolation[nnodes(dg), 2])
+        du[v, nnodes(dg), l, m, element] = (
+          du[v, nnodes(dg), l, m, element] + surface_flux_values[v, l, m, 2, element] * factor_2)
+
         # surface at -y
-        du[v, l, 1,          m, element] += (surface_flux_values[v, l, m, 3, element]
-                                             * boundary_interpolation[1, 1])
+        du[v, l, 1,          m, element] = (
+          du[v, l, 1,          m, element] + surface_flux_values[v, l, m, 3, element] * factor_1)
+
         # surface at +y
-        du[v, l, nnodes(dg), m, element] += (surface_flux_values[v, l, m, 4, element]
-                                             * boundary_interpolation[nnodes(dg), 2])
+        du[v, l, nnodes(dg), m, element] = (
+          du[v, l, nnodes(dg), m, element] + surface_flux_values[v, l, m, 4, element] * factor_2)
+
         # surface at -z
-        du[v, l, m, 1,          element] += (surface_flux_values[v, l, m, 5, element]
-                                             * boundary_interpolation[1,          1])
+        du[v, l, m, 1,          element] = (
+          du[v, l, m, 1,          element] + surface_flux_values[v, l, m, 5, element] * factor_1)
+
         # surface at +z
-        du[v, l, m, nnodes(dg), element] += (surface_flux_values[v, l, m, 6, element]
-                                             * boundary_interpolation[nnodes(dg), 2])
+        du[v, l, m, nnodes(dg), element] = (
+          du[v, l, m, nnodes(dg), element] + surface_flux_values[v, l, m, 6, element] * factor_2)
       end
     end
   end

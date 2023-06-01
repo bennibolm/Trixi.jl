@@ -1,7 +1,7 @@
 
 using Trixi, OrdinaryDiffEq
 
-dg = DGMulti(polydeg = 3, element_type = Tri(),
+dg = DGMulti(polydeg = 3, element_type = Tri(), approximation_type = Polynomial(),
              surface_integral = SurfaceIntegralWeakForm(FluxHLL()),
              volume_integral = VolumeIntegralWeakForm())
 
@@ -10,8 +10,7 @@ initial_condition = initial_condition_convergence_test
 source_terms = source_terms_convergence_test
 
 cells_per_dimension = (4, 4)
-vertex_coordinates, EToV = StartUpDG.uniform_mesh(dg.basis.elementType, cells_per_dimension...)
-mesh = VertexMappedMesh(vertex_coordinates, EToV, dg, is_periodic=(true,true))
+mesh = DGMultiMesh(dg, cells_per_dimension, periodicity=true)
 semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, dg,
                                     source_terms = source_terms)
 

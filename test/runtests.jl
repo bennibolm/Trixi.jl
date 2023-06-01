@@ -15,17 +15,24 @@ const TRIXI_NTHREADS   = clamp(Sys.CPU_THREADS, 2, 3)
     # cf. https://github.com/JuliaParallel/MPI.jl/pull/391
     @test true
 
-    # Based on `runtests.jl` from `MPI.jl` and `PencilArrays.jl`
-    # On Julia v1.5 and before, precompilation is strictly serial and any attempt
-    # to use it in parallel will result in race conditions and probably errors.
-    # Hence, the additional flag `--compiled-modules=no` is required for Julia
-    # versions older than v1.6.
-    mpiexec() do cmd
-      run(`$cmd -n $TRIXI_MPI_NPROCS $(Base.julia_cmd()) --threads=1 --check-bounds=yes $(abspath("test_mpi.jl"))`)
+    # There are spurious test failures of Trixi.jl with MPI on Windows, see
+    # https://github.com/trixi-framework/Trixi.jl/issues/901
+    # To reduce their impact, we do not test MPI with coverage on Windows.
+    # This reduces the chance to hit a spurious test failure by one half.
+    # In addition, it looks like the Linux GitHub runners run out of memory during the 3D tests
+    # with coverage, so we currently do not test MPI with coverage on Linux. For more details,
+    # see the discussion at https://github.com/trixi-framework/Trixi.jl/pull/1062#issuecomment-1035901020
+    cmd = string(Base.julia_cmd())
+    coverage = occursin("--code-coverage", cmd) && !occursin("--code-coverage=none", cmd)
+    if !(coverage && Sys.iswindows()) && !(coverage && Sys.islinux())
+      # We provide a `--heap-size-hint` to avoid/reduce out-of-memory errors during CI testing
+      mpiexec() do cmd
+        run(`$cmd -n $TRIXI_MPI_NPROCS $(Base.julia_cmd()) --threads=1 --check-bounds=yes --heap-size-hint=1G $(abspath("test_mpi.jl"))`)
+      end
     end
   end
 
-  @time if TRIXI_TEST == "all" || TRIXI_TEST == "threaded"
+  @time if TRIXI_TEST == "all" || TRIXI_TEST == "threaded" || TRIXI_TEST == "threaded_legacy"
     # Do a dummy `@test true`:
     # If the process errors out the testset would error out as well,
     # cf. https://github.com/JuliaParallel/MPI.jl/pull/391
@@ -75,8 +82,15 @@ const TRIXI_NTHREADS   = clamp(Sys.CPU_THREADS, 2, 3)
 
   @time if TRIXI_TEST == "all" || TRIXI_TEST == "unstructured_dgmulti"
     include("test_unstructured_2d.jl")
+    include("test_dgmulti_1d.jl")
     include("test_dgmulti_2d.jl")
     include("test_dgmulti_3d.jl")
+  end
+
+  @time if TRIXI_TEST == "all" || TRIXI_TEST == "parabolic"
+    include("test_parabolic_1d.jl")
+    include("test_parabolic_2d.jl")
+    include("test_parabolic_3d.jl")
   end
 
   @time if TRIXI_TEST == "all" || TRIXI_TEST == "misc_part1"
@@ -86,6 +100,14 @@ const TRIXI_NTHREADS   = clamp(Sys.CPU_THREADS, 2, 3)
 
   @time if TRIXI_TEST == "all" || TRIXI_TEST == "misc_part2"
     include("test_special_elixirs.jl")
+  end
+
+  @time if TRIXI_TEST == "all" || TRIXI_TEST == "performance_specializations_part1"
+    include("test_performance_specializations_2d.jl")
+  end
+
+  @time if TRIXI_TEST == "all" || TRIXI_TEST == "performance_specializations_part2"
+    include("test_performance_specializations_3d.jl")
   end
 
   @time if TRIXI_TEST == "all" || TRIXI_TEST == "paper_self_gravitating_gas_dynamics"

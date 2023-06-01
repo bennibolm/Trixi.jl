@@ -34,10 +34,9 @@ solver = DGMulti(polydeg = 3, element_type = Hex(), approximation_type = Polynom
                 volume_integral = VolumeIntegralFluxDifferencing(volume_flux))
 
 cells_per_dimension = (8, 8, 8)
-vertex_coordinates, EToV = StartUpDG.uniform_mesh(solver.basis.elementType, cells_per_dimension...)
-vertex_coordinates = map(x -> pi * x, vertex_coordinates) # remap the domain to [-pi, pi]^3
-mesh = VertexMappedMesh(vertex_coordinates, EToV, solver; is_periodic=(true, true, true))
-
+mesh = DGMultiMesh(solver, cells_per_dimension,
+                   coordinates_min=(-pi, -pi, -pi), coordinates_max=(pi, pi, pi),
+                   periodicity=true)
 
 semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, solver)
 
@@ -62,6 +61,6 @@ callbacks = CallbackSet(summary_callback,
 ###############################################################################
 # run the simulation
 
-sol = solve(ode, RDPK3SpFSAL49(), abstol = 1.0e-7, reltol = 1.0e-7,
-            save_everystep = false, callback = callbacks)
+sol = solve(ode, RDPK3SpFSAL49(); abstol = 1.0e-7, reltol = 1.0e-7,
+            ode_default_options()..., callback = callbacks)
 summary_callback() # print the timer summary

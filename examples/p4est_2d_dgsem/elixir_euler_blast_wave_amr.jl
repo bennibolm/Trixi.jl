@@ -1,7 +1,7 @@
 
+using Downloads: download
 using OrdinaryDiffEq
 using Trixi
-using Plots
 
 ###############################################################################
 # semidiscretization of the compressible Euler equations
@@ -56,7 +56,7 @@ isfile(mesh_file) || download("https://gist.githubusercontent.com/efaulhaber/a07
 
 mesh = P4estMesh{2}(mesh_file, polydeg=3, initial_refinement_level=1)
 
-semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, solver, 
+semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, solver,
                                     boundary_conditions=Dict(
                                       :all => BoundaryConditionDirichlet(initial_condition)
                                     ))

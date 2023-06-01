@@ -9,6 +9,12 @@
 @inline nvariables(::AbstractEquations{NDIMS, NVARS}) where {NDIMS, NVARS} = NVARS
 
 # TODO: Taal performance, 1:NVARS vs. Base.OneTo(NVARS) vs. SOneTo(NVARS)
+"""
+    eachvariable(equations::AbstractEquations)
+
+Return an iterator over the indices that specify the location in relevant data structures
+for the variables in `equations`. In particular, not the variables themselves are returned.
+"""
 @inline eachvariable(equations::AbstractEquations) = Base.OneTo(nvariables(equations))
 
 """
@@ -85,6 +91,18 @@ for the corresponding set of governing `equations`.
 """
 function flux end
 
+"""
+    flux(u, normal_direction::AbstractVector, equations::AbstractEquations{1})
+
+Enables calling `flux` with a non-integer argument `normal_direction` for one-dimensional
+equations. Returns the value of `flux(u, 1, equations)` scaled by `normal_direction[1]`.
+"""
+@inline function flux(u, normal_direction::AbstractVector, equations::AbstractEquations{1})
+  # Call `flux` with `orientation::Int = 1` for dispatch. Note that the actual
+  # `orientation` argument is ignored.
+  return normal_direction[1] * flux(u, 1, equations)
+end
+
 
 """
     rotate_to_x(u, normal, equations)
@@ -153,7 +171,8 @@ end
 @inline function (boundary_condition::BoundaryConditionDirichlet)(u_inner,
                                                                   normal_direction::AbstractVector,
                                                                   x, t,
-                                                                  surface_flux_function, equations)
+                                                                  surface_flux_function,
+                                                                  equations)
   # get the external value of the solution
   u_boundary = boundary_condition.boundary_value_function(x, t, equations)
 
@@ -164,6 +183,61 @@ end
 end
 
 
+"""
+    BoundaryConditionCharacteristic(outer_boundary_value_function)
+
+"""
+struct BoundaryConditionCharacteristic{B,C}
+  outer_boundary_value_function::B
+  boundary_value_function::C
+end
+
+function BoundaryConditionCharacteristic(outer_boundary_value_function)
+  BoundaryConditionCharacteristic{typeof(outer_boundary_value_function), typeof(characteristic_boundary_value_function)}(
+    outer_boundary_value_function, characteristic_boundary_value_function)
+end
+
+
+# Dirichlet-type boundary condition for use with TreeMesh or StructuredMesh
+@inline function (boundary_condition::BoundaryConditionCharacteristic)(u_inner, orientation_or_normal,
+                                                                       direction,
+                                                                       x, t,
+                                                                       surface_flux_function, equations)
+  u_boundary = characteristic_boundary_value_function(boundary_condition.outer_boundary_value_function,
+                                                      u_inner, orientation_or_normal, direction, x , t, equations)
+
+  # Calculate boundary flux
+  if iseven(direction) # u_inner is "left" of boundary, u_boundary is "right" of boundary
+    flux = surface_flux_function(u_inner, u_boundary, orientation_or_normal, equations)
+  else # u_boundary is "left" of boundary, u_inner is "right" of boundary
+    flux = surface_flux_function(u_boundary, u_inner, orientation_or_normal, equations)
+  end
+
+  return flux
+end
+
+
+
+# operator types used for dispatch on parabolic boundary fluxes
+struct Gradient end
+struct Divergence end
+
+"""
+    BoundaryConditionNeumann(boundary_normal_flux_function)
+
+Similar to `BoundaryConditionDirichlet`, but creates a Neumann boundary condition for parabolic
+equations that uses the function `boundary_normal_flux_function` to specify the values of the normal
+flux at the boundary.
+The passed boundary value function will be called with the same arguments as an initial condition function is called, i.e., as
+```julia
+boundary_normal_flux_function(x, t, equations)
+```
+where `x` specifies the coordinates, `t` is the current time, and `equation` is the corresponding system of equations.
+"""
+struct BoundaryConditionNeumann{B}
+  boundary_normal_flux_function::B
+end
+
 # set sensible default values that may be overwritten by specific equations
 """
     have_nonconservative_terms(equations)
@@ -173,10 +247,10 @@ with or without nonconservative terms. Classical conservation laws such as the
 [`CompressibleEulerEquations2D`](@ref) do not have nonconservative terms. The
 [`ShallowWaterEquations2D`](@ref) with non-constant bottom topography are an
 example of equations with nonconservative terms.
-The return value will be `Val(true)` or `Val(false)` to allow dispatching on the return type.
+The return value will be `True()` or `False()` to allow dispatching on the return type.
 """
-have_nonconservative_terms(::AbstractEquations) = Val(false)
-have_constant_speed(::AbstractEquations) = Val(false)
+have_nonconservative_terms(::AbstractEquations) = False()
+have_constant_speed(::AbstractEquations) = False()
 
 default_analysis_errors(::AbstractEquations)     = (:l2_error, :linf_error)
 """
@@ -194,15 +268,15 @@ Return the conserved variables `u`. While this function is as trivial as `identi
 it is also as useful.
 """
 @inline cons2cons(u, ::AbstractEquations) = u
-function cons2prim#=(u, ::AbstractEquations)=# end
+
 @inline Base.first(u, ::AbstractEquations) = first(u)
 
 """
     cons2prim(u, equations)
 
 Convert the conserved variables `u` to the primitive variables for a given set of
-`equations`. `u` is a vector type of the correct length `nvariables(equations)`. 
-Notice the function doesn't include any error checks for the purpose of efficiency, 
+`equations`. `u` is a vector type of the correct length `nvariables(equations)`.
+Notice the function doesn't include any error checks for the purpose of efficiency,
 so please make sure your input is correct.
 The inverse conversion is performed by [`prim2cons`](@ref).
 """
@@ -212,8 +286,8 @@ function cons2prim end
     prim2cons(u, equations)
 
 Convert the primitive variables `u` to the conserved variables for a given set of
-`equations`. `u` is a vector type of the correct length `nvariables(equations)`. 
-Notice the function doesn't include any error checks for the purpose of efficiency, 
+`equations`. `u` is a vector type of the correct length `nvariables(equations)`.
+Notice the function doesn't include any error checks for the purpose of efficiency,
 so please make sure your input is correct.
 The inverse conversion is performed by [`cons2prim`](@ref).
 """
@@ -224,6 +298,9 @@ function prim2cons end
 
 Return the chosen entropy of the conserved variables `u` for a given set of
 `equations`.
+
+`u` is a vector of the conserved variables at a single node, i.e., a vector
+of the correct length `nvariables(equations)`.
 """
 function entropy end
 
@@ -231,10 +308,11 @@ function entropy end
     cons2entropy(u, equations)
 
 Convert the conserved variables `u` to the entropy variables for a given set of
-`equations` with chosen standard [`entropy`](@ref). 
+`equations` with chosen standard [`entropy`](@ref).
+
 `u` is a vector type of the correct length `nvariables(equations)`.
-Notice the function doesn't include any error checks for the purpose of efficiency, 
-so please make sure your input is correct. 
+Notice the function doesn't include any error checks for the purpose of efficiency,
+so please make sure your input is correct.
 The inverse conversion is performed by [`entropy2cons`](@ref).
 """
 function cons2entropy end
@@ -243,14 +321,46 @@ function cons2entropy end
     entropy2cons(w, equations)
 
 Convert the entropy variables `w` based on a standard [`entropy`](@ref) to the
-conserved variables for a given set of `equations`. 
-`u` is a vector type of the correct length `nvariables(equations)`. 
-Notice the function doesn't include any error checks for the purpose of efficiency, 
+conserved variables for a given set of `equations`.
+`u` is a vector type of the correct length `nvariables(equations)`.
+Notice the function doesn't include any error checks for the purpose of efficiency,
 so please make sure your input is correct.
 The inverse conversion is performed by [`cons2entropy`](@ref).
 """
 function entropy2cons end
 
+"""
+    energy_total(u, equations)
+
+Return the total energy of the conserved variables `u` for a given set of
+`equations`, e.g., the [`CompressibleEulerEquations2D`](@ref).
+
+`u` is a vector of the conserved variables at a single node, i.e., a vector
+of the correct length `nvariables(equations)`.
+"""
+function energy_total end
+
+"""
+    energy_kinetic(u, equations)
+
+Return the kinetic energy of the conserved variables `u` for a given set of
+`equations`, e.g., the [`CompressibleEulerEquations2D`](@ref).
+
+`u` is a vector of the conserved variables at a single node, i.e., a vector
+of the correct length `nvariables(equations)`.
+"""
+function energy_kinetic end
+
+"""
+    energy_internal(u, equations)
+
+Return the internal energy of the conserved variables `u` for a given set of
+`equations`, e.g., the [`CompressibleEulerEquations2D`](@ref).
+
+`u` is a vector of the conserved variables at a single node, i.e., a vector
+of the correct length `nvariables(equations)`.
+"""
+function energy_internal end
 
 ####################################################################################################
 # Include files with actual implementations for different systems of equations.
@@ -270,7 +380,10 @@ include("inviscid_burgers_1d.jl")
 
 # Shallow water equations
 abstract type AbstractShallowWaterEquations{NDIMS, NVARS} <: AbstractEquations{NDIMS, NVARS} end
+include("shallow_water_1d.jl")
 include("shallow_water_2d.jl")
+include("shallow_water_two_layer_1d.jl")
+include("shallow_water_two_layer_2d.jl")
 
 # CompressibleEulerEquations
 abstract type AbstractCompressibleEulerEquations{NDIMS, NVARS} <: AbstractEquations{NDIMS, NVARS} end
@@ -285,6 +398,13 @@ include("compressible_euler_multicomponent_2d.jl")
 
 # Retrieve number of components from equation instance for the multicomponent case
 @inline ncomponents(::AbstractCompressibleEulerMulticomponentEquations{NDIMS, NVARS, NCOMP}) where {NDIMS, NVARS, NCOMP} = NCOMP
+"""
+    eachcomponent(equations::AbstractCompressibleEulerMulticomponentEquations)
+
+Return an iterator over the indices that specify the location in relevant data structures
+for the components in `AbstractCompressibleEulerMulticomponentEquations`.
+In particular, not the components themselves are returned.
+"""
 @inline eachcomponent(equations::AbstractCompressibleEulerMulticomponentEquations) = Base.OneTo(ncomponents(equations))
 
 # Ideal MHD
@@ -300,6 +420,13 @@ include("ideal_glm_mhd_multicomponent_2d.jl")
 
 # Retrieve number of components from equation instance for the multicomponent case
 @inline ncomponents(::AbstractIdealGlmMhdMulticomponentEquations{NDIMS, NVARS, NCOMP}) where {NDIMS, NVARS, NCOMP} = NCOMP
+"""
+    eachcomponent(equations::AbstractIdealGlmMhdMulticomponentEquations)
+
+Return an iterator over the indices that specify the location in relevant data structures
+for the components in `AbstractIdealGlmMhdMulticomponentEquations`.
+In particular, not the components themselves are returned.
+"""
 @inline eachcomponent(equations::AbstractIdealGlmMhdMulticomponentEquations) = Base.OneTo(ncomponents(equations))
 
 # Diffusion equation: first order hyperbolic system
@@ -317,5 +444,10 @@ include("lattice_boltzmann_3d.jl")
 abstract type AbstractAcousticPerturbationEquations{NDIMS, NVARS} <: AbstractEquations{NDIMS, NVARS} end
 include("acoustic_perturbation_2d.jl")
 
+# Linearized Euler equations
+abstract type AbstractLinearizedEulerEquations{NDIMS, NVARS} <: AbstractEquations{NDIMS, NVARS} end
+include("linearized_euler_2d.jl")
+
+abstract type AbstractEquationsParabolic{NDIMS, NVARS} <: AbstractEquations{NDIMS, NVARS} end
 
 end # @muladd

@@ -9,6 +9,9 @@
     LobattoLegendreBasis([RealT=Float64,] polydeg::Integer)
 
 Create a nodal Lobatto-Legendre basis for polynomials of degree `polydeg`.
+
+For the special case `polydeg=0` the DG method reduces to a finite volume method.
+Therefore, this function sets the center point of the cell as single node.
 """
 struct LobattoLegendreBasis{RealT<:Real, NNODES,
                             VectorT<:AbstractVector{RealT},
@@ -100,6 +103,13 @@ end
 
 @inline nnodes(basis::LobattoLegendreBasis{RealT, NNODES}) where {RealT, NNODES} = NNODES
 
+"""
+    eachnode(basis::LobattoLegendreBasis)
+
+Return an iterator over the indices that specify the location in relevant data structures
+for the nodes in `basis`. 
+In particular, not the nodes themselves are returned.
+"""
 @inline eachnode(basis::LobattoLegendreBasis) = Base.OneTo(nnodes(basis))
 
 @inline polydeg(basis::LobattoLegendreBasis) = nnodes(basis) - 1
@@ -266,6 +276,13 @@ end
 @inline Base.real(analyzer::LobattoLegendreAnalyzer{RealT}) where {RealT} = RealT
 
 @inline nnodes(analyzer::LobattoLegendreAnalyzer{RealT, NNODES}) where {RealT, NNODES} = NNODES
+"""
+    eachnode(analyzer::LobattoLegendreAnalyzer)
+
+Return an iterator over the indices that specify the location in relevant data structures
+for the nodes in `analyzer`. 
+In particular, not the nodes themselves are returned.
+"""
 @inline eachnode(analyzer::LobattoLegendreAnalyzer) = Base.OneTo(nnodes(analyzer))
 
 @inline polydeg(analyzer::LobattoLegendreAnalyzer) = nnodes(analyzer) - 1
@@ -489,6 +506,13 @@ function gauss_lobatto_nodes_weights(n_nodes::Integer)
   # Initialize output
   nodes = zeros(n_nodes)
   weights = zeros(n_nodes)
+
+  # Special case for polynomial degree zero (first order finite volume)
+  if n_nodes == 1
+    nodes[1] = 0
+    weights[1] = 2
+    return nodes, weights
+  end
 
   # Get polynomial degree for convenience
   N = n_nodes - 1

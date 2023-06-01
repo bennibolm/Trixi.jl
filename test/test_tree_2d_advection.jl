@@ -5,15 +5,16 @@ using Trixi
 
 include("test_trixi.jl")
 
-# pathof(Trixi) returns /path/to/Trixi/src/Trixi.jl, dirname gives the parent directory
-EXAMPLES_DIR = joinpath(pathof(Trixi) |> dirname |> dirname, "examples", "tree_2d_dgsem")
+EXAMPLES_DIR = pkgdir(Trixi, "examples", "tree_2d_dgsem")
 
 @testset "Linear scalar advection" begin
   @trixi_testset "elixir_advection_basic.jl" begin
     @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_advection_basic.jl"),
       # Expected errors are exactly the same as in the parallel test!
       l2   = [8.311947673061856e-6],
-      linf = [6.627000273229378e-5])
+      linf = [6.627000273229378e-5],
+      # Let the small basic test run to the end
+      coverage_override = (maxiters=10^5,))
   end
 
   @trixi_testset "elixir_advection_extended.jl with polydeg=1" begin
@@ -35,26 +36,39 @@ EXAMPLES_DIR = joinpath(pathof(Trixi) |> dirname |> dirname, "examples", "tree_2
       # Expected errors are exactly the same as in the parallel test!
       l2   = [0.0015188466707237375],
       linf = [0.008446655719187679])
+
+    # Ensure that we do not have excessive memory allocations
+    # (e.g., from type instabilities)
+    let
+      t = sol.t[end]
+      u_ode = sol.u[end]
+      du_ode = similar(u_ode)
+      @test (@allocated Trixi.rhs!(du_ode, u_ode, semi, t)) < 1000
+    end
   end
 
   @trixi_testset "elixir_advection_amr.jl" begin
     @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_advection_amr.jl"),
       # Expected errors are exactly the same as in the parallel test!
       l2   = [4.913300828257469e-5],
-      linf = [0.00045263895394385967])
+      linf = [0.00045263895394385967],
+      # Let this test run to the end to cover some AMR code
+      coverage_override = (maxiters=10^5,))
   end
 
   @trixi_testset "elixir_advection_amr_nonperiodic.jl" begin
     @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_advection_amr_nonperiodic.jl"),
       # Expected errors are exactly the same as in the parallel test!
       l2   = [3.2207388565869075e-5],
-      linf = [0.0007508059772436404])
+      linf = [0.0007508059772436404],
+      coverage_override = (maxiters=6,))
   end
 
   @trixi_testset "elixir_advection_amr_solution_independent.jl" begin
     @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_advection_amr_solution_independent.jl"),
       l2   = [4.949660644033807e-5],
-      linf = [0.0004867846262313763])
+      linf = [0.0004867846262313763],
+      coverage_override = (maxiters=6,))
   end
 
   @trixi_testset "elixir_advection_amr_visualization.jl" begin
@@ -68,7 +82,8 @@ EXAMPLES_DIR = joinpath(pathof(Trixi) |> dirname |> dirname, "examples", "tree_2
 
     @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_advection_amr_visualization.jl"),
       l2   = [0.0007225529919720868],
-      linf = [0.005954447875428925])
+      linf = [0.005954447875428925],
+      coverage_override = (maxiters=6,))
 
     # Restore GKSwstype to previous value (if it was set)
     if !isinteractive()
@@ -83,7 +98,10 @@ EXAMPLES_DIR = joinpath(pathof(Trixi) |> dirname |> dirname, "examples", "tree_2
   @trixi_testset "elixir_advection_timeintegration.jl" begin
     @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_advection_timeintegration.jl"),
       l2   = [2.4976030518356626e-5],
-      linf = [0.0005531580316338533])
+      linf = [0.0005531580316338533],
+      # Let this test terminate by time instead of maxiters to cover some lines
+      # in time_integration/methods_2N.jl
+      coverage_override = (maxiters=10^5, tspan=(0.0, 0.1)))
   end
 
   @trixi_testset "elixir_advection_timeintegration.jl with carpenter_kennedy_erk43" begin

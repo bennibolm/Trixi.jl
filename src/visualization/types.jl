@@ -1,12 +1,12 @@
-# Convenience type to allow dispatch on solution objects that were created by Trixi
+# Convenience type to allow dispatch on solution objects that were created by Trixi.jl
 #
-# This is a union of a Trixi-specific DiffEqBase.ODESolution and of Trixi's own
+# This is a union of a Trixi.jl-specific SciMLBase.ODESolution and of Trixi.jl's own
 # TimeIntegratorSolution.
 #
 # Note: This is an experimental feature and may be changed in future releases without notice.
 const TrixiODESolution = Union{ODESolution{T, N, uType, uType2, DType, tType, rateType, P} where
     {T, N, uType, uType2, DType, tType, rateType, P<:ODEProblem{uType_, tType_, isinplace, P_, F_} where
-     {uType_, tType_, isinplace, P_<:AbstractSemidiscretization, F_<:ODEFunction{true, typeof(rhs!)}}}, TimeIntegratorSolution}
+     {uType_, tType_, isinplace, P_<:AbstractSemidiscretization, F_}}, TimeIntegratorSolution}
 
 # By default, Julia/LLVM does not use fused multiply-add operations (FMAs).
 # Since these FMAs can increase the performance of many numerical algorithms,
@@ -226,7 +226,6 @@ julia> plot(pd["scalar"]) # To plot only a single variable
 julia> plot!(getmesh(pd)) # To add grid lines to the plot
 ```
 """
-
 PlotData2D(u_ode, semi; kwargs...) = PlotData2D(wrap_array_native(u_ode, semi),
                                                 mesh_equations_solver_cache(semi)...;
                                                 kwargs...)
@@ -277,7 +276,7 @@ end
     PlotData2D(sol; kwargs...)
 
 Create a `PlotData2D` object from a solution object created by either `OrdinaryDiffEq.solve!` (which
-returns a `DiffEqBase.ODESolution`) or Trixi's own `solve!` (which returns a
+returns a `SciMLBase.ODESolution`) or Trixi.jl's own `solve!` (which returns a
 `TimeIntegratorSolution`).
 
 !!! warning "Experimental implementation"
@@ -317,7 +316,11 @@ function PlotData2D(u::StructArray, mesh, equations, dg::DGMulti, cache;
   solution_variables_ = digest_solution_variables(equations, solution_variables)
   variable_names = SVector(varnames(solution_variables_, equations))
 
-  num_plotting_points = size(Vp, 1)
+  if Vp isa UniformScaling
+    num_plotting_points = size(u, 1)
+  else
+    num_plotting_points = size(Vp, 1)
+  end
   nvars = nvariables(equations)
   uEltype = eltype(first(u))
   u_plot = StructArray{SVector{nvars, uEltype}}(ntuple(_->zeros(uEltype, num_plotting_points, md.num_elements), nvars))
@@ -403,6 +406,12 @@ struct ScalarData{T}
   data::T
 end
 
+"""
+    ScalarPlotData2D(u, semi::AbstractSemidiscretization; kwargs...)
+
+Returns an `PlotData2DTriangulated` object which is used to visualize a single scalar field.
+`u` should be an array whose entries correspond to values of the scalar field at nodal points.
+"""
 ScalarPlotData2D(u, semi::AbstractSemidiscretization; kwargs...) =
   ScalarPlotData2D(u, mesh_equations_solver_cache(semi)...; kwargs...)
 
@@ -492,7 +501,7 @@ When visualizing data from a two-dimensional simulation, a 1D slice is extracted
 `slice` specifies the axis along which the slice is extracted and may be `:x`, or `:y`.
 The slice position is specified by a `point` that lies on it, which defaults to `(0.0, 0.0)`.
 Both of these values are ignored when visualizing 1D data.
-This applies analogously to three-dimensonal simulations, where `slice` may be `xy:`, `:xz`, or `:yz`.
+This applies analogously to three-dimensional simulations, where `slice` may be `:xy`, `:xz`, or `:yz`.
 
 Another way to visualize 2D/3D data is by creating a plot along a given curve.
 This is done with the keyword argument `curve`. It can be set to a list of 2D/3D points
@@ -520,6 +529,29 @@ function PlotData1D(u, mesh::TreeMesh, equations, solver, cache;
   if ndims(mesh) == 1
     x, data, mesh_vertices_x = get_data_1d(original_nodes, unstructured_data, nvisnodes)
     orientation_x = 1
+
+    # Special care is required for first-order FV approximations since the nodes are the
+    # cell centers and do not contain the boundaries
+    n_nodes = size(unstructured_data, 1)
+    if n_nodes == 1
+      n_visnodes = length(x) ÷ nelements(solver, cache)
+      if n_visnodes != 2
+        throw(ArgumentError("This number of visualization nodes is currently not supported for finite volume approximations."))
+      end
+      left_boundary = mesh.tree.center_level_0[1] - mesh.tree.length_level_0 / 2
+      dx_2 = zero(left_boundary)
+      for i in 1:div(length(x), 2)
+        # Adjust plot nodes so that they are at the boundaries of each element
+        dx_2 = x[2 * i - 1] - left_boundary
+        x[2 * i - 1] -= dx_2
+        x[2 * i    ] += dx_2
+        left_boundary = left_boundary+ 2 * dx_2
+
+        # Adjust mesh plot nodes
+        mesh_vertices_x[i] -= dx_2
+      end
+      mesh_vertices_x[end] += dx_2
+    end
   elseif ndims(mesh) == 2
     if curve !== nothing
       x, data, mesh_vertices_x = unstructured_2d_to_1d_curve(original_nodes, unstructured_data, nvisnodes, curve, mesh, solver, cache)
@@ -553,22 +585,67 @@ function PlotData1D(u, mesh, equations, solver, cache;
   if ndims(mesh) == 1
     x, data, mesh_vertices_x = get_data_1d(original_nodes, unstructured_data, nvisnodes)
     orientation_x = 1
-  else # ndims(mesh) == 2
+  elseif ndims(mesh) == 2
+    # Create a 'PlotData2DTriangulated' object so a triangulation can be used when extracting relevant data.
     pd = PlotData2DTriangulated(u, mesh, equations, solver, cache; solution_variables, nvisnodes)
-    x, data, mesh_vertices_x = unstructured_2d_to_1d_curve(pd, curve, slice, point)
+    x, data, mesh_vertices_x = unstructured_2d_to_1d_curve(pd, curve, slice, point, nvisnodes)
+  else # ndims(mesh) == 3
+    # Extract the information required to create a PlotData1D object.
+    x, data, mesh_vertices_x = unstructured_3d_to_1d_curve(original_nodes, u, curve, slice, point, nvisnodes)
   end
 
   return PlotData1D(x, data, variable_names, mesh_vertices_x,
                     orientation_x)
 end
 
+# Specializes the `PlotData1D` constructor for one-dimensional `DGMulti` solvers.
+function PlotData1D(u, mesh, equations, dg::DGMulti{1}, cache;
+                    solution_variables=nothing)
+
+  solution_variables_ = digest_solution_variables(equations, solution_variables)
+  variable_names = SVector(varnames(solution_variables_, equations))
+
+  orientation_x = 0 # Set 'orientation' to zero on default.
+
+  if u isa StructArray
+    # Convert conserved variables to the given `solution_variables` and set up
+    # plotting coordinates
+    # This uses a "structure of arrays"
+    data = map(x -> vcat(dg.basis.Vp * x, fill(NaN, 1, size(u, 2))),
+              StructArrays.components(solution_variables_.(u, equations)))
+    x = vcat(dg.basis.Vp * mesh.md.x, fill(NaN, 1, size(u, 2)))
+
+    # Here, we ensure that `DGMulti` visualization uses the same data layout and format
+    # as `TreeMesh`. This enables us to reuse existing plot recipes. In particular,
+    # `hcat(data...)` creates a matrix of size `num_plotting_points` by `nvariables(equations)`,
+    # with data on different elements separated by `NaNs`.
+    x_plot = vec(x)
+    data_plot = hcat(vec.(data)...)
+  else
+    # Convert conserved variables to the given `solution_variables` and set up
+    # plotting coordinates
+    # This uses an "array of structures"
+    data_tmp = dg.basis.Vp * solution_variables_.(u, equations)
+    data = vcat(data_tmp, fill(NaN * zero(eltype(data_tmp)), 1, size(u, 2)))
+    x = vcat(dg.basis.Vp * mesh.md.x, fill(NaN, 1, size(u, 2)))
+
+    # Same as above - we create `data_plot` as array of size `num_plotting_points`
+    # by "number of plotting variables".
+    x_plot = vec(x)
+    data_plot = permutedims(reinterpret(reshape, eltype(eltype(data)), vec(data)),
+      (2, 1))
+  end
+
+  return PlotData1D(x_plot, data_plot, variable_names, mesh.md.VX, orientation_x)
+end
 
 """
     PlotData1D(sol; kwargs...)
 
-Create a `PlotData1D` object from a solution object created by either `OrdinaryDiffEq.solve!` (which
-returns a `DiffEqBase.ODESolution`) or Trixi's own `solve!` (which returns a
+Create a `PlotData1D` object from a solution object created by either `OrdinaryDiffEq.solve!`
+(which returns a `SciMLBase.ODESolution`) or Trixi.jl's own `solve!` (which returns a
 `TimeIntegratorSolution`).
+
 !!! warning "Experimental implementation"
     This is an experimental feature and may change in future releases.
 """

@@ -5,10 +5,9 @@ using Trixi
 
 include("test_trixi.jl")
 
-# pathof(Trixi) returns /path/to/Trixi/src/Trixi.jl, dirname gives the parent directory
-EXAMPLES_DIR = joinpath(pathof(Trixi) |> dirname |> dirname, "examples", "unstructured_2d_dgsem")
+EXAMPLES_DIR = pkgdir(Trixi, "examples", "unstructured_2d_dgsem")
 
-# Start with a clean environment: remove Trixi output directory if it exists
+# Start with a clean environment: remove Trixi.jl output directory if it exists
 outdir = "out"
 isdir(outdir) && rm(outdir, recursive=true)
 
@@ -21,8 +20,8 @@ isdir(outdir) && rm(outdir, recursive=true)
 
   @trixi_testset "elixir_euler_free_stream.jl" begin
     @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_euler_free_stream.jl"),
-      l2   = [3.357431396258123e-14, 2.439943089578555e-13, 1.4655386790023588e-13, 4.670410488845425e-13],
-      linf = [1.0169198816356584e-11, 6.838458965763294e-11, 4.456759961080081e-11, 1.4207657272891083e-10],
+      l2   = [3.3937971107485363e-14, 2.447586447887882e-13, 1.4585205789296455e-13, 4.716993468962946e-13],
+      linf = [8.804734719092266e-12, 6.261270668606045e-11, 2.93670088247211e-11, 1.205400224080222e-10],
       tspan = (0.0, 0.1),
       atol = 3.0e-13)
   end
@@ -107,9 +106,17 @@ isdir(outdir) && rm(outdir, recursive=true)
 
   @trixi_testset "elixir_shallowwater_well_balanced.jl" begin
     @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_shallowwater_well_balanced.jl"),
-      l2   = [1.2164292510839083, 2.8049631232564753e-12, 1.5664980749498454e-12, 1.216429251083908],
-      linf = [1.5138512282315868, 5.0263880749562876e-11, 3.5805418805003075e-11, 1.513851228231574],
+      l2   = [1.2164292510839076, 2.6118925543469468e-12, 1.1636046671473883e-12, 1.2164292510839079],
+      linf = [1.5138512282315846, 4.998482888288039e-11, 2.0246214978154587e-11, 1.513851228231574],
       tspan = (0.0, 0.25))
+  end
+
+  @trixi_testset "elixir_shallowwater_well_balanced.jl with FluxHydrostaticReconstruction" begin
+    @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_shallowwater_well_balanced.jl"),
+      l2   = [1.2164292510839085, 1.2643106818778908e-12, 7.46884905098358e-13, 1.2164292510839079],
+      linf = [1.513851228231562, 1.6287765844373185e-11, 6.8766999132716964e-12, 1.513851228231574],
+      surface_flux=(FluxHydrostaticReconstruction(flux_lax_friedrichs, hydrostatic_reconstruction_audusse_etal), flux_nonconservative_audusse_etal),
+      tspan = (0.0, 0.2))
   end
 
   @trixi_testset "elixir_shallowwater_source_terms.jl" begin
@@ -119,17 +126,25 @@ isdir(outdir) && rm(outdir, recursive=true)
       tspan = (0.0, 0.025))
   end
 
+  @trixi_testset "elixir_shallowwater_source_terms.jl with FluxHydrostaticReconstruction" begin
+    @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_shallowwater_source_terms.jl"),
+      l2   = [0.0011197139793938152, 0.015430259691310781, 0.017081031802719724, 5.089218476758271e-6],
+      linf = [0.014300809338967824, 0.12783372461225184, 0.17625472321992852, 2.6407324614341476e-5],
+      surface_flux=(FluxHydrostaticReconstruction(flux_hll, hydrostatic_reconstruction_audusse_etal), flux_nonconservative_audusse_etal),
+      tspan = (0.0, 0.025))
+  end
+
   @trixi_testset "elixir_shallowwater_dirichlet.jl" begin
     @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_shallowwater_dirichlet.jl"),
-      l2   = [1.1577518608963063e-5, 4.371173779970303e-13, 4.2152984234036224e-13, 1.1577518608935235e-5],
-      linf = [8.394063878491842e-5, 9.632644747754261e-11, 9.54898901893391e-11, 8.394063879602065e-5],
+      l2   = [1.1577518608940115e-5, 4.867189932537344e-13, 4.647273240470541e-13, 1.1577518608933468e-5],
+      linf = [8.394063878602864e-5, 1.1469760027632646e-10, 1.1146619484429974e-10, 8.394063879602065e-5],
       tspan = (0.0, 2.0))
   end
 
-  @trixi_testset "elixir_shallowwater_wall_bc.jl" begin
-    @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_shallowwater_wall_bc.jl"),
-      l2   = [0.04443210036005491, 0.14454582374113853, 0.15239799057671485, 6.225080477024867e-8],
-      linf = [0.7727399447958347, 2.127376144492187, 3.361677723990531, 3.982097160903919e-7],
+  @trixi_testset "elixir_shallowwater_wall_bc_shockcapturing.jl" begin
+    @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_shallowwater_wall_bc_shockcapturing.jl"),
+      l2   = [0.04444388691670699, 0.1527771788033111, 0.1593763537203512, 6.225080476986749e-8],
+      linf = [0.6526506870169639, 1.980765893182952, 2.4807635459119757, 3.982097158683473e-7],
       tspan = (0.0, 0.05))
   end
 
@@ -139,9 +154,41 @@ isdir(outdir) && rm(outdir, recursive=true)
       linf = [2.7639232436274392, 3.3985508653311767, 3.3330308209196224, 2.052861364219655],
       tspan = (0.0, 0.25))
   end
+
+  @trixi_testset "elixir_shallowwater_twolayer_convergence.jl" begin
+    @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_shallowwater_twolayer_convergence.jl"),
+      l2    = [0.0007953969898161991, 0.00882074628714633, 0.0024322572528892934,
+               0.0007597425017400447, 0.004501238950166439, 0.0015784803573661104,
+               6.849532064729749e-6],
+      linf  = [0.00592559068081977, 0.08072451118697077, 0.0344854497419107, 0.005892196680485795,
+               0.04262651217675306, 0.014006223513881366, 2.5829318284764646e-5],
+      tspan = (0.0, 0.25))
+  end
+
+  @trixi_testset "elixir_shallowwater_twolayer_well_balanced.jl" begin
+    @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_shallowwater_twolayer_well_balanced.jl"),
+      l2    = [4.706532184998499e-16, 1.1215950712872183e-15, 6.7822712922421565e-16,
+               0.002192812926266047, 5.506855295923691e-15, 3.3105180099689275e-15,
+               0.0021928129262660085],
+      linf  = [4.468647674116255e-15, 1.3607872120431166e-14, 9.557155049520056e-15,
+               0.024280130945632084, 6.68910907640583e-14, 4.7000983997100496e-14,
+               0.024280130945632732],
+      tspan = (0.0, 0.25))
+  end
+
+  @trixi_testset "elixir_shallowwater_twolayer_dam_break.jl with flux_lax_friedrichs" begin
+    @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_shallowwater_twolayer_dam_break.jl"),
+      l2    = [0.012471300561905669, 0.012363413819726868, 0.0009541478004413331,
+               0.09120260327331643, 0.015269590815749993, 0.0012064657396853422,
+               0.09991983966647647],
+      linf  = [0.04497814714937959, 0.03286959000796511, 0.010746094385294369,
+               0.11138723974511211, 0.03640850605444494, 0.014368386516056392, 0.10000000000000003],
+      surface_flux = (flux_lax_friedrichs, flux_nonconservative_fjordholm_etal),
+      tspan = (0.0, 0.25))
+  end
 end
 
-# Clean up afterwards: delete Trixi output directory
+# Clean up afterwards: delete Trixi.jl output directory
 @test_nowarn rm(outdir, recursive=true)
 
 end # module

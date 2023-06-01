@@ -7,8 +7,8 @@
 
 function rhs!(du, u, t,
               mesh::StructuredMesh{2}, equations,
-              initial_condition, boundary_conditions, source_terms,
-              dg::DG, cache)
+              initial_condition, boundary_conditions, source_terms::Source,
+              dg::DG, cache) where {Source}
   # Reset du
   @trixi_timeit timer() "reset ∂u/∂t" reset_du!(du, dg, cache)
 
@@ -16,7 +16,7 @@ function rhs!(du, u, t,
   @trixi_timeit timer() "volume integral" calc_volume_integral!(
     du, u, mesh,
     have_nonconservative_terms(equations), equations,
-    dg.volume_integral, dg, cache)
+    dg.volume_integral, dg, cache, t, boundary_conditions)
 
   # Calculate interface fluxes
   @trixi_timeit timer() "interface flux" calc_interface_flux!(
@@ -46,7 +46,7 @@ end
 
 @inline function weak_form_kernel!(du, u,
                                    element, mesh::Union{StructuredMesh{2}, UnstructuredMesh2D, P4estMesh{2}},
-                                   nonconservative_terms::Val{false}, equations,
+                                   nonconservative_terms::False, equations,
                                    dg::DGSEM, cache, alpha=true)
   # true * [some floating point value] == [exactly the same floating point value]
   # This can (hopefully) be optimized away due to constant propagation.
@@ -80,10 +80,10 @@ end
 end
 
 
-@inline function split_form_kernel!(du, u,
-                                    element, mesh::Union{StructuredMesh{2}, UnstructuredMesh2D, P4estMesh{2}},
-                                    nonconservative_terms::Val{false}, equations,
-                                    volume_flux, dg::DGSEM, cache, alpha=true)
+@inline function flux_differencing_kernel!(du, u,
+                                           element, mesh::Union{StructuredMesh{2}, UnstructuredMesh2D, P4estMesh{2}},
+                                           nonconservative_terms::False, equations,
+                                           volume_flux, dg::DGSEM, cache, alpha=true)
   @unpack derivative_split = dg.basis
   @unpack contravariant_vectors = cache.elements
 
@@ -128,16 +128,16 @@ end
   end
 end
 
-@inline function split_form_kernel!(du, u,
-                                    element, mesh::Union{StructuredMesh{2}, UnstructuredMesh2D, P4estMesh{2}},
-                                    nonconservative_terms::Val{true}, equations,
-                                    volume_flux, dg::DGSEM, cache, alpha=true)
+@inline function flux_differencing_kernel!(du, u,
+                                           element, mesh::Union{StructuredMesh{2}, UnstructuredMesh2D, P4estMesh{2}},
+                                           nonconservative_terms::True, equations,
+                                           volume_flux, dg::DGSEM, cache, alpha=true)
   @unpack derivative_split = dg.basis
   @unpack contravariant_vectors = cache.elements
   symmetric_flux, nonconservative_flux = volume_flux
 
   # Apply the symmetric flux as usual
-  split_form_kernel!(du, u, element, mesh, Val(false), equations, symmetric_flux, dg, cache, alpha)
+  flux_differencing_kernel!(du, u, element, mesh, False(), equations, symmetric_flux, dg, cache, alpha)
 
   # Calculate the remaining volume terms using the nonsymmetric generalized flux
   for j in eachnode(dg), i in eachnode(dg)
@@ -190,7 +190,7 @@ end
 # [arXiv: 2008.12044v2](https://arxiv.org/pdf/2008.12044)
 @inline function calcflux_fv!(fstar1_L, fstar1_R, fstar2_L, fstar2_R, u,
                               mesh::Union{StructuredMesh{2}, UnstructuredMesh2D, P4estMesh{2}},
-                              nonconservative_terms::Val{false}, equations,
+                              nonconservative_terms::False, equations,
                               volume_flux_fv, dg::DGSEM, element, cache)
   @unpack contravariant_vectors = cache.elements
   @unpack weights, derivative_matrix = dg.basis
@@ -252,7 +252,7 @@ end
 # Calculate the finite volume fluxes inside curvilinear elements (**with non-conservative terms**).
 @inline function calcflux_fv!(fstar1_L, fstar1_R, fstar2_L, fstar2_R, u::AbstractArray{<:Any,4},
                               mesh::Union{StructuredMesh{2}, UnstructuredMesh2D, P4estMesh{2}},
-                              nonconservative_terms::Val{true}, equations,
+                              nonconservative_terms::True, equations,
                               volume_flux_fv, dg::DGSEM, element, cache)
   @unpack contravariant_vectors = cache.elements
   @unpack weights, derivative_matrix = dg.basis
@@ -327,10 +327,320 @@ end
   return nothing
 end
 
+@inline function calcflux_fhat!(fhat1, fhat2, u,
+                                mesh::StructuredMesh{2}, nonconservative_terms::False, equations,
+                                volume_flux, dg::DGSEM, element, cache)
+
+  @unpack contravariant_vectors = cache.elements
+  @unpack weights, derivative_split = dg.basis
+  @unpack flux_temp_threaded = cache
+
+  flux_temp = flux_temp_threaded[Threads.threadid()]
+
+  # The FV-form fluxes are calculated in a recursive manner, i.e.:
+  # fhat_(0,1)   = w_0 * FVol_0,
+  # fhat_(j,j+1) = fhat_(j-1,j) + w_j * FVol_j,   for j=1,...,N-1,
+  # with the split form volume fluxes FVol_j = -2 * sum_i=0^N D_ji f*_(j,i).
+
+  # To use the symmetry of the `volume_flux`, the split form volume flux is precalculated
+  # like in `calc_volume_integral!` for the `VolumeIntegralFluxDifferencing`
+  # and saved in in `flux_temp`.
+
+  # Split form volume flux in orientation 1: x direction
+  flux_temp .= zero(eltype(flux_temp))
+
+  for j in eachnode(dg), i in eachnode(dg)
+    u_node = get_node_vars(u, equations, dg, i, j, element)
+
+    # pull the contravariant vectors in each coordinate direction
+    Ja1_node = get_contravariant_vector(1, contravariant_vectors, i, j, element) # x direction
+
+    # All diagonal entries of `derivative_split` are zero. Thus, we can skip
+    # the computation of the diagonal terms. In addition, we use the symmetry
+    # of the `volume_flux` to save half of the possible two-point flux
+    # computations.
+
+    # x direction
+    for ii in (i+1):nnodes(dg)
+      u_node_ii = get_node_vars(u, equations, dg, ii, j, element)
+      # pull the contravariant vectors and compute the average
+      Ja1_node_ii = get_contravariant_vector(1, contravariant_vectors, ii, j, element)
+      Ja1_avg = 0.5 * (Ja1_node + Ja1_node_ii)
+
+      # compute the contravariant sharp flux in the direction of the averaged contravariant vector
+      fluxtilde1 = volume_flux(u_node, u_node_ii, Ja1_avg, equations)
+      multiply_add_to_node_vars!(flux_temp, derivative_split[i, ii], fluxtilde1, equations, dg, i,  j)
+      multiply_add_to_node_vars!(flux_temp, derivative_split[ii, i], fluxtilde1, equations, dg, ii, j)
+    end
+  end
+
+  # FV-form flux `fhat` in x direction
+  fhat1[:, 1,            :] .= zero(eltype(fhat1))
+  fhat1[:, nnodes(dg)+1, :] .= zero(eltype(fhat1))
+
+  for j in eachnode(dg), i in 1:nnodes(dg)-1, v in eachvariable(equations)
+    fhat1[v, i+1, j] = fhat1[v, i, j] + weights[i] * flux_temp[v, i, j]
+  end
+
+  # Split form volume flux in orientation 2: y direction
+  flux_temp .= zero(eltype(flux_temp))
+
+  for j in eachnode(dg), i in eachnode(dg)
+    u_node = get_node_vars(u, equations, dg, i, j, element)
+
+    # pull the contravariant vectors in each coordinate direction
+    Ja2_node = get_contravariant_vector(2, contravariant_vectors, i, j, element)
+
+    # y direction
+    for jj in (j+1):nnodes(dg)
+      u_node_jj = get_node_vars(u, equations, dg, i, jj, element)
+      # pull the contravariant vectors and compute the average
+      Ja2_node_jj = get_contravariant_vector(2, contravariant_vectors, i, jj, element)
+      Ja2_avg = 0.5 * (Ja2_node + Ja2_node_jj)
+      # compute the contravariant sharp flux in the direction of the averaged contravariant vector
+      fluxtilde2 = volume_flux(u_node, u_node_jj, Ja2_avg, equations)
+      multiply_add_to_node_vars!(flux_temp, derivative_split[j, jj], fluxtilde2, equations, dg, i, j)
+      multiply_add_to_node_vars!(flux_temp, derivative_split[jj, j], fluxtilde2, equations, dg, i, jj)
+    end
+  end
+
+  # FV-form flux `fhat` in y direction
+  fhat2[:, :, 1           ] .= zero(eltype(fhat2))
+  fhat2[:, :, nnodes(dg)+1] .= zero(eltype(fhat2))
+
+  for j in 1:nnodes(dg)-1, i in eachnode(dg), v in eachvariable(equations)
+    fhat2[v, i, j+1] = fhat2[v, i, j] + weights[j] * flux_temp[v, i, j]
+  end
+
+  return nothing
+end
+
+
+@inline function calc_lambdas_bar_states!(u, t, mesh::StructuredMesh,
+    nonconservative_terms, equations, indicator, dg, cache, boundary_conditions; calcBarStates=true)
+
+  if indicator isa IndicatorIDP && !indicator.BarStates
+    return nothing
+  end
+  @unpack lambda1, lambda2, bar_states1, bar_states2 = indicator.cache.ContainerBarStates
+  @unpack contravariant_vectors = cache.elements
+
+  @unpack normal_direction_xi, normal_direction_eta = indicator.cache.ContainerBarStates
+
+  # Calc lambdas and bar states inside elements
+  @threaded for element in eachelement(dg, cache)
+    for j in eachnode(dg), i in 2:nnodes(dg)
+      u_node     = get_node_vars(u, equations, dg, i,   j, element)
+      u_node_im1 = get_node_vars(u, equations, dg, i-1, j, element)
+
+      normal_direction = get_node_coords(normal_direction_xi, equations, dg, i-1, j, element)
+
+      lambda1[i, j, element] = max_abs_speed_naive(u_node_im1, u_node, normal_direction, equations)
+
+      !calcBarStates && continue
+
+      flux1     = flux(u_node,     normal_direction, equations)
+      flux1_im1 = flux(u_node_im1, normal_direction, equations)
+      for v in eachvariable(equations)
+        bar_states1[v, i, j, element] = 0.5 * (u_node[v] + u_node_im1[v]) - 0.5 * (flux1[v] - flux1_im1[v]) / lambda1[i, j, element]
+      end
+    end
+
+    for j in 2:nnodes(dg), i in eachnode(dg)
+      u_node     = get_node_vars(u, equations, dg, i,   j, element)
+      u_node_jm1 = get_node_vars(u, equations, dg, i, j-1, element)
+
+      normal_direction = get_node_coords(normal_direction_eta, equations, dg, i, j-1, element)
+
+      lambda2[i, j, element] = max_abs_speed_naive(u_node_jm1, u_node, normal_direction, equations)
+
+      !calcBarStates && continue
+
+      flux2     = flux(u_node,     normal_direction, equations)
+      flux2_jm1 = flux(u_node_jm1, normal_direction, equations)
+      for v in eachvariable(equations)
+        bar_states2[v, i, j, element] = 0.5 * (u_node[v] + u_node_jm1[v]) - 0.5 * (flux2[v] - flux2_jm1[v]) / lambda2[i, j, element]
+      end
+    end
+  end
+
+  # Calc lambdas and bar states at interfaces and periodic boundaries
+  @threaded for element in eachelement(dg, cache)
+    # Get neighboring element ids
+    left  = cache.elements.left_neighbors[1, element]
+    lower = cache.elements.left_neighbors[2, element]
+
+    if left != 0
+      for i in eachnode(dg)
+        u_left    = get_node_vars(u, equations, dg, nnodes(dg), i, left)
+        u_element = get_node_vars(u, equations, dg, 1,          i, element)
+
+        Ja1 = get_contravariant_vector(1, contravariant_vectors, 1, i, element)
+        lambda = max_abs_speed_naive(u_left, u_element, Ja1, equations)
+
+        lambda1[nnodes(dg)+1, i, left]    = lambda
+        lambda1[1,            i, element] = lambda
+
+        !calcBarStates && continue
+
+        flux_left    = flux(u_left,    Ja1, equations)
+        flux_element = flux(u_element, Ja1, equations)
+        bar_state = 0.5 * (u_element + u_left) - 0.5 * (flux_element - flux_left) / lambda
+        for v in eachvariable(equations)
+          bar_states1[v, nnodes(dg)+1, i, left]    = bar_state[v]
+          bar_states1[v, 1,            i, element] = bar_state[v]
+        end
+      end
+    end
+    if lower != 0
+      for i in eachnode(dg)
+        u_lower   = get_node_vars(u, equations, dg, i, nnodes(dg), lower)
+        u_element = get_node_vars(u, equations, dg, i,          1, element)
+
+        Ja2 = get_contravariant_vector(2, contravariant_vectors, i, 1, element)
+        lambda = max_abs_speed_naive(u_lower, u_element, Ja2, equations)
+
+        lambda2[i, nnodes(dg)+1, lower]   = lambda
+        lambda2[i,            1, element] = lambda
+
+        !calcBarStates && continue
+
+        flux_lower   = flux(u_lower,   Ja2, equations)
+        flux_element = flux(u_element, Ja2, equations)
+        bar_state = 0.5 * (u_element + u_lower) - 0.5 * (flux_element - flux_lower) / lambda
+        for v in eachvariable(equations)
+          bar_states2[v, i, nnodes(dg)+1, lower]   = bar_state[v]
+          bar_states2[v, i,            1, element] = bar_state[v]
+        end
+      end
+    end
+  end
+
+  # Calc lambdas and bar states at physical boundaries
+  if isperiodic(mesh)
+    return nothing
+  end
+  linear_indices = LinearIndices(size(mesh))
+  if !isperiodic(mesh, 1)
+    # - xi direction
+    for cell_y in axes(mesh, 2)
+      element  = linear_indices[begin, cell_y]
+      for j in eachnode(dg)
+        Ja1 = get_contravariant_vector(1, contravariant_vectors, 1, j, element)
+        u_inner = get_node_vars(u, equations, dg, 1, j, element)
+        u_outer = get_boundary_outer_state(u_inner, cache, t, boundary_conditions[1], Ja1, 1,
+                                           equations, dg, 1, j, element)
+        lambda1[1, j, element] = max_abs_speed_naive(u_inner, u_outer, Ja1, equations)
+
+        !calcBarStates && continue
+
+        flux_inner = flux(u_inner, Ja1, equations)
+        flux_outer = flux(u_outer, Ja1, equations)
+        for v in eachvariable(equations)
+          bar_states1[v, 1, j, element] = 0.5 * (u_inner[v] + u_outer[v]) - 0.5 * (flux_inner[v] - flux_outer[v]) / lambda1[1, j, element]
+        end
+      end
+    end
+    # + xi direction
+    for cell_y in axes(mesh, 2)
+      element = linear_indices[end, cell_y]
+      for j in eachnode(dg)
+        Ja1 = get_contravariant_vector(1, contravariant_vectors, nnodes(dg), j, element)
+        u_inner = get_node_vars(u, equations, dg, nnodes(dg), j, element)
+        u_outer = get_boundary_outer_state(u_inner, cache, t, boundary_conditions[2], Ja1, 2,
+                                           equations, dg, nnodes(dg), j, element)
+        lambda1[nnodes(dg)+1, j, element] = max_abs_speed_naive(u_inner, u_outer, Ja1, equations)
+
+        !calcBarStates && continue
+
+        flux_inner = flux(u_inner, Ja1, equations)
+        flux_outer = flux(u_outer, Ja1, equations)
+        for v in eachvariable(equations)
+          bar_states1[v, nnodes(dg)+1, j, element] = 0.5 * (u_inner[v] + u_outer[v]) - 0.5 * (flux_outer[v] - flux_inner[v]) / lambda1[nnodes(dg)+1, j, element]
+        end
+      end
+    end
+  end
+  if !isperiodic(mesh, 2)
+    # - eta direction
+    for cell_x in axes(mesh, 1)
+      element = linear_indices[cell_x, begin]
+      for i in eachnode(dg)
+        Ja2 = get_contravariant_vector(2, contravariant_vectors, i, 1, element)
+        u_inner = get_node_vars(u, equations, dg, i, 1, element)
+        u_outer = get_boundary_outer_state(u_inner, cache, t, boundary_conditions[3], Ja2, 3,
+                                           equations, dg, i, 1, element)
+        lambda2[i, 1, element] = max_abs_speed_naive(u_inner, u_outer, Ja2, equations)
+
+        !calcBarStates && continue
+
+        flux_inner = flux(u_inner, Ja2, equations)
+        flux_outer = flux(u_outer, Ja2, equations)
+        for v in eachvariable(equations)
+          bar_states2[v, i, 1, element] = 0.5 * (u_inner[v] + u_outer[v]) - 0.5 * (flux_inner[v] - flux_outer[v]) / lambda2[i, 1, element]
+        end
+      end
+    end
+    # + eta direction
+    for cell_x in axes(mesh, 1)
+      element = linear_indices[cell_x, end]
+      for i in eachnode(dg)
+        Ja2 = get_contravariant_vector(2, contravariant_vectors, i, nnodes(dg), element)
+        u_inner = get_node_vars(u, equations, dg, i, nnodes(dg), element)
+        u_outer = get_boundary_outer_state(u_inner, cache, t, boundary_conditions[4], Ja2, 4,
+                                           equations, dg, i, nnodes(dg), element)
+        lambda2[i, nnodes(dg)+1, element] = max_abs_speed_naive(u_inner, u_outer, Ja2, equations)
+
+        !calcBarStates && continue
+
+        flux_inner = flux(u_inner, Ja2, equations)
+        flux_outer = flux(u_outer, Ja2, equations)
+        for v in eachvariable(equations)
+          bar_states2[v, i, nnodes(dg)+1, element] = 0.5 * (u_outer[v] + u_inner[v]) - 0.5 * (flux_outer[v] - flux_inner[v]) / lambda2[i, nnodes(dg)+1, element]
+        end
+      end
+    end
+  end
+
+  return nothing
+end
+
+@inline function perform_IDP_correction(u, dt, mesh::StructuredMesh{2}, equations, dg, cache)
+  @unpack inverse_weights = dg.basis
+  @unpack antidiffusive_flux1, antidiffusive_flux2 = cache.ContainerAntidiffusiveFlux2D
+  @unpack alpha1, alpha2 = dg.volume_integral.indicator.cache.ContainerShockCapturingIndicator
+
+  if dg.volume_integral.indicator.indicator_smooth
+    elements = cache.element_ids_dgfv
+  else
+    elements = eachelement(dg, cache)
+  end
+
+  @threaded for element in elements
+  # @threaded for element in eachelement(dg, cache)
+    for j in eachnode(dg), i in eachnode(dg)
+      inverse_jacobian = -cache.elements.inverse_jacobian[i, j, element]
+
+      # Note: antidiffusive_flux1[v, i, xi, element] = antidiffusive_flux2[v, xi, i, element] = 0 for all i in 1:nnodes and xi in {1, nnodes+1}
+      alpha_flux1     = (1.0 - alpha1[i,   j, element]) * get_node_vars(antidiffusive_flux1, equations, dg, i,   j, element)
+      alpha_flux1_ip1 = (1.0 - alpha1[i+1, j, element]) * get_node_vars(antidiffusive_flux1, equations, dg, i+1, j, element)
+      alpha_flux2     = (1.0 - alpha2[i,   j, element]) * get_node_vars(antidiffusive_flux2, equations, dg, i,   j, element)
+      alpha_flux2_jp1 = (1.0 - alpha2[i, j+1, element]) * get_node_vars(antidiffusive_flux2, equations, dg, i, j+1, element)
+
+      for v in eachvariable(equations)
+        u[v, i, j, element] += dt * inverse_jacobian * (inverse_weights[i] * (alpha_flux1_ip1[v] - alpha_flux1[v]) +
+                                                        inverse_weights[j] * (alpha_flux2_jp1[v] - alpha_flux2[v]) )
+      end
+    end
+  end
+
+  return nothing
+end
+
 
 function calc_interface_flux!(cache, u,
                               mesh::StructuredMesh{2},
-                              nonconservative_terms, # can be Val{true}/Val{false}
+                              nonconservative_terms, # can be True/False
                               equations, surface_integral, dg::DG)
   @unpack elements = cache
 
@@ -360,7 +670,7 @@ end
 @inline function calc_interface_flux!(surface_flux_values, left_element, right_element,
                                       orientation, u,
                                       mesh::StructuredMesh{2},
-                                      nonconservative_terms::Val{false}, equations,
+                                      nonconservative_terms::False, equations,
                                       surface_integral, dg::DG, cache)
   # This is slow for LSA, but for some reason faster for Euler (see #519)
   if left_element <= 0 # left_element = 0 at boundaries
@@ -415,9 +725,9 @@ end
 @inline function calc_interface_flux!(surface_flux_values, left_element, right_element,
                                       orientation, u,
                                       mesh::StructuredMesh{2},
-                                      nonconservative_terms::Val{true}, equations,
+                                      nonconservative_terms::True, equations,
                                       surface_integral, dg::DG, cache)
-  # See comment on `calc_interface_flux!` with `nonconservative_terms::Val{false}`
+  # See comment on `calc_interface_flux!` with `nonconservative_terms::False`
   if left_element <= 0 # left_element = 0 at boundaries
     return nothing
   end

@@ -5,8 +5,7 @@ using Trixi
 
 include("test_trixi.jl")
 
-# pathof(Trixi) returns /path/to/Trixi/src/Trixi.jl, dirname gives the parent directory
-EXAMPLES_DIR = joinpath(pathof(Trixi) |> dirname |> dirname, "examples", "tree_1d_dgsem")
+EXAMPLES_DIR = pkgdir(Trixi, "examples", "tree_1d_dgsem")
 
 @testset "MHD Multicomponent" begin
 
@@ -58,7 +57,8 @@ EXAMPLES_DIR = joinpath(pathof(Trixi) |> dirname |> dirname, "examples", "tree_1
               0.11550738429083786],
       linf = [0.4345551123140612, 1.0874941615375844, 0.0, 1.0493729052116585,
               3.219646771412954e-15, 1.5160434573973656, 0.0, 0.18616213071936066,
-              0.3723242614387213])
+              0.3723242614387213],
+      coverage_override = (maxiters=6,))
     end
 
 end

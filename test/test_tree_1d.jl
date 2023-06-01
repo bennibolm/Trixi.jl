@@ -5,10 +5,9 @@ using Trixi
 
 include("test_trixi.jl")
 
-# pathof(Trixi) returns /path/to/Trixi/src/Trixi.jl, dirname gives the parent directory
-EXAMPLES_DIR = joinpath(pathof(Trixi) |> dirname |> dirname, "examples", "tree_1d_dgsem")
+EXAMPLES_DIR = pkgdir(Trixi, "examples", "tree_1d_dgsem")
 
-# Start with a clean environment: remove Trixi output directory if it exists
+# Start with a clean environment: remove Trixi.jl output directory if it exists
 outdir = "out"
 isdir(outdir) && rm(outdir, recursive=true)
 
@@ -25,7 +24,6 @@ isdir(outdir) && rm(outdir, recursive=true)
   # Hyperbolic diffusion
   include("test_tree_1d_hypdiff.jl")
 
-
   # Compressible Euler
   include("test_tree_1d_euler.jl")
 
@@ -40,6 +38,14 @@ isdir(outdir) && rm(outdir, recursive=true)
 
   # Compressible Euler with self-gravity
   include("test_tree_1d_eulergravity.jl")
+
+  # Shallow water
+  include("test_tree_1d_shallowwater.jl")
+  # Two-layer Shallow Water
+  include("test_tree_1d_shallowwater_twolayer.jl")
+
+  # FDSBP methods on the TreeMesh
+  include("test_tree_1d_fdsbp.jl")
 end
 
 # Coverage test for all initial conditions
@@ -158,7 +164,9 @@ end
                         alive_callback=TrivialCallback())
         end
       end
-      @test isempty(read(fname, String))
+      output = read(fname, String)
+      output = replace(output, "[ Info: You just called `trixi_include`. Julia may now compile the code, please be patient.\n" => "")
+      @test isempty(output)
     finally
       rm(fname, force=true)
     end
@@ -211,7 +219,7 @@ end
 
 
   # We use nonconservative terms
-  Trixi.have_nonconservative_terms(::NonconservativeLinearAdvectionEquation) = Val(true)
+  Trixi.have_nonconservative_terms(::NonconservativeLinearAdvectionEquation) = Trixi.True()
 
   function flux_nonconservative(u_mine, u_other, orientation,
                                 equations::NonconservativeLinearAdvectionEquation)
@@ -245,7 +253,7 @@ end
   volume_flux  = (flux_central, flux_nonconservative)
   surface_flux = (flux_lax_friedrichs, flux_nonconservative)
   solver = DGSEM(polydeg=3, surface_flux=surface_flux,
-                volume_integral=VolumeIntegralFluxDifferencing(volume_flux))
+                 volume_integral=VolumeIntegralFluxDifferencing(volume_flux))
 
   # Setup the spatial semidiscretization containing all ingredients
   semi = SemidiscretizationHyperbolic(mesh, equation, initial_condition_sine, solver)
@@ -267,7 +275,7 @@ end
 end
 
 
-# Clean up afterwards: delete Trixi output directory
+# Clean up afterwards: delete Trixi.jl output directory
 @test_nowarn rm(outdir, recursive=true)
 
 end # TreeMesh1D
