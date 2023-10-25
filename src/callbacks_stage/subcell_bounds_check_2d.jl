@@ -128,21 +128,18 @@ end
     (; idp_bounds_delta) = limiter.cache
     (; antidiffusive_flux1, antidiffusive_flux2) = cache.antidiffusive_fluxes
 
-    # TODO: Revise Bounds Check for MCL
-
     n_vars = nvariables(equations)
-
-    deviation_min = zeros(eltype(u), n_vars + limiter.PressurePositivityLimiterKuzmin)
-    deviation_max = zeros(eltype(u), n_vars)
 
     if limiter.DensityLimiter
         # New solution u^{n+1}
         for element in eachelement(solver, cache)
             for j in eachnode(solver), i in eachnode(solver)
-                deviation_min[1] = max(deviation_min[1],
-                                       var_min[1, i, j, element] - u[1, i, j, element])
-                deviation_max[1] = max(deviation_max[1],
-                                       u[1, i, j, element] - var_max[1, i, j, element])
+                idp_bounds_delta[1, 1, 1] = max(idp_bounds_delta[1, 1, 1],
+                                                var_min[1, i, j, element] -
+                                                u[1, i, j, element])
+                idp_bounds_delta[1, 2, 1] = max(idp_bounds_delta[1, 2, 1],
+                                                u[1, i, j, element] -
+                                                var_max[1, i, j, element])
             end
         end
 
@@ -156,34 +153,34 @@ end
                 rho_limited = bar_states1[1, i, j, element] -
                               antidiffusive_flux1[1, i, j, element] /
                               lambda1[i, j, element]
-                deviation_min[1] = max(deviation_min[1],
-                                       var_min[1, i, j, element] - rho_limited)
-                deviation_max[1] = max(deviation_max[1],
-                                       rho_limited - var_max[1, i, j, element])
+                idp_bounds_delta[1, 1, 1] = max(idp_bounds_delta[1, 1, 1],
+                                                var_min[1, i, j, element] - rho_limited)
+                idp_bounds_delta[1, 2, 1] = max(idp_bounds_delta[1, 2, 1],
+                                                rho_limited - var_max[1, i, j, element])
                 # +x
                 rho_limited = bar_states1[1, i + 1, j, element] +
                               antidiffusive_flux1[1, i + 1, j, element] /
                               lambda1[i + 1, j, element]
-                deviation_min[1] = max(deviation_min[1],
-                                       var_min[1, i, j, element] - rho_limited)
-                deviation_max[1] = max(deviation_max[1],
-                                       rho_limited - var_max[1, i, j, element])
+                idp_bounds_delta[1, 1, 1] = max(idp_bounds_delta[1, 1, 1],
+                                                var_min[1, i, j, element] - rho_limited)
+                idp_bounds_delta[1, 2, 1] = max(idp_bounds_delta[1, 2, 1],
+                                                rho_limited - var_max[1, i, j, element])
                 # -y
                 rho_limited = bar_states2[1, i, j, element] -
                               antidiffusive_flux2[1, i, j, element] /
                               lambda2[i, j, element]
-                deviation_min[1] = max(deviation_min[1],
-                                       var_min[1, i, j, element] - rho_limited)
-                deviation_max[1] = max(deviation_max[1],
-                                       rho_limited - var_max[1, i, j, element])
+                idp_bounds_delta[1, 1, 1] = max(idp_bounds_delta[1, 1, 1],
+                                                var_min[1, i, j, element] - rho_limited)
+                idp_bounds_delta[1, 2, 1] = max(idp_bounds_delta[1, 2, 1],
+                                                rho_limited - var_max[1, i, j, element])
                 # +y
                 rho_limited = bar_states2[1, i, j + 1, element] +
                               antidiffusive_flux2[1, i, j + 1, element] /
                               lambda2[i, j + 1, element]
-                deviation_min[1] = max(deviation_min[1],
-                                       var_min[1, i, j, element] - rho_limited)
-                deviation_max[1] = max(deviation_max[1],
-                                       rho_limited - var_max[1, i, j, element])
+                idp_bounds_delta[1, 1, 1] = max(idp_bounds_delta[1, 1, 1],
+                                                var_min[1, i, j, element] - rho_limited)
+                idp_bounds_delta[1, 2, 1] = max(idp_bounds_delta[1, 2, 1],
+                                                rho_limited - var_max[1, i, j, element])
             end
         end
     end # limiter.DensityLimiter
@@ -194,17 +191,20 @@ end
             for j in eachnode(solver), i in eachnode(solver)
                 for v in 2:n_vars
                     var_limited = u[v, i, j, element] / u[1, i, j, element]
-                    deviation_min[v] = max(deviation_min[v],
-                                           var_min[v, i, j, element] - var_limited)
-                    deviation_max[v] = max(deviation_max[v],
-                                           var_limited - var_max[v, i, j, element])
+                    idp_bounds_delta[1, 1, v] = max(idp_bounds_delta[1, 1, v],
+                                                    var_min[v, i, j, element] -
+                                                    var_limited)
+                    idp_bounds_delta[1, 2, v] = max(idp_bounds_delta[1, 2, v],
+                                                    var_limited -
+                                                    var_max[v, i, j, element])
                 end
                 if limiter.PressurePositivityLimiterKuzmin
                     error_pressure = 0.5 *
                                      (u[2, i, j, element]^2 + u[3, i, j, element]^2) -
                                      u[1, i, j, element] * u[4, i, j, element]
-                    deviation_min[n_vars + 1] = max(deviation_min[n_vars + 1],
-                                                    error_pressure)
+                    idp_bounds_delta[1, 1, n_vars + 1] = max(idp_bounds_delta[1, 1,
+                                                                              n_vars + 1],
+                                                             error_pressure)
                 end
             end
         end
@@ -227,20 +227,21 @@ end
                     var_limited = bar_states1[v, i, j, element] -
                                   antidiffusive_flux1[v, i, j, element] /
                                   lambda1[i, j, element]
-                    deviation_min[v] = max(deviation_min[v],
-                                           var_min[v, i, j, element] -
-                                           var_limited / rho_limited)
-                    deviation_max[v] = max(deviation_max[v],
-                                           var_limited / rho_limited -
-                                           var_max[v, i, j, element])
+                    idp_bounds_delta[1, 1, v] = max(idp_bounds_delta[1, 1, v],
+                                                    var_min[v, i, j, element] -
+                                                    var_limited / rho_limited)
+                    idp_bounds_delta[1, 2, v] = max(idp_bounds_delta[1, 2, v],
+                                                    var_limited / rho_limited -
+                                                    var_max[v, i, j, element])
                     if limiter.PressurePositivityLimiterKuzmin && (v == 2 || v == 3)
                         error_pressure += 0.5 * var_limited^2
                     end
                 end
                 if limiter.PressurePositivityLimiterKuzmin
                     error_pressure -= var_limited * rho_limited
-                    deviation_min[n_vars + 1] = max(deviation_min[n_vars + 1],
-                                                    error_pressure)
+                    idp_bounds_delta[1, 1, n_vars + 1] = max(idp_bounds_delta[1, 1,
+                                                                              n_vars + 1],
+                                                             error_pressure)
                     error_pressure = zero(eltype(idp_bounds_delta))
                 end
                 # +x
@@ -251,20 +252,21 @@ end
                     var_limited = bar_states1[v, i + 1, j, element] +
                                   antidiffusive_flux1[v, i + 1, j, element] /
                                   lambda1[i + 1, j, element]
-                    deviation_min[v] = max(deviation_min[v],
-                                           var_min[v, i, j, element] -
-                                           var_limited / rho_limited)
-                    deviation_max[v] = max(deviation_max[v],
-                                           var_limited / rho_limited -
-                                           var_max[v, i, j, element])
+                    idp_bounds_delta[1, 1, v] = max(idp_bounds_delta[1, 1, v],
+                                                    var_min[v, i, j, element] -
+                                                    var_limited / rho_limited)
+                    idp_bounds_delta[1, 2, v] = max(idp_bounds_delta[1, 2, v],
+                                                    var_limited / rho_limited -
+                                                    var_max[v, i, j, element])
                     if limiter.PressurePositivityLimiterKuzmin && (v == 2 || v == 3)
                         error_pressure += 0.5 * var_limited^2
                     end
                 end
                 if limiter.PressurePositivityLimiterKuzmin
                     error_pressure -= var_limited * rho_limited
-                    deviation_min[n_vars + 1] = max(deviation_min[n_vars + 1],
-                                                    error_pressure)
+                    idp_bounds_delta[1, 1, n_vars + 1] = max(idp_bounds_delta[1, 1,
+                                                                              n_vars + 1],
+                                                             error_pressure)
                     error_pressure = zero(eltype(idp_bounds_delta))
                 end
                 # -y
@@ -275,20 +277,21 @@ end
                     var_limited = bar_states2[v, i, j, element] -
                                   antidiffusive_flux2[v, i, j, element] /
                                   lambda2[i, j, element]
-                    deviation_min[v] = max(deviation_min[v],
-                                           var_min[v, i, j, element] -
-                                           var_limited / rho_limited)
-                    deviation_max[v] = max(deviation_max[v],
-                                           var_limited / rho_limited -
-                                           var_max[v, i, j, element])
+                    idp_bounds_delta[1, 1, v] = max(idp_bounds_delta[1, 1, v],
+                                                    var_min[v, i, j, element] -
+                                                    var_limited / rho_limited)
+                    idp_bounds_delta[1, 2, v] = max(idp_bounds_delta[1, 2, v],
+                                                    var_limited / rho_limited -
+                                                    var_max[v, i, j, element])
                     if limiter.PressurePositivityLimiterKuzmin && (v == 2 || v == 3)
                         error_pressure += 0.5 * var_limited^2
                     end
                 end
                 if limiter.PressurePositivityLimiterKuzmin
                     error_pressure -= var_limited * rho_limited
-                    deviation_min[n_vars + 1] = max(deviation_min[n_vars + 1],
-                                                    error_pressure)
+                    idp_bounds_delta[1, 1, n_vars + 1] = max(idp_bounds_delta[1, 1,
+                                                                              n_vars + 1],
+                                                             error_pressure)
                     error_pressure = zero(eltype(idp_bounds_delta))
                 end
                 # +y
@@ -299,20 +302,21 @@ end
                     var_limited = bar_states2[v, i, j + 1, element] +
                                   antidiffusive_flux2[v, i, j + 1, element] /
                                   lambda2[i, j + 1, element]
-                    deviation_min[v] = max(deviation_min[v],
-                                           var_min[v, i, j, element] -
-                                           var_limited / rho_limited)
-                    deviation_max[v] = max(deviation_max[v],
-                                           var_limited / rho_limited -
-                                           var_max[v, i, j, element])
+                    idp_bounds_delta[1, 1, v] = max(idp_bounds_delta[1, 1, v],
+                                                    var_min[v, i, j, element] -
+                                                    var_limited / rho_limited)
+                    idp_bounds_delta[1, 2, v] = max(idp_bounds_delta[1, 2, v],
+                                                    var_limited / rho_limited -
+                                                    var_max[v, i, j, element])
                     if limiter.PressurePositivityLimiterKuzmin && (v == 2 || v == 3)
                         error_pressure += 0.5 * var_limited^2
                     end
                 end
                 if limiter.PressurePositivityLimiterKuzmin
                     error_pressure -= var_limited * rho_limited
-                    deviation_min[n_vars + 1] = max(deviation_min[n_vars + 1],
-                                                    error_pressure)
+                    idp_bounds_delta[1, 1, n_vars + 1] = max(idp_bounds_delta[1, 1,
+                                                                              n_vars + 1],
+                                                             error_pressure)
                     error_pressure = zero(eltype(idp_bounds_delta))
                 end
             end
@@ -322,19 +326,20 @@ end
         for element in eachelement(solver, cache)
             for j in eachnode(solver), i in eachnode(solver)
                 for v in 2:n_vars
-                    deviation_min[v] = max(deviation_min[v],
-                                           var_min[v, i, j, element] -
-                                           u[v, i, j, element])
-                    deviation_max[v] = max(deviation_max[v],
-                                           u[v, i, j, element] -
-                                           var_max[v, i, j, element])
+                    idp_bounds_delta[1, 1, v] = max(idp_bounds_delta[1, 1, v],
+                                                    var_min[v, i, j, element] -
+                                                    u[v, i, j, element])
+                    idp_bounds_delta[1, 2, v] = max(idp_bounds_delta[1, 2, v],
+                                                    u[v, i, j, element] -
+                                                    var_max[v, i, j, element])
                 end
                 if limiter.PressurePositivityLimiterKuzmin
                     error_pressure = 0.5 *
                                      (u[2, i, j, element]^2 + u[3, i, j, element]^2) -
                                      u[1, i, j, element] * u[4, i, j, element]
-                    deviation_min[n_vars + 1] = max(deviation_min[n_vars + 1],
-                                                    error_pressure)
+                    idp_bounds_delta[1, 1, n_vars + 1] = max(idp_bounds_delta[1, 1,
+                                                                              n_vars + 1],
+                                                             error_pressure)
                 end
             end
         end
@@ -357,18 +362,21 @@ end
                     var_limited = bar_states1[v, i, j, element] -
                                   antidiffusive_flux1[v, i, j, element] /
                                   lambda1[i, j, element]
-                    deviation_min[v] = max(deviation_min[v],
-                                           var_min[v, i, j, element] - var_limited)
-                    deviation_max[v] = max(deviation_max[v],
-                                           var_limited - var_max[v, i, j, element])
+                    idp_bounds_delta[1, 1, v] = max(idp_bounds_delta[1, 1, v],
+                                                    var_min[v, i, j, element] -
+                                                    var_limited)
+                    idp_bounds_delta[1, 2, v] = max(idp_bounds_delta[1, 2, v],
+                                                    var_limited -
+                                                    var_max[v, i, j, element])
                     if limiter.PressurePositivityLimiterKuzmin && (v == 2 || v == 3)
                         error_pressure += 0.5 * var_limited^2
                     end
                 end
                 if limiter.PressurePositivityLimiterKuzmin
                     error_pressure -= var_limited * rho_limited
-                    deviation_min[n_vars + 1] = max(deviation_min[n_vars + 1],
-                                                    error_pressure)
+                    idp_bounds_delta[1, 1, n_vars + 1] = max(idp_bounds_delta[1, 1,
+                                                                              n_vars + 1],
+                                                             error_pressure)
                     error_pressure = zero(eltype(idp_bounds_delta))
                 end
                 # +x
@@ -379,18 +387,21 @@ end
                     var_limited = bar_states1[v, i + 1, j, element] +
                                   antidiffusive_flux1[v, i + 1, j, element] /
                                   lambda1[i + 1, j, element]
-                    deviation_min[v] = max(deviation_min[v],
-                                           var_min[v, i, j, element] - var_limited)
-                    deviation_max[v] = max(deviation_max[v],
-                                           var_limited - var_max[v, i, j, element])
+                    idp_bounds_delta[1, 1, v] = max(idp_bounds_delta[1, 1, v],
+                                                    var_min[v, i, j, element] -
+                                                    var_limited)
+                    idp_bounds_delta[1, 2, v] = max(idp_bounds_delta[1, 2, v],
+                                                    var_limited -
+                                                    var_max[v, i, j, element])
                     if limiter.PressurePositivityLimiterKuzmin && (v == 2 || v == 3)
                         error_pressure += 0.5 * var_limited^2
                     end
                 end
                 if limiter.PressurePositivityLimiterKuzmin
                     error_pressure -= var_limited * rho_limited
-                    deviation_min[n_vars + 1] = max(deviation_min[n_vars + 1],
-                                                    error_pressure)
+                    idp_bounds_delta[1, 1, n_vars + 1] = max(idp_bounds_delta[1, 1,
+                                                                              n_vars + 1],
+                                                             error_pressure)
                     error_pressure = zero(eltype(idp_bounds_delta))
                 end
                 # -y
@@ -401,18 +412,21 @@ end
                     var_limited = bar_states2[v, i, j, element] -
                                   antidiffusive_flux2[v, i, j, element] /
                                   lambda2[i, j, element]
-                    deviation_min[v] = max(deviation_min[v],
-                                           var_min[v, i, j, element] - var_limited)
-                    deviation_max[v] = max(deviation_max[v],
-                                           var_limited - var_max[v, i, j, element])
+                    idp_bounds_delta[1, 1, v] = max(idp_bounds_delta[1, 1, v],
+                                                    var_min[v, i, j, element] -
+                                                    var_limited)
+                    idp_bounds_delta[1, 2, v] = max(idp_bounds_delta[1, 2, v],
+                                                    var_limited -
+                                                    var_max[v, i, j, element])
                     if limiter.PressurePositivityLimiterKuzmin && (v == 2 || v == 3)
                         error_pressure += 0.5 * var_limited^2
                     end
                 end
                 if limiter.PressurePositivityLimiterKuzmin
                     error_pressure -= var_limited * rho_limited
-                    deviation_min[n_vars + 1] = max(deviation_min[n_vars + 1],
-                                                    error_pressure)
+                    idp_bounds_delta[1, 1, n_vars + 1] = max(idp_bounds_delta[1, 1,
+                                                                              n_vars + 1],
+                                                             error_pressure)
                     error_pressure = zero(eltype(idp_bounds_delta))
                 end
                 # +y
@@ -423,18 +437,21 @@ end
                     var_limited = bar_states2[v, i, j + 1, element] +
                                   antidiffusive_flux2[v, i, j + 1, element] /
                                   lambda2[i, j + 1, element]
-                    deviation_min[v] = max(deviation_min[v],
-                                           var_min[v, i, j, element] - var_limited)
-                    deviation_max[v] = max(deviation_max[v],
-                                           var_limited - var_max[v, i, j, element])
+                    idp_bounds_delta[1, 1, v] = max(idp_bounds_delta[1, 1, v],
+                                                    var_min[v, i, j, element] -
+                                                    var_limited)
+                    idp_bounds_delta[1, 2, v] = max(idp_bounds_delta[1, 2, v],
+                                                    var_limited -
+                                                    var_max[v, i, j, element])
                     if limiter.PressurePositivityLimiterKuzmin && (v == 2 || v == 3)
                         error_pressure += 0.5 * var_limited^2
                     end
                 end
                 if limiter.PressurePositivityLimiterKuzmin
                     error_pressure -= var_limited * rho_limited
-                    deviation_min[n_vars + 1] = max(deviation_min[n_vars + 1],
-                                                    error_pressure)
+                    idp_bounds_delta[1, 1, n_vars + 1] = max(idp_bounds_delta[1, 1,
+                                                                              n_vars + 1],
+                                                             error_pressure)
                     error_pressure = zero(eltype(idp_bounds_delta))
                 end
             end
@@ -445,8 +462,9 @@ end
             for j in eachnode(solver), i in eachnode(solver)
                 error_pressure = 0.5 * (u[2, i, j, element]^2 + u[3, i, j, element]^2) -
                                  u[1, i, j, element] * u[4, i, j, element]
-                deviation_min[n_vars + 1] = max(deviation_min[n_vars + 1],
-                                                error_pressure)
+                idp_bounds_delta[1, 1, n_vars + 1] = max(idp_bounds_delta[1, 1,
+                                                                          n_vars + 1],
+                                                         error_pressure)
             end
         end
 
@@ -471,8 +489,9 @@ end
                                  (bar_states1[4, i, j, element] -
                                   antidiffusive_flux1[4, i, j, element] /
                                   lambda1[i, j, element]) * rho_limited
-                deviation_min[n_vars + 1] = max(deviation_min[n_vars + 1],
-                                                error_pressure)
+                idp_bounds_delta[1, 1, n_vars + 1] = max(idp_bounds_delta[1, 1,
+                                                                          n_vars + 1],
+                                                         error_pressure)
                 # +x
                 rho_limited = bar_states1[1, i + 1, j, element] +
                               antidiffusive_flux1[1, i + 1, j, element] /
@@ -488,8 +507,9 @@ end
                                  (bar_states1[4, i + 1, j, element] +
                                   antidiffusive_flux1[4, i + 1, j, element] /
                                   lambda1[i + 1, j, element]) * rho_limited
-                deviation_min[n_vars + 1] = max(deviation_min[n_vars + 1],
-                                                error_pressure)
+                idp_bounds_delta[1, 1, n_vars + 1] = max(idp_bounds_delta[1, 1,
+                                                                          n_vars + 1],
+                                                         error_pressure)
                 # -y
                 rho_limited = bar_states2[1, i, j, element] -
                               antidiffusive_flux2[1, i, j, element] /
@@ -505,8 +525,9 @@ end
                                  (bar_states2[4, i, j, element] -
                                   antidiffusive_flux2[4, i, j, element] /
                                   lambda2[i, j, element]) * rho_limited
-                deviation_min[n_vars + 1] = max(deviation_min[n_vars + 1],
-                                                error_pressure)
+                idp_bounds_delta[1, 1, n_vars + 1] = max(idp_bounds_delta[1, 1,
+                                                                          n_vars + 1],
+                                                         error_pressure)
                 # +y
                 rho_limited = bar_states2[1, i, j + 1, element] +
                               antidiffusive_flux2[1, i, j + 1, element] /
@@ -522,8 +543,9 @@ end
                                  (bar_states2[4, i, j + 1, element] +
                                   antidiffusive_flux2[4, i, j + 1, element] /
                                   lambda2[i, j + 1, element]) * rho_limited
-                deviation_min[n_vars + 1] = max(deviation_min[n_vars + 1],
-                                                error_pressure)
+                idp_bounds_delta[1, 1, n_vars + 1] = max(idp_bounds_delta[1, 1,
+                                                                          n_vars + 1],
+                                                         error_pressure)
             end
         end
     end # limiter.PressurePositivityLimiterKuzmin
@@ -532,7 +554,8 @@ end
         # New solution u^{n+1}
         for element in eachelement(solver, cache)
             for j in eachnode(solver), i in eachnode(solver)
-                deviation_min[1] = max(deviation_min[1], -u[1, i, j, element])
+                idp_bounds_delta[1, 1, 1] = max(idp_bounds_delta[1, 1, 1],
+                                                -u[1, i, j, element])
             end
         end
 
@@ -547,33 +570,35 @@ end
                 rho_limited = (1 - beta) * bar_states1[1, i, j, element] -
                               antidiffusive_flux1[1, i, j, element] /
                               lambda1[i, j, element]
-                deviation_min[1] = max(deviation_min[1], -rho_limited)
+                idp_bounds_delta[1, 1, 1] = max(idp_bounds_delta[1, 1, 1], -rho_limited)
                 # +x
                 rho_limited = (1 - beta) * bar_states1[1, i + 1, j, element] +
                               antidiffusive_flux1[1, i + 1, j, element] /
                               lambda1[i + 1, j, element]
-                deviation_min[1] = max(deviation_min[1], -rho_limited)
+                idp_bounds_delta[1, 1, 1] = max(idp_bounds_delta[1, 1, 1], -rho_limited)
                 # -y
                 rho_limited = (1 - beta) * bar_states2[1, i, j, element] -
                               antidiffusive_flux2[1, i, j, element] /
                               lambda2[i, j, element]
-                deviation_min[1] = max(deviation_min[1], -rho_limited)
+                idp_bounds_delta[1, 1, 1] = max(idp_bounds_delta[1, 1, 1], -rho_limited)
                 # +y
                 rho_limited = (1 - beta) * bar_states2[1, i, j + 1, element] +
                               antidiffusive_flux2[1, i, j + 1, element] /
                               lambda2[i, j + 1, element]
-                deviation_min[1] = max(deviation_min[1], -rho_limited)
+                idp_bounds_delta[1, 1, 1] = max(idp_bounds_delta[1, 1, 1], -rho_limited)
             end
         end
     end # limiter.DensityPositivityLimiter
 
     for v in eachvariable(equations)
-        idp_bounds_delta[1, v] = max(idp_bounds_delta[1, v], deviation_min[v])
-        idp_bounds_delta[2, v] = max(idp_bounds_delta[2, v], deviation_max[v])
+        idp_bounds_delta[2, 1, v] = max(idp_bounds_delta[2, 1, v],
+                                        idp_bounds_delta[1, 1, v])
+        idp_bounds_delta[2, 2, v] = max(idp_bounds_delta[2, 2, v],
+                                        idp_bounds_delta[1, 2, v])
     end
     if limiter.PressurePositivityLimiterKuzmin
-        idp_bounds_delta[1, n_vars + 1] = max(idp_bounds_delta[1, n_vars + 1],
-                                              deviation_min[n_vars + 1])
+        idp_bounds_delta[2, 1, n_vars + 1] = max(idp_bounds_delta[2, 1, n_vars + 1],
+                                                 idp_bounds_delta[1, 1, n_vars + 1])
     end
 
     if !save_errors
@@ -582,12 +607,19 @@ end
     open("$output_directory/deviations.txt", "a") do f
         print(f, iter, ", ", time)
         for v in eachvariable(equations)
-            print(f, ", ", deviation_min[v], ", ", deviation_max[v])
+            print(f, ", ", idp_bounds_delta[1, 1, v], ", ", idp_bounds_delta[1, 2, v])
         end
         if limiter.PressurePositivityLimiterKuzmin
-            print(f, ", ", deviation_min[n_vars + 1])
+            print(f, ", ", idp_bounds_delta[1, 1, n_vars + 1])
         end
         println(f)
+    end
+    for v in eachvariable(equations)
+        idp_bounds_delta[1, 1, v] = zero(eltype(idp_bounds_delta))
+        idp_bounds_delta[1, 2, v] = zero(eltype(idp_bounds_delta))
+    end
+    if limiter.PressurePositivityLimiterKuzmin
+        idp_bounds_delta[1, 1, n_vars + 1] = zero(eltype(idp_bounds_delta))
     end
 
     return nothing

@@ -321,12 +321,16 @@ EXAMPLES_DIR = pkgdir(Trixi, "examples", "tree_2d_dgsem")
   end
 
   @trixi_testset "elixir_euler_sedov_blast_wave_MCL.jl" begin
+    rm("out/deviations.txt", force=true)
     @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_euler_sedov_blast_wave_MCL.jl"),
       l2   = [0.4740321851943766, 0.15889871334104985, 0.15889871334104988, 0.6190405536267991],
       linf = [4.011954283668753, 1.8527131099524292, 1.8527131099524277, 6.465833729130187],
       tspan = (0.0, 1.0),
       initial_refinement_level=4,
       coverage_override = (maxiters=6,))
+      lines = readlines("out/deviations.txt")
+      @test lines[1] == "# iter, simu_time, rho_min, rho_max, rho_v1_min, rho_v1_max, rho_v2_min, rho_v2_max, rho_e_min, rho_e_max, pressure_min"
+      @test startswith(lines[end], "349") || startswith(lines[end], "1")
       # Ensure that we do not have excessive memory allocations
       # (e.g., from type instabilities)
       let
