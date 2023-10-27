@@ -190,7 +190,7 @@ end
 
 @inline function finalize_callback(callback::BoundsCheckCallback, semi,
                                    limiter::SubcellLimiterMCL)
-    @unpack idp_bounds_delta = limiter.cache
+    @unpack mcl_bounds_delta = limiter.cache
 
     # TODO: Revise bounds check for MCL
 
@@ -199,12 +199,12 @@ end
     println("─"^100)
     variables = varnames(cons2cons, semi.equations)
     for v in eachvariable(semi.equations)
-        println(variables[v], ":\n- lower bound: ", idp_bounds_delta[2, 1, v],
-                "\n- upper bound: ", idp_bounds_delta[2, 2, v])
+        println(variables[v], ":\n- lower bound: ", mcl_bounds_delta[2, 1, v],
+                "\n- upper bound: ", mcl_bounds_delta[2, 2, v])
     end
     if limiter.PressurePositivityLimiterKuzmin
         println("pressure:\n- positivity: ",
-                idp_bounds_delta[2, 1, nvariables(semi.equations) + 1])
+                mcl_bounds_delta[2, 1, nvariables(semi.equations) + 1])
     end
     println("─"^100 * "\n")
 
