@@ -192,8 +192,6 @@ end
                                    limiter::SubcellLimiterMCL)
     @unpack mcl_bounds_delta = limiter.cache
 
-    # TODO: Revise bounds check for MCL
-
     println("─"^100)
     println("Maximum deviation from bounds:")
     println("─"^100)
