@@ -204,6 +204,10 @@ end
         println("pressure:\n- positivity: ",
                 mcl_bounds_delta[2, 1, nvariables(semi.equations) + 1])
     end
+    if limiter.SemiDiscEntropyLimiter
+        # TODO: Bounds check for entropy limiting
+        println("\nWARNING: No bounds check for the entropy limiter.")
+    end
     println("─"^100 * "\n")
 
     return nothing
