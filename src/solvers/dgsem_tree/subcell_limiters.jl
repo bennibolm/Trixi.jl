@@ -20,9 +20,9 @@ end
 
 """
     SubcellLimiterIDP(equations::AbstractEquations, basis;
-                      local_minmax_variables_cons = [],
-                      positivity_variables_cons = [],
-                      positivity_variables_nonlinear = (),
+                      local_minmax_variables_cons = String[],
+                      positivity_variables_cons = String[],
+                      positivity_variables_nonlinear = [],
                       positivity_correction_factor = 0.1,
                       spec_entropy = false,
                       math_entropy = false,
@@ -36,9 +36,13 @@ end
 
 Subcell invariant domain preserving (IDP) limiting used with [`VolumeIntegralSubcellLimiting`](@ref)
 including:
-- maximum/minimum Zalesak-type limiting for conservative variables (`local_minmax_variables_cons`)
-- positivity limiting for conservative (`positivity_variables_cons`) and non-linear variables (`positivity_variables_nonlinear`)
-- one-sided limiting for specific and mathematical entropy (`spec_entropy`, `math_entropy`)
+- Local maximum/minimum Zalesak-type limiting for conservative variables (`local_minmax_variables_cons`)
+- Positivity limiting for conservative (`positivity_variables_cons`) and non-linear variables (`positivity_variables_nonlinear`)
+- One-sided limiting for specific and mathematical entropy (`spec_entropy`, `math_entropy`)
+
+Conservative variables to be limited are passed as a vector of strings, e.g. `local_minmax_variables_cons = ["rho"]`
+and `positivity_variables_cons = ["rho"]`. For non-linear variables the specific functions are
+passed in a vector, e.g. `positivity_variables_nonlinear = [pressure]`.
 
 The bounds can be calculated using the `bar_states` or the low-order FV solution. The positivity
 limiter uses `positivity_correction_factor` such that `u^new >= positivity_correction_factor * u^FV`.
@@ -79,8 +83,8 @@ struct SubcellLimiterIDP{RealT <: Real, LimitingVariablesNonlinear,
     bar_states::Bool
     cache::Cache
     max_iterations_newton::Int
-    newton_tolerances::Tuple{RealT, RealT}          # Relative and absolute tolerances for Newton's method
-    gamma_constant_newton::RealT                    # Constant for the subcell limiting of convex (nonlinear) constraints
+    newton_tolerances::Tuple{RealT, RealT}  # Relative and absolute tolerances for Newton's method
+    gamma_constant_newton::RealT            # Constant for the subcell limiting of convex (nonlinear) constraints
     smoothness_indicator::Bool
     threshold_smoothness_indicator::RealT
     IndicatorHG::Indicator
@@ -88,9 +92,9 @@ end
 
 # this method is used when the limiter is constructed as for shock-capturing volume integrals
 function SubcellLimiterIDP(equations::AbstractEquations, basis;
-                           local_minmax_variables_cons = [],
-                           positivity_variables_cons = [],
-                           positivity_variables_nonlinear = (),
+                           local_minmax_variables_cons = String[],
+                           positivity_variables_cons = String[],
+                           positivity_variables_nonlinear = [],
                            positivity_correction_factor = 0.1,
                            spec_entropy = false,
                            math_entropy = false,
@@ -108,9 +112,14 @@ function SubcellLimiterIDP(equations::AbstractEquations, basis;
         error("Only one of the two can be selected: math_entropy/spec_entropy")
     end
 
+    local_minmax_variables_cons_ = get_variable_index.(local_minmax_variables_cons,
+                                                       equations)
+    positivity_variables_cons_ = get_variable_index.(positivity_variables_cons,
+                                                     equations)
+
     bound_keys = ()
     if local_minmax
-        for v in local_minmax_variables_cons
+        for v in local_minmax_variables_cons_
             v_string = string(v)
             bound_keys = (bound_keys..., Symbol(v_string, "_min"),
                           Symbol(v_string, "_max"))
@@ -122,8 +131,8 @@ function SubcellLimiterIDP(equations::AbstractEquations, basis;
     if math_entropy
         bound_keys = (bound_keys..., :math_entropy_max)
     end
-    for v in positivity_variables_cons
-        if !(v in local_minmax_variables_cons)
+    for v in positivity_variables_cons_
+        if !(v in local_minmax_variables_cons_)
             bound_keys = (bound_keys..., Symbol(string(v), "_min"))
         end
     end
@@ -143,13 +152,12 @@ function SubcellLimiterIDP(equations::AbstractEquations, basis;
     SubcellLimiterIDP{typeof(positivity_correction_factor),
                       typeof(positivity_variables_nonlinear),
                       typeof(cache), typeof(IndicatorHG)}(local_minmax,
-                                                          local_minmax_variables_cons,
+                                                          local_minmax_variables_cons_,
                                                           positivity,
-                                                          positivity_variables_cons,
+                                                          positivity_variables_cons_,
                                                           positivity_variables_nonlinear,
                                                           positivity_correction_factor,
-                                                          spec_entropy,
-                                                          math_entropy,
+                                                          spec_entropy, math_entropy,
                                                           bar_states,
                                                           cache,
                                                           max_iterations_newton,
@@ -162,7 +170,7 @@ end
 
 function Base.show(io::IO, limiter::SubcellLimiterIDP)
     @nospecialize limiter # reduce precompilation time
-    @unpack local_minmax, positivity, spec_entropy, math_entropy = limiter
+    (; local_minmax, positivity, spec_entropy, math_entropy) = limiter
 
     print(io, "SubcellLimiterIDP(")
     if !(local_minmax || positivity || spec_entropy || math_entropy)
@@ -185,7 +193,7 @@ end
 
 function Base.show(io::IO, ::MIME"text/plain", limiter::SubcellLimiterIDP)
     @nospecialize limiter # reduce precompilation time
-    @unpack local_minmax, positivity, spec_entropy, math_entropy = limiter
+    (; local_minmax, positivity, spec_entropy, math_entropy) = limiter
 
     if get(io, :compact, false)
         show(io, limiter)

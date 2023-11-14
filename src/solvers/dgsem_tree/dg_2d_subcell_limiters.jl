@@ -863,38 +863,41 @@ end
 
     # state variables
     if limiter.local_minmax
-        for index in limiter.local_minmax_variables_cons
-            var_min = variable_bounds[Symbol("$(index)_min")]
-            var_max = variable_bounds[Symbol("$(index)_max")]
+        for v in limiter.local_minmax_variables_cons
+            v_string = string(v)
+            var_min = variable_bounds[Symbol(v_string, "_min")]
+            var_max = variable_bounds[Symbol(v_string, "_max")]
             @threaded for element in eachelement(dg, cache)
-                var_min[:, :, element] .= typemax(eltype(var_min))
-                var_max[:, :, element] .= typemin(eltype(var_max))
+                for j in eachnode(dg), i in eachnode(dg)
+                    var_min[i, j, element] = typemax(eltype(var_min))
+                    var_max[i, j, element] = typemin(eltype(var_max))
+                end
                 for j in eachnode(dg), i in eachnode(dg)
                     var_min[i, j, element] = min(var_min[i, j, element],
-                                                 u[index, i, j, element])
+                                                 u[v, i, j, element])
                     var_max[i, j, element] = max(var_max[i, j, element],
-                                                 u[index, i, j, element])
+                                                 u[v, i, j, element])
                     # TODO: Add source term!
                     # - xi direction
                     var_min[i, j, element] = min(var_min[i, j, element],
-                                                 bar_states1[index, i, j, element])
+                                                 bar_states1[v, i, j, element])
                     var_max[i, j, element] = max(var_max[i, j, element],
-                                                 bar_states1[index, i, j, element])
+                                                 bar_states1[v, i, j, element])
                     # + xi direction
                     var_min[i, j, element] = min(var_min[i, j, element],
-                                                 bar_states1[index, i + 1, j, element])
+                                                 bar_states1[v, i + 1, j, element])
                     var_max[i, j, element] = max(var_max[i, j, element],
-                                                 bar_states1[index, i + 1, j, element])
+                                                 bar_states1[v, i + 1, j, element])
                     # - eta direction
                     var_min[i, j, element] = min(var_min[i, j, element],
-                                                 bar_states2[index, i, j, element])
+                                                 bar_states2[v, i, j, element])
                     var_max[i, j, element] = max(var_max[i, j, element],
-                                                 bar_states2[index, i, j, element])
+                                                 bar_states2[v, i, j, element])
                     # + eta direction
                     var_min[i, j, element] = min(var_min[i, j, element],
-                                                 bar_states2[index, i, j + 1, element])
+                                                 bar_states2[v, i, j + 1, element])
                     var_max[i, j, element] = max(var_max[i, j, element],
-                                                 bar_states2[index, i, j + 1, element])
+                                                 bar_states2[v, i, j + 1, element])
                 end
             end
         end
@@ -903,7 +906,9 @@ end
     if limiter.spec_entropy
         s_min = variable_bounds[:spec_entropy_min]
         @threaded for element in eachelement(dg, cache)
-            s_min[:, :, element] .= typemax(eltype(s_min))
+            for j in eachnode(dg), i in eachnode(dg)
+                s_min[i, j, element] = typemax(eltype(s_min))
+            end
             for j in eachnode(dg), i in eachnode(dg)
                 s = entropy_spec(get_node_vars(u, equations, dg, i, j, element),
                                  equations)
@@ -932,7 +937,9 @@ end
     if limiter.math_entropy
         s_max = variable_bounds[:math_entropy_max]
         @threaded for element in eachelement(dg, cache)
-            s_max[:, :, element] .= typemin(eltype(s_max))
+            for j in eachnode(dg), i in eachnode(dg)
+                s_max[i, j, element] = typemin(eltype(s_max))
+            end
             for j in eachnode(dg), i in eachnode(dg)
                 s = entropy_math(get_node_vars(u, equations, dg, i, j, element),
                                  equations)
