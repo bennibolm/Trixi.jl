@@ -470,35 +470,6 @@ end
     end
 end
 
-@trixi_testset "elixir_euler_sedov_blast_wave.jl (HLLE)" begin
-    @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_euler_sedov_blast_wave.jl"),
-                        l2=[
-                            0.352405949321075,
-                            0.17207721487429464,
-                            0.17207721487433883,
-                            0.6263024434020885,
-                        ],
-                        linf=[
-                            2.760997358628186,
-                            1.8279186132509326,
-                            1.8279186132502805,
-                            6.251573757093399,
-                        ],
-                        tspan=(0.0, 0.5),
-                        callbacks=CallbackSet(summary_callback,
-                                              analysis_callback, alive_callback,
-                                              stepsize_callback),
-                        surface_flux=flux_hlle),
-    # Ensure that we do not have excessive memory allocations
-    # (e.g., from type instabilities)
-    let
-        t = sol.t[end]
-        u_ode = sol.u[end]
-        du_ode = similar(u_ode)
-        @test (@allocated Trixi.rhs!(du_ode, u_ode, semi, t)) < 1000
-    end
-end
-
 @trixi_testset "elixir_euler_sedov_blast_wave_sc_subcell.jl" begin
     @test_trixi_include(joinpath(EXAMPLES_DIR,
                                  "elixir_euler_sedov_blast_wave_sc_subcell.jl"),
@@ -559,23 +530,33 @@ end
     end
 end
 
-@trixi_testset "elixir_euler_sedov_blast_wave_neuralnetwork_perssonperaire.jl" begin
-    @test_trixi_include(joinpath(EXAMPLES_DIR,
-                                 "elixir_euler_sedov_blast_wave_neuralnetwork_perssonperaire.jl"),
+@trixi_testset "elixir_euler_sedov_blast_wave.jl (HLLE)" begin
+    @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_euler_sedov_blast_wave.jl"),
                         l2=[
-                            0.0845430093623868,
-                            0.09271459184623232,
-                            0.09271459184623232,
-                            0.4377291875101709,
+                            0.352405949321075,
+                            0.17207721487429464,
+                            0.17207721487433883,
+                            0.6263024434020885,
                         ],
                         linf=[
-                            1.3608553480069898,
-                            1.6822884847136004,
-                            1.6822884847135997,
-                            4.2201475428867035,
+                            2.760997358628186,
+                            1.8279186132509326,
+                            1.8279186132502805,
+                            6.251573757093399,
                         ],
-                        maxiters=30,
-                        coverage_override=(maxiters = 6,))
+                        tspan=(0.0, 0.5),
+                        callbacks=CallbackSet(summary_callback,
+                                              analysis_callback, alive_callback,
+                                              stepsize_callback),
+                        surface_flux=flux_hlle),
+    # Ensure that we do not have excessive memory allocations
+    # (e.g., from type instabilities)
+    let
+        t = sol.t[end]
+        u_ode = sol.u[end]
+        du_ode = similar(u_ode)
+        @test (@allocated Trixi.rhs!(du_ode, u_ode, semi, t)) < 1000
+    end
 end
 
 @trixi_testset "elixir_euler_positivity.jl" begin
@@ -789,18 +770,6 @@ end
         du_ode = similar(u_ode)
         @test (@allocated Trixi.rhs!(du_ode, u_ode, semi, t)) < 15000
     end
-end
-
-@trixi_testset "elixir_euler_kelvin_helmholtz_instability_amr_neuralnetwork_perssonperaire.jl" begin
-    @test_trixi_include(joinpath(EXAMPLES_DIR,
-                                 "elixir_euler_kelvin_helmholtz_instability_amr_neuralnetwork_perssonperaire.jl"),
-                        # This stuff is experimental and annoying to test. In the future, we plan
-                        # to move it to another repository. Thus, we save developer time right now
-                        # and do not run these tests anymore.
-                        # l2   = [0.0009823702998067061, 0.004943231496200673, 0.0048604522073091815, 0.00496983530893294],
-                        # linf = [0.00855717053383187, 0.02087422420794427, 0.017121993783086185, 0.02720703869972585],
-                        maxiters=30,
-                        coverage_override=(maxiters = 2,))
 end
 
 @trixi_testset "elixir_euler_colliding_flow.jl" begin
