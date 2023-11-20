@@ -931,13 +931,13 @@ end
             end
             for i in eachnode(dg)
                 # interface/boundary of (nnodes(dg), i) in positive xi direction
-                s = entropy_spec(get_node_vars(bar_states1, equations, dg, nnodes(dg) + 1, i,
-                                               element), equations)
+                s = entropy_spec(get_node_vars(bar_states1, equations, dg,
+                                               nnodes(dg) + 1, i, element), equations)
                 s_min[nnodes(dg), i, element] = min(s_min[nnodes(dg), i, element], s)
 
                 # interface/boundary of (i, nnodes(dg)) in positive eta direction
-                s = entropy_spec(get_node_vars(bar_states2, equations, dg, i, nnodes(dg) + 1,
-                                               element), equations)
+                s = entropy_spec(get_node_vars(bar_states2, equations, dg, i,
+                                               nnodes(dg) + 1, element), equations)
                 s_min[i, nnodes(dg), element] = min(s_min[i, nnodes(dg), element], s)
             end
         end
@@ -972,13 +972,13 @@ end
             end
             for i in eachnode(dg)
                 # interface/boundary of (nnodes(dg), i) in positive xi direction
-                s = entropy_math(get_node_vars(bar_states1, equations, dg, nnodes(dg) + 1, i,
-                                               element), equations)
+                s = entropy_math(get_node_vars(bar_states1, equations, dg,
+                                               nnodes(dg) + 1, i, element), equations)
                 s_max[nnodes(dg), i, element] = max(s_max[nnodes(dg), i, element], s)
 
                 # interface/boundary of (i, nnodes(dg)) in positive eta direction
-                s = entropy_math(get_node_vars(bar_states2, equations, dg, i, nnodes(dg) + 1,
-                                               element), equations)
+                s = entropy_math(get_node_vars(bar_states2, equations, dg, i,
+                                               nnodes(dg) + 1, element), equations)
                 s_max[i, nnodes(dg), element] = max(s_max[i, nnodes(dg), element], s)
             end
         end
