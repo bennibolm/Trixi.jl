@@ -909,26 +909,36 @@ end
                 s_min[i, j, element] = typemax(eltype(s_min))
             end
             for j in eachnode(dg), i in eachnode(dg)
+                # FV solution at node (i, j)
                 s = entropy_spec(get_node_vars(u, equations, dg, i, j, element),
                                  equations)
                 s_min[i, j, element] = min(s_min[i, j, element], s)
-                # TODO: Add source?
-                # - xi direction
+                # TODO: Add source term!
+                # xi direction: subcell face between (i-1, j) and (i, j)
                 s = entropy_spec(get_node_vars(bar_states1, equations, dg, i, j,
                                                element), equations)
                 s_min[i, j, element] = min(s_min[i, j, element], s)
-                # + xi direction
-                s = entropy_spec(get_node_vars(bar_states1, equations, dg, i + 1, j,
-                                               element), equations)
-                s_min[i, j, element] = min(s_min[i, j, element], s)
-                # - eta direction
+                if i > 1
+                    s_min[i - 1, j, element] = min(s_min[i - 1, j, element], s)
+                end
+                # eta direction: subcell face between (i, j-1) and (i, j)
                 s = entropy_spec(get_node_vars(bar_states2, equations, dg, i, j,
                                                element), equations)
                 s_min[i, j, element] = min(s_min[i, j, element], s)
-                # + eta direction
-                s = entropy_spec(get_node_vars(bar_states2, equations, dg, i, j + 1,
+                if j > 1
+                    s_min[i, j - 1, element] = min(s_min[i, j - 1, element], s)
+                end
+            end
+            for i in eachnode(dg)
+                # interface/boundary of (nnodes(dg), i) in positive xi direction
+                s = entropy_spec(get_node_vars(bar_states1, equations, dg, nnodes(dg) + 1, i,
                                                element), equations)
-                s_min[i, j, element] = min(s_min[i, j, element], s)
+                s_min[nnodes(dg), i, element] = min(s_min[nnodes(dg), i, element], s)
+
+                # interface/boundary of (i, nnodes(dg)) in positive eta direction
+                s = entropy_spec(get_node_vars(bar_states2, equations, dg, i, nnodes(dg) + 1,
+                                               element), equations)
+                s_min[i, nnodes(dg), element] = min(s_min[i, nnodes(dg), element], s)
             end
         end
     end
@@ -940,25 +950,36 @@ end
                 s_max[i, j, element] = typemin(eltype(s_max))
             end
             for j in eachnode(dg), i in eachnode(dg)
+                # FV solution at node (i, j)
                 s = entropy_math(get_node_vars(u, equations, dg, i, j, element),
                                  equations)
                 s_max[i, j, element] = max(s_max[i, j, element], s)
-                # - xi direction
+                # TODO: Add source term!
+                # xi direction: subcell face between (i-1, j) and (i, j)
                 s = entropy_math(get_node_vars(bar_states1, equations, dg, i, j,
                                                element), equations)
                 s_max[i, j, element] = max(s_max[i, j, element], s)
-                # + xi direction
-                s = entropy_math(get_node_vars(bar_states1, equations, dg, i + 1, j,
-                                               element), equations)
-                s_max[i, j, element] = max(s_max[i, j, element], s)
-                # - eta direction
+                if i > 1
+                    s_max[i - 1, j, element] = max(s_max[i - 1, j, element], s)
+                end
+                # eta direction: subcell face between (i, j-1) and (i, j)
                 s = entropy_math(get_node_vars(bar_states2, equations, dg, i, j,
                                                element), equations)
                 s_max[i, j, element] = max(s_max[i, j, element], s)
-                # + eta direction
-                s = entropy_math(get_node_vars(bar_states2, equations, dg, i, j + 1,
+                if j > 1
+                    s_max[i, j - 1, element] = max(s_max[i, j - 1, element], s)
+                end
+            end
+            for i in eachnode(dg)
+                # interface/boundary of (nnodes(dg), i) in positive xi direction
+                s = entropy_math(get_node_vars(bar_states1, equations, dg, nnodes(dg) + 1, i,
                                                element), equations)
-                s_max[i, j, element] = max(s_max[i, j, element], s)
+                s_max[nnodes(dg), i, element] = max(s_max[nnodes(dg), i, element], s)
+
+                # interface/boundary of (i, nnodes(dg)) in positive eta direction
+                s = entropy_math(get_node_vars(bar_states2, equations, dg, i, nnodes(dg) + 1,
+                                               element), equations)
+                s_max[i, nnodes(dg), element] = max(s_max[i, nnodes(dg), element], s)
             end
         end
     end
