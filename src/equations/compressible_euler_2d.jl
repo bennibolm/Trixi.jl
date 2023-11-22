@@ -394,9 +394,11 @@ Should be used together with [`StructuredMesh`](@ref).
     return boundary_flux
 end
 
+# TODO: Add docstring when about to merge.
 @inline function characteristic_boundary_value_function(outer_boundary_value_function,
                                                         u_inner, orientation::Integer,
-                                                        direction, x, t, equations)
+                                                        direction, x, t,
+                                                        equations::CompressibleEulerEquations2D)
     # Get inverse of density
     srho = 1 / u_inner[1]
 
@@ -419,7 +421,8 @@ end
 @inline function characteristic_boundary_value_function(outer_boundary_value_function,
                                                         u_inner,
                                                         normal_direction::AbstractVector,
-                                                        direction, x, t, equations)
+                                                        direction, x, t,
+                                                        equations::CompressibleEulerEquations2D)
     # Get normal velocity
     if iseven(direction) # u_inner is "left" of boundary, u_boundary is "right" of boundary
         factor = 1
@@ -434,10 +437,22 @@ end
                                                         u_inner, vn, x, t, equations)
 end
 
+@inline function characteristic_boundary_value_function(outer_boundary_value_function,
+                                                        u_inner,
+                                                        normal_direction::AbstractVector,
+                                                        x, t,
+                                                        equations::CompressibleEulerEquations2D)
+    vn = (normal_direction[1] * u_inner[2] + normal_direction[2] * u_inner[3]) /
+         norm(normal_direction)
+
+    return characteristic_boundary_value_function_inner(outer_boundary_value_function,
+                                                        u_inner, vn, x, t, equations)
+end
+
 # Inner function to distinguish between different mesh types.
 @inline function characteristic_boundary_value_function_inner(outer_boundary_value_function,
                                                               u_inner, vn, x, t,
-                                                              equations)
+                                                              equations::CompressibleEulerEquations2D)
     # Get inverse of density
     srho = 1 / u_inner[1]
 
