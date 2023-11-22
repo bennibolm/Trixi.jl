@@ -539,19 +539,18 @@ end
     @test_trixi_include(joinpath(EXAMPLES_DIR,
                                  "elixir_euler_free_stream_sc_subcell.jl"),
                         l2=[
-                            2.6224749465938795e-14,
-                            1.6175366858083413e-14,
-                            2.358782725951525e-14,
-                            5.910156539173304e-14,
+                            1.4663777294625118e-15,
+                            2.320054900530864e-14,
+                            3.487555722563465e-14,
+                            2.008802099296406e-14,
                         ],
                         linf=[
-                            1.1546319456101628e-14,
-                            1.084687895058778e-13,
-                            1.7050250100680842e-13,
-                            2.0250467969162855e-13,
+                            2.3092638912203256e-14,
+                            2.0623780461193064e-13,
+                            2.6795232699328153e-13,
+                            2.362554596402333e-13,
                         ],
-                        atol=1.0e-13,
-                        cells_per_dimension=(8, 8))
+                        atol=7.0e-13)
     # Ensure that we do not have excessive memory allocations
     # (e.g., from type instabilities)
     let
@@ -565,19 +564,18 @@ end
 @trixi_testset "elixir_euler_free_stream_MCL.jl" begin
     @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_euler_free_stream_MCL.jl"),
                         l2=[
-                            3.532639560334565e-14,
-                            1.4787576718355913e-14,
-                            2.109573923923632e-14,
-                            2.54649935281524e-14,
+                            8.457600308458635e-16,
+                            2.185478357408446e-14,
+                            3.14987670823871e-14,
+                            1.6817763381190492e-14,
                         ],
                         linf=[
-                            7.993605777301127e-15,
-                            1.1611545058798356e-13,
-                            1.7619239400801234e-13,
-                            2.007283228522283e-13,
+                            2.1316282072803006e-14,
+                            2.0759782781709646e-13,
+                            2.4705237855471296e-13,
+                            2.255973186038318e-13,
                         ],
-                        atol=1.0e-13,
-                        cells_per_dimension=(8, 8))
+                        atol=7.0e-13)
     # Ensure that we do not have excessive memory allocations
     # (e.g., from type instabilities)
     let

@@ -43,7 +43,7 @@ function max_dt(u, t, mesh::TreeMesh{2},
     return 2 / (nnodes(dg) * max_scaled_speed)
 end
 
-@inline function max_dt(u, t, mesh::Union{TreeMesh, StructuredMesh},
+@inline function max_dt(u, t, mesh::Union{TreeMesh, StructuredMesh, P4estMesh},
                         constant_speed::False, equations, semi, dg::DG, cache,
                         limiter::Union{SubcellLimiterIDP, SubcellLimiterMCL})
     @unpack inverse_weights = dg.basis
@@ -75,7 +75,7 @@ end
             J = 1 / cache.elements.inverse_jacobian[element]
         end
         for j in eachnode(dg), i in eachnode(dg)
-            if mesh isa StructuredMesh{2}
+            if (mesh isa StructuredMesh{2}) || (mesh isa P4estMesh{2})
                 J = 1 / cache.elements.inverse_jacobian[i, j, element]
             end
             denom = inverse_weights[i] *

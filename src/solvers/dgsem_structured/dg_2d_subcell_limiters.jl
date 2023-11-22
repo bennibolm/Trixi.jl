@@ -10,8 +10,8 @@
 #
 # See also `flux_differencing_kernel!`.
 @inline function calcflux_fhat!(fhat1_L, fhat1_R, fhat2_L, fhat2_R, u,
-                                mesh::StructuredMesh{2}, nonconservative_terms::False,
-                                equations,
+                                mesh::Union{StructuredMesh{2}, P4estMesh{2}},
+                                nonconservative_terms::False, equations,
                                 volume_flux, dg::DGSEM, element, cache)
     (; contravariant_vectors) = cache.elements
     (; weights, derivative_split) = dg.basis
@@ -109,7 +109,8 @@
     return nothing
 end
 
-@inline function calc_lambdas_bar_states!(u, t, mesh::StructuredMesh,
+@inline function calc_lambdas_bar_states!(u, t,
+                                          mesh::Union{StructuredMesh{2}, P4estMesh{2}},
                                           nonconservative_terms, equations, limiter,
                                           dg, cache, boundary_conditions;
                                           calc_bar_states = true)
@@ -117,8 +118,6 @@ end
         return nothing
     end
     (; lambda1, lambda2, bar_states1, bar_states2) = limiter.cache.container_bar_states
-    (; contravariant_vectors) = cache.elements
-
     (; normal_direction_xi, normal_direction_eta) = limiter.cache.container_bar_states
 
     # Calc lambdas and bar states inside elements
@@ -165,6 +164,19 @@ end
             end
         end
     end
+
+    calc_lambdas_bar_states_interface!(u, t, limiter, boundary_conditions, mesh,
+                                       equations,
+                                       dg, cache; calc_bar_states = calc_bar_states)
+
+    return nothing
+end
+
+@inline function calc_lambdas_bar_states_interface!(u, t, limiter, boundary_conditions,
+                                                    mesh::StructuredMesh{2}, equations,
+                                                    dg, cache; calc_bar_states = true)
+    (; contravariant_vectors) = cache.elements
+    (; lambda1, lambda2, bar_states1, bar_states2) = limiter.cache.container_bar_states
 
     # Calc lambdas and bar states at interfaces and periodic boundaries
     @threaded for element in eachelement(dg, cache)

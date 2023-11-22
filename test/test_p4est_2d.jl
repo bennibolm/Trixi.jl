@@ -153,6 +153,32 @@ end
     end
 end
 
+@trixi_testset "elixir_euler_free_stream_sc_subcell.jl" begin
+    @test_trixi_include(joinpath(EXAMPLES_DIR,
+                                 "elixir_euler_free_stream_sc_subcell.jl"),
+                        l2=[
+                            1.4663777294625118e-15,
+                            2.320054900530864e-14,
+                            3.487555722563465e-14,
+                            2.008802099296406e-14,
+                        ],
+                        linf=[
+                            2.3092638912203256e-14,
+                            2.0623780461193064e-13,
+                            2.6795232699328153e-13,
+                            2.362554596402333e-13,
+                        ],
+                        atol=2.0e-12,)
+    # Ensure that we do not have excessive memory allocations
+    # (e.g., from type instabilities)
+    let
+        t = sol.t[end]
+        u_ode = sol.u[end]
+        du_ode = similar(u_ode)
+        @test (@allocated Trixi.rhs!(du_ode, u_ode, semi, t)) < 15000
+    end
+end
+
 @trixi_testset "elixir_euler_shockcapturing_ec.jl" begin
     @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_euler_shockcapturing_ec.jl"),
                         l2=[

@@ -13,19 +13,14 @@ surface_flux = flux_lax_friedrichs
 volume_flux = flux_ranocha
 polydeg = 3
 basis = LobattoLegendreBasis(polydeg)
-limiter_mcl = SubcellLimiterMCL(equations, basis;
-                                density_limiter = false,
-                                density_coefficient_for_all = false,
-                                sequential_limiter = false,
-                                conservative_limiter = false,
-                                positivity_limiter_pressure = true,
-                                positivity_limiter_pressure_exact = true,
-                                positivity_limiter_density = true,
-                                entropy_limiter_semidiscrete = false,
-                                smoothness_indicator = false,
-                                Plotting = true)
+limiter_idp = SubcellLimiterIDP(equations, basis;
+                                positivity_variables_cons = ["rho"],
+                                positivity_variables_nonlinear = [pressure],
+                                positivity_correction_factor = 0.1,
+                                spec_entropy = false,
+                                bar_states = true)
 
-volume_integral = VolumeIntegralSubcellLimiting(limiter_mcl;
+volume_integral = VolumeIntegralSubcellLimiting(limiter_idp;
                                                 volume_flux_dg = volume_flux,
                                                 volume_flux_fv = surface_flux)
 solver = DGSEM(basis, surface_flux, volume_integral)
@@ -51,8 +46,12 @@ function mapping(xi_, eta_)
     return SVector(x, y)
 end
 
-cells_per_dimension = (16, 16)
-mesh = StructuredMesh(cells_per_dimension, mapping, periodicity = true)
+trees_per_dimension = (16, 16)
+
+# Create P4estMesh with 16 x 16 trees and 16 x 16 elements
+mesh = P4estMesh(trees_per_dimension, polydeg = 3,
+                 mapping = mapping,
+                 initial_refinement_level = 0, periodicity = true)
 
 semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, solver)
 
@@ -84,7 +83,7 @@ callbacks = CallbackSet(summary_callback,
 ###############################################################################
 # run the simulation
 
-stage_callbacks = (BoundsCheckCallback(save_errors = false),)
+stage_callbacks = (SubcellLimiterIDPCorrection(), BoundsCheckCallback(save_errors = false))
 
 sol = Trixi.solve(ode, Trixi.SimpleSSPRK33(stage_callbacks = stage_callbacks);
                   dt = 1.0, # solve needs some value here but it will be overwritten by the stepsize_callback
