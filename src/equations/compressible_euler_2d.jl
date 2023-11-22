@@ -415,7 +415,8 @@ end
     end
 
     return characteristic_boundary_value_function_inner(outer_boundary_value_function,
-                                                        u_inner, vn, x, t, equations)
+                                                        u_inner, srho, vn, x, t,
+                                                        equations)
 end
 
 @inline function characteristic_boundary_value_function(outer_boundary_value_function,
@@ -423,18 +424,22 @@ end
                                                         normal_direction::AbstractVector,
                                                         direction, x, t,
                                                         equations::CompressibleEulerEquations2D)
+    # Get inverse of density
+    srho = 1 / u_inner[1]
+
     # Get normal velocity
     if iseven(direction) # u_inner is "left" of boundary, u_boundary is "right" of boundary
         factor = 1
     else # u_boundary is "left" of boundary, u_inner is "right" of boundary
         factor = -1
     end
-    vn = factor *
+    vn = factor * srho *
          (normal_direction[1] * u_inner[2] + normal_direction[2] * u_inner[3]) /
          norm(normal_direction)
 
     return characteristic_boundary_value_function_inner(outer_boundary_value_function,
-                                                        u_inner, vn, x, t, equations)
+                                                        u_inner, srho, vn, x, t,
+                                                        equations)
 end
 
 @inline function characteristic_boundary_value_function(outer_boundary_value_function,
@@ -442,20 +447,21 @@ end
                                                         normal_direction::AbstractVector,
                                                         x, t,
                                                         equations::CompressibleEulerEquations2D)
-    vn = (normal_direction[1] * u_inner[2] + normal_direction[2] * u_inner[3]) /
+    # Get inverse of density
+    srho = 1 / u_inner[1]
+
+    vn = srho * (normal_direction[1] * u_inner[2] + normal_direction[2] * u_inner[3]) /
          norm(normal_direction)
 
     return characteristic_boundary_value_function_inner(outer_boundary_value_function,
-                                                        u_inner, vn, x, t, equations)
+                                                        u_inner, srho, vn, x, t,
+                                                        equations)
 end
 
 # Inner function to distinguish between different mesh types.
 @inline function characteristic_boundary_value_function_inner(outer_boundary_value_function,
-                                                              u_inner, vn, x, t,
+                                                              u_inner, srho, vn, x, t,
                                                               equations::CompressibleEulerEquations2D)
-    # Get inverse of density
-    srho = 1 / u_inner[1]
-
     # get pressure and Mach from state
     p = pressure(u_inner, equations)
     a = sqrt(equations.gamma * p * srho)
