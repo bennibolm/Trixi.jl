@@ -167,17 +167,20 @@ function calc_bounds_onesided_interface!(var_minmax, minmax, variable, u, t, sem
         j_secondary = j_secondary_start
 
         for node in eachnode(dg)
-            var_primary = variable(get_node_vars(u, equations, dg, i_primary, j_primary, primary_element), equations)
-            var_secondary = variable(get_node_vars(u, equations, dg, i_secondary, j_secondary, secondary_element), equations)
+            var_primary = variable(get_node_vars(u, equations, dg, i_primary, j_primary,
+                                                 primary_element), equations)
+            var_secondary = variable(get_node_vars(u, equations, dg, i_secondary,
+                                                   j_secondary, secondary_element),
+                                     equations)
 
             var_minmax[i_primary, j_primary, primary_element] = minmax(var_minmax[i_primary,
                                                                                   j_primary,
                                                                                   primary_element],
                                                                        var_secondary)
             var_minmax[i_secondary, j_secondary, secondary_element] = minmax(var_minmax[i_secondary,
-                                                                                           j_secondary,
-                                                                                           secondary_element],
-                                                                                var_primary)
+                                                                                        j_secondary,
+                                                                                        secondary_element],
+                                                                             var_primary)
 
             # Increment primary element indices
             i_primary += i_primary_step

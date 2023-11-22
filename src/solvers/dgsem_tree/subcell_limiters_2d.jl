@@ -475,7 +475,8 @@ end
 end
 
 @inline function idp_spec_entropy!(alpha, limiter, u, t, dt, semi,
-                                   mesh::Union{StructuredMesh{2}, P4estMesh{2}}, elements)
+                                   mesh::Union{StructuredMesh{2}, P4estMesh{2}},
+                                   elements)
     _, equations, dg, cache = mesh_equations_solver_cache(semi)
     (; variable_bounds) = limiter.cache.subcell_limiter_coefficients
     s_min = variable_bounds[:spec_entropy_min]
@@ -526,7 +527,8 @@ end
 end
 
 @inline function idp_math_entropy!(alpha, limiter, u, t, dt, semi,
-                                   mesh::Union{StructuredMesh{2}, P4estMesh{2}}, elements)
+                                   mesh::Union{StructuredMesh{2}, P4estMesh{2}},
+                                   elements)
     _, equations, dg, cache = mesh_equations_solver_cache(semi)
     (; variable_bounds) = limiter.cache.subcell_limiter_coefficients
     s_max = variable_bounds[:math_entropy_max]
