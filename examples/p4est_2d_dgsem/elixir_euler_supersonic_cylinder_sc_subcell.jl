@@ -48,6 +48,16 @@ initial_condition = initial_condition_mach3_flow
     return flux
 end
 
+@inline function Trixi.get_boundary_outer_state(u_inner, cache, t,
+                                                boundary_condition::typeof(boundary_condition_supersonic_inflow),
+                                                normal_direction::AbstractVector, direction,
+                                                equations,
+                                                dg::DG, indices...)
+    x = Trixi.get_node_coords(cache.elements.node_coordinates, equations, dg, indices...)
+
+    return initial_condition(x, t, equations)
+end
+
 # Supersonic outflow boundary condition.
 # Calculate the boundary flux entirely from the internal solution state. Analogous to supersonic inflow
 # except all the solution state values are set from the internal solution as everything leaves the domain
@@ -57,6 +67,13 @@ end
     flux = Trixi.flux(u_inner, normal_direction, equations)
 
     return flux
+end
+
+@inline function Trixi.get_boundary_outer_state(u_inner, cache, t,
+                                                boundary_condition::typeof(boundary_condition_outflow),
+                                                orientation_or_normal, direction, equations,
+                                                dg, indices...)
+    return u_inner
 end
 
 # boundary_condition_inflow_outflow = BoundaryConditionCharacteristic(initial_condition)

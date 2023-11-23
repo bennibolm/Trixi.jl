@@ -450,6 +450,7 @@ end
     # Get inverse of density
     srho = 1 / u_inner[1]
 
+    # Get normal velocity
     vn = srho * (normal_direction[1] * u_inner[2] + normal_direction[2] * u_inner[3]) /
          norm(normal_direction)
 

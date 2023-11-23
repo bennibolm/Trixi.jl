@@ -1850,13 +1850,6 @@ end
                    u_inner[4])
 end
 
-# Default implementation of `get_boundary_outer_state` returns inner value.
-@inline function get_boundary_outer_state(u_inner, cache, t, boundary_condition,
-                                          orientation_or_normal, direction, equations,
-                                          dg, indices...)
-    return u_inner
-end
-
 @inline function get_boundary_outer_state(u_inner, cache, t,
                                           boundary_condition::BoundaryConditionDirichlet,
                                           orientation_or_normal, direction, equations,
