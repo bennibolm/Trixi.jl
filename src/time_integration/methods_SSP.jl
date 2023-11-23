@@ -270,7 +270,7 @@ function calc_normal_directions!(container_bar_states, mesh::TreeMesh, equations
 end
 
 function calc_normal_directions!(container_bar_states,
-                                 mesh::Union{StructuredMesh, P4estMesh},
+                                 mesh::Union{StructuredMesh{2}, P4estMesh{2}},
                                  equations, dg, cache)
     (; weights, derivative_matrix) = dg.basis
     (; contravariant_vectors) = cache.elements
