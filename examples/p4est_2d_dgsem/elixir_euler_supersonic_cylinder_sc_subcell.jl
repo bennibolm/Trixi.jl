@@ -55,7 +55,7 @@ end
                                                 dg::DG, indices...)
     x = Trixi.get_node_coords(cache.elements.node_coordinates, equations, dg, indices...)
 
-    return initial_condition(x, t, equations)
+    return initial_condition_mach3_flow(x, t, equations)
 end
 
 # Supersonic outflow boundary condition.
