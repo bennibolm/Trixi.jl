@@ -149,7 +149,8 @@ end
     (; boundaries) = cache
     index_range = eachnode(dg)
 
-    foreach(enumerate(boundary_condition_types)) do (i, boundary_condition)
+    # Allocation-free version of `foreach(enumerate((...))`
+    foreach_enumerate(boundary_condition_types) do (i, boundary_condition)
         for boundary in boundary_indices[i]
             element = boundaries.neighbor_ids[boundary]
             node_indices = boundaries.node_indices[boundary]
