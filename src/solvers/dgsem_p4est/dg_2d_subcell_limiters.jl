@@ -198,17 +198,17 @@ end
                 bar_state = 0.5 * (u_inner + u_outer) -
                             0.5 * (flux_outer - flux_inner) / lambda
                 if direction == 1
-                    set_node_vars!(bar_states1, bar_state, equations, dg, i_node,
-                                   j_node, element)
+                    set_node_vars!(bar_states1, bar_state, equations, dg,
+                                   i_node, j_node, element)
                 elseif direction == 2
-                    set_node_vars!(bar_states1, bar_state, equations, dg, i_node + 1,
-                                   j_node, element)
+                    set_node_vars!(bar_states1, bar_state, equations, dg,
+                                   i_node + 1, j_node, element)
                 elseif direction == 3
-                    set_node_vars!(bar_states2, bar_state, equations, dg, i_node,
-                                   j_node, element)
+                    set_node_vars!(bar_states2, bar_state, equations, dg,
+                                   i_node, j_node, element)
                 else # direction == 4
-                    set_node_vars!(bar_states2, bar_state, equations, dg, i_node,
-                                   j_node + 1, element)
+                    set_node_vars!(bar_states2, bar_state, equations, dg,
+                                   i_node, j_node + 1, element)
                 end
             end
         end

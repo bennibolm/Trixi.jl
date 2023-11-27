@@ -52,7 +52,7 @@ end
                                                 boundary_condition::typeof(boundary_condition_supersonic_inflow),
                                                 normal_direction::AbstractVector, direction,
                                                 equations,
-                                                dg::DG, indices...)
+                                                dg, indices...)
     x = Trixi.get_node_coords(cache.elements.node_coordinates, equations, dg, indices...)
 
     return initial_condition_mach3_flow(x, t, equations)
