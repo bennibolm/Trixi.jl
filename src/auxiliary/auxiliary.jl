@@ -349,6 +349,7 @@ end
 # Same as `foreach(enumerate(something))`, but without allocations.
 #
 # Note that compile times may increase if this is used with big tuples.
+# TODO: Add comment in the respective PR (here and where it is used: `dg_p4est/dg_2d_subcell_limiters.jl`)
 @inline foreach_enumerate(func, collection) = foreach_enumerate(func, collection, 1)
 @inline foreach_enumerate(func, collection::Tuple{}, index) = nothing
 
