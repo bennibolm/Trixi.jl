@@ -12,18 +12,15 @@ function calc_bounds_twosided_interface!(var_min, var_max, variable, u, t, semi,
 
     (; neighbor_ids, node_indices) = cache.interfaces
     index_range = eachnode(dg)
-    index_end = last(index_range)
 
     for interface in eachinterface(dg, cache)
         # Get element and side index information on the primary element
         primary_element = neighbor_ids[1, interface]
         primary_indices = node_indices[1, interface]
-        primary_direction = indices2direction(primary_indices)
 
         # Get element and side index information on the secondary element
         secondary_element = neighbor_ids[2, interface]
         secondary_indices = node_indices[2, interface]
-        secondary_direction = indices2direction(secondary_indices)
 
         # Create the local i,j indexing
         i_primary_start, i_primary_step = index_to_start_step_2d(primary_indices[1],

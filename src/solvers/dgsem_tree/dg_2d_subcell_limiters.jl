@@ -1843,7 +1843,7 @@ end
                                           normal_direction::AbstractVector,
                                           direction, equations, dg, indices...)
     factor = (normal_direction[1] * u_inner[2] + normal_direction[2] * u_inner[3])
-    u_normal = (factor / sum(normal_direction.^2)) * normal_direction
+    u_normal = (factor / sum(normal_direction .^ 2)) * normal_direction
 
     return SVector(u_inner[1],
                    u_inner[2] - 2.0 * u_normal[1],
@@ -1888,7 +1888,7 @@ end
     u_outer = boundary_condition.boundary_value_function(boundary_condition.outer_boundary_value_function,
                                                          u_inner,
                                                          normal_direction /
-                                                         sum(normal_direction.^2),
+                                                         sum(normal_direction .^ 2),
                                                          direction, x, t, equations)
 
     return u_outer
