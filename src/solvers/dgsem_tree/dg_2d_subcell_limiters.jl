@@ -1889,8 +1889,7 @@ end
 
     u_outer = boundary_condition.boundary_value_function(boundary_condition.outer_boundary_value_function,
                                                          u_inner,
-                                                         normal_direction /
-                                                         norm(normal_direction),
+                                                         normal_direction,
                                                          direction, x, t, equations)
 
     return u_outer

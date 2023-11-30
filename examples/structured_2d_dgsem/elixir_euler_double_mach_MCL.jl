@@ -83,8 +83,7 @@ end
     if x[1] < 1 / 6 # BoundaryConditionCharacteristic
         u_outer = Trixi.characteristic_boundary_value_function(initial_condition_double_mach_reflection,
                                                                u_inner,
-                                                               normal_direction /
-                                                               norm(normal_direction),
+                                                               normal_direction,
                                                                direction, x, t, equations)
 
     else # if x[1] >= 1 / 6 # boundary_condition_slip_wall
