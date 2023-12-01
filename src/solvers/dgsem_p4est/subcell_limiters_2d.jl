@@ -68,20 +68,21 @@ function calc_bounds_twosided_interface!(var_min, var_max, variable, u, t, semi,
     end
 
     calc_bounds_twosided_interface_inner!(var_min, var_max, variable, u, t,
-                                          boundary_conditions, equations, dg, cache)
+                                          boundary_conditions,
+                                          mesh, equations, dg, cache)
 
     return nothing
 end
 
 @inline function calc_bounds_twosided_interface_inner!(var_min, var_max, variable, u, t,
                                                        boundary_conditions::BoundaryConditionPeriodic,
-                                                       equations, dg, cache)
+                                                       mesh, equations, dg, cache)
     return nothing
 end
 
 @inline function calc_bounds_twosided_interface_inner!(var_min, var_max, variable, u, t,
-                                                       boundary_conditions, equations,
-                                                       dg, cache)
+                                                       boundary_conditions,
+                                                       mesh, equations, dg, cache)
     (; boundary_condition_types, boundary_indices) = boundary_conditions
     (; contravariant_vectors) = cache.elements
 
@@ -110,8 +111,8 @@ end
 
                 u_outer = get_boundary_outer_state(u_inner, cache, t,
                                                    boundary_condition, normal_direction,
-                                                   direction, equations, dg, i_node,
-                                                   j_node, element)
+                                                   direction, mesh, equations, dg,
+                                                   i_node, j_node, element)
                 var_outer = u_outer[variable]
 
                 var_min[i_node, j_node, element] = min(var_min[i_node, j_node, element],
@@ -186,7 +187,8 @@ function calc_bounds_onesided_interface!(var_minmax, minmax, variable, u, t, sem
     end
 
     calc_bounds_onesided_interface_inner!(var_minmax, minmax, variable, u, t,
-                                          boundary_conditions, equations, dg, cache)
+                                          boundary_conditions,
+                                          mesh, equations, dg, cache)
 
     return nothing
 end
@@ -194,13 +196,13 @@ end
 @inline function calc_bounds_onesided_interface_inner!(var_minmax, minmax, variable, u,
                                                        t,
                                                        boundary_conditions::BoundaryConditionPeriodic,
-                                                       equations, dg, cache)
+                                                       mesh, equations, dg, cache)
     return nothing
 end
 
 @inline function calc_bounds_onesided_interface_inner!(var_minmax, minmax, variable, u,
                                                        t, boundary_conditions,
-                                                       equations, dg, cache)
+                                                       mesh, equations, dg, cache)
     (; boundary_condition_types, boundary_indices) = boundary_conditions
     (; contravariant_vectors) = cache.elements
 
@@ -229,8 +231,8 @@ end
 
                 u_outer = get_boundary_outer_state(u_inner, cache, t,
                                                    boundary_condition, normal_direction,
-                                                   direction, equations, dg, i_node,
-                                                   j_node, element)
+                                                   direction, mesh, equations, dg,
+                                                   i_node, j_node, element)
                 var_outer = variable(u_outer, equations)
 
                 var_minmax[i_node, j_node, element] = minmax(var_minmax[i_node, j_node,

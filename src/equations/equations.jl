@@ -227,7 +227,8 @@ end
                                                                        surface_flux_function,
                                                                        equations)
     u_boundary = boundary_condition.boundary_value_function(boundary_condition.outer_boundary_value_function,
-                                                            u_inner, orientation_or_normal,
+                                                            u_inner,
+                                                            orientation_or_normal,
                                                             direction, x, t, equations)
 
     # Calculate boundary flux
@@ -249,8 +250,8 @@ end
                                                                        surface_flux_function,
                                                                        equations)
     u_boundary = boundary_condition.boundary_value_function(boundary_condition.outer_boundary_value_function,
-                                                            u_inner, normal_direction, x, t,
-                                                            equations)
+                                                            u_inner, normal_direction,
+                                                            x, t, equations)
 
     # Calculate boundary flux
     flux = surface_flux_function(u_inner, u_boundary, normal_direction, equations)

@@ -86,7 +86,8 @@
             flux_primary = flux(u_primary, normal_direction, equations)
             flux_secondary = flux(u_secondary, normal_direction, equations)
 
-            bar_state = 0.5 * (u_primary + u_secondary) - 0.5 * (flux_secondary - flux_primary) / lambda
+            bar_state = 0.5 * (u_primary + u_secondary) -
+                        0.5 * (flux_secondary - flux_primary) / lambda
             if primary_direction == 1
                 set_node_vars!(bar_states1, bar_state, equations, dg,
                                i_primary, j_primary, primary_element)
@@ -116,23 +117,24 @@
         end
     end
 
-    calc_lambdas_bar_states_boundary!(u, t, limiter, boundary_conditions, equations, dg,
-                                      cache; calc_bar_states = calc_bar_states)
+    calc_lambdas_bar_states_boundary!(u, t, limiter, boundary_conditions,
+                                      mesh, equations, dg, cache;
+                                      calc_bar_states = calc_bar_states)
 
     return nothing
 end
 
 @inline function calc_lambdas_bar_states_boundary!(u, t, limiter,
                                                    boundary_conditions::BoundaryConditionPeriodic,
-                                                   mesh::P4estMesh, equations, dg, cache;
-                                                   calc_bar_states = true)
+                                                   mesh::P4estMesh, equations, dg,
+                                                   cache; calc_bar_states = true)
     return nothing
 end
 
 # Calc lambdas and bar states at physical boundaries
 @inline function calc_lambdas_bar_states_boundary!(u, t, limiter, boundary_conditions,
-                                                   mesh::P4estMesh{2}, equations, dg, cache;
-                                                   calc_bar_states = true)
+                                                   mesh::P4estMesh{2}, equations, dg,
+                                                   cache; calc_bar_states = true)
     (; boundary_condition_types, boundary_indices) = boundary_conditions
     (; contravariant_vectors) = cache.elements
 
@@ -166,8 +168,8 @@ end
                 u_inner = get_node_vars(u, equations, dg, i_node, j_node, element)
                 u_outer = get_boundary_outer_state(u_inner, cache, t,
                                                    boundary_condition, normal_direction,
-                                                   direction, equations, dg, i_node,
-                                                   j_node, element)
+                                                   direction, mesh, equations, dg,
+                                                   i_node, j_node, element)
 
                 lambda = max_abs_speed_naive(u_inner, u_outer, normal_direction,
                                              equations)

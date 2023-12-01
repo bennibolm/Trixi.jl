@@ -77,6 +77,7 @@ end
 @inline function Trixi.get_boundary_outer_state(u_inner, cache, t,
                                                 boundary_condition::typeof(boundary_condition_mixed_characteristic_wall),
                                                 normal_direction::AbstractVector, direction,
+                                                mesh::StructuredMesh{2},
                                                 equations::CompressibleEulerEquations2D,
                                                 dg, indices...)
     x = Trixi.get_node_coords(cache.elements.node_coordinates, equations, dg, indices...)
