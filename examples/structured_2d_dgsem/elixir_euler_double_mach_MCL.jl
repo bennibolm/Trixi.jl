@@ -63,7 +63,12 @@ boundary_condition_inflow_outflow = BoundaryConditionCharacteristic(initial_cond
                                                                   direction, x, t,
                                                                   equations)
         # Calculate boundary flux
-        flux = surface_flux_function(u_boundary, u_inner, normal_direction, equations)
+        if iseven(direction) # u_inner is "left" of boundary, u_boundary is "right" of boundary
+            flux = surface_flux_function(u_inner, u_boundary, orientation_or_normal,
+                                         equations)
+        else
+            flux = surface_flux_function(u_boundary, u_inner, normal_direction, equations)
+        end
     else # x[1] >= 1 / 6
         # Use the free slip wall BC otherwise
         flux = boundary_condition_slip_wall(u_inner, normal_direction, direction, x, t,
@@ -123,7 +128,7 @@ volume_integral = VolumeIntegralSubcellLimiting(limiter_mcl;
                                                 volume_flux_fv = surface_flux)
 solver = DGSEM(basis, surface_flux, volume_integral)
 
-initial_refinement_level = 6
+initial_refinement_level = 4
 cells_per_dimension = (4 * 2^initial_refinement_level, 2^initial_refinement_level)
 coordinates_min = (0.0, 0.0)
 coordinates_max = (4.0, 1.0)
