@@ -86,39 +86,31 @@
             flux_primary = flux(u_primary, normal_direction, equations)
             flux_secondary = flux(u_secondary, normal_direction, equations)
 
-            bar_state_primary = 0.5 * (u_primary + u_secondary) -
-                                0.5 * (flux_secondary - flux_primary) / lambda
-            if isodd(secondary_direction)
-                bar_state_secondary = 0.5 * (u_primary + u_secondary) -
-                                      0.5 * (flux_secondary - flux_primary) / lambda
-            else
-                bar_state_secondary = 0.5 * (u_primary + u_secondary) -
-                                      0.5 * (flux_primary - flux_secondary) / lambda
-            end
+            bar_state = 0.5 * (u_primary + u_secondary) - 0.5 * (flux_secondary - flux_primary) / lambda
             if primary_direction == 1
-                set_node_vars!(bar_states1, bar_state_primary, equations, dg,
+                set_node_vars!(bar_states1, bar_state, equations, dg,
                                i_primary, j_primary, primary_element)
             elseif primary_direction == 2
-                set_node_vars!(bar_states1, bar_state_primary, equations, dg,
+                set_node_vars!(bar_states1, bar_state, equations, dg,
                                i_primary + 1, j_primary, primary_element)
             elseif primary_direction == 3
-                set_node_vars!(bar_states2, bar_state_primary, equations, dg,
+                set_node_vars!(bar_states2, bar_state, equations, dg,
                                i_primary, j_primary, primary_element)
             else # primary_direction == 4
-                set_node_vars!(bar_states2, bar_state_primary, equations, dg,
+                set_node_vars!(bar_states2, bar_state, equations, dg,
                                i_primary, j_primary + 1, primary_element)
             end
             if secondary_direction == 1
-                set_node_vars!(bar_states1, bar_state_secondary, equations, dg,
+                set_node_vars!(bar_states1, bar_state, equations, dg,
                                i_secondary, j_secondary, secondary_element)
             elseif secondary_direction == 2
-                set_node_vars!(bar_states1, bar_state_secondary, equations, dg,
+                set_node_vars!(bar_states1, bar_state, equations, dg,
                                i_secondary + 1, j_secondary, secondary_element)
             elseif secondary_direction == 3
-                set_node_vars!(bar_states2, bar_state_secondary, equations, dg,
+                set_node_vars!(bar_states2, bar_state, equations, dg,
                                i_secondary, j_secondary, secondary_element)
             else # secondary_direction == 4
-                set_node_vars!(bar_states2, bar_state_secondary, equations, dg,
+                set_node_vars!(bar_states2, bar_state, equations, dg,
                                i_secondary, j_secondary + 1, secondary_element)
             end
         end
@@ -132,14 +124,14 @@ end
 
 @inline function calc_lambdas_bar_states_boundary!(u, t, limiter,
                                                    boundary_conditions::BoundaryConditionPeriodic,
-                                                   equations, dg, cache;
+                                                   mesh::P4estMesh, equations, dg, cache;
                                                    calc_bar_states = true)
     return nothing
 end
 
 # Calc lambdas and bar states at physical boundaries
 @inline function calc_lambdas_bar_states_boundary!(u, t, limiter, boundary_conditions,
-                                                   equations, dg, cache;
+                                                   mesh::P4estMesh{2}, equations, dg, cache;
                                                    calc_bar_states = true)
     (; boundary_condition_types, boundary_indices) = boundary_conditions
     (; contravariant_vectors) = cache.elements

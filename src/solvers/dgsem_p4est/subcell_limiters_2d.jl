@@ -141,12 +141,10 @@ function calc_bounds_onesided_interface!(var_minmax, minmax, variable, u, t, sem
         # Get element and side index information on the primary element
         primary_element = neighbor_ids[1, interface]
         primary_indices = node_indices[1, interface]
-        primary_direction = indices2direction(primary_indices)
 
         # Get element and side index information on the secondary element
         secondary_element = neighbor_ids[2, interface]
         secondary_indices = node_indices[2, interface]
-        secondary_direction = indices2direction(secondary_indices)
 
         # Create the local i,j indexing
         i_primary_start, i_primary_step = index_to_start_step_2d(primary_indices[1],
