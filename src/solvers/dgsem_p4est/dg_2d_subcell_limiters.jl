@@ -126,7 +126,7 @@ end
 
 @inline function calc_lambdas_bar_states_boundary!(u, t, limiter,
                                                    boundary_conditions::BoundaryConditionPeriodic,
-                                                   mesh::P4estMesh, equations, dg,
+                                                   mesh::P4estMesh{2}, equations, dg,
                                                    cache; calc_bar_states = true)
     return nothing
 end
