@@ -1859,7 +1859,7 @@ end
                                           boundary_condition::BoundaryConditionDirichlet,
                                           orientation_or_normal, direction, mesh,
                                           equations, dg, indices...)
-    @unpack node_coordinates = cache.elements
+    (; node_coordinates) = cache.elements
 
     x = get_node_coords(node_coordinates, equations, dg, indices...)
     u_outer = boundary_condition.boundary_value_function(x, t, equations)
