@@ -418,7 +418,8 @@ end
 end
 
 @trixi_testset "elixir_euler_supersonic_cylinder_sc_subcell.jl" begin
-    @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_euler_supersonic_cylinder_sc_subcell.jl"),
+    @test_trixi_include(joinpath(EXAMPLES_DIR,
+                                 "elixir_euler_supersonic_cylinder_sc_subcell.jl"),
                         l2=[
                             0.01733051773398731,
                             0.038254257166961285,
