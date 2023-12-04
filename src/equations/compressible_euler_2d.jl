@@ -415,9 +415,9 @@ end
         vn = factor * u_inner[3] * srho
     end
 
-    return characteristic_boundary_value_function_inner(outer_boundary_value_function,
-                                                        u_inner, srho, vn, x, t,
-                                                        equations)
+    return calc_characteristic_boundary_value_function(outer_boundary_value_function,
+                                                       u_inner, srho, vn, x, t,
+                                                       equations)
 end
 
 # Using with StructuredMesh{2}
@@ -439,9 +439,9 @@ end
          (normal_direction[1] * u_inner[2] + normal_direction[2] * u_inner[3]) /
          norm(normal_direction)
 
-    return characteristic_boundary_value_function_inner(outer_boundary_value_function,
-                                                        u_inner, srho, vn, x, t,
-                                                        equations)
+    return calc_characteristic_boundary_value_function(outer_boundary_value_function,
+                                                       u_inner, srho, vn, x, t,
+                                                       equations)
 end
 
 # Using with P4estMesh{2}
@@ -457,12 +457,13 @@ end
     vn = srho * (normal_direction[1] * u_inner[2] + normal_direction[2] * u_inner[3]) /
          norm(normal_direction)
 
-    return characteristic_boundary_value_function_inner(outer_boundary_value_function,
-                                                        u_inner, srho, vn, x, t,
-                                                        equations)
+    return calc_characteristic_boundary_value_function(outer_boundary_value_function,
+                                                       u_inner, srho, vn, x, t,
+                                                       equations)
 end
 
-# Function to compute the outer state of the characteristics-based boundary condition. This function is called by all mesh types.
+# Function to compute the outer state of the characteristics-based boundary condition.
+# This function is called by all mesh types.
 @inline function calc_characteristic_boundary_value_function(outer_boundary_value_function,
                                                              u_inner, srho, vn, x, t,
                                                              equations::CompressibleEulerEquations2D)
