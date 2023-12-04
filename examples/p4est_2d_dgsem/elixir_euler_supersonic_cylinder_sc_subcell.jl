@@ -51,8 +51,8 @@ end
 @inline function Trixi.get_boundary_outer_state(u_inner, cache, t,
                                                 boundary_condition::typeof(boundary_condition_supersonic_inflow),
                                                 normal_direction::AbstractVector, direction,
-                                                equations,
-                                                dg, indices...)
+                                                mesh::P4estMesh{2}, equations, dg,
+                                                indices...)
     x = Trixi.get_node_coords(cache.elements.node_coordinates, equations, dg, indices...)
 
     return initial_condition_mach3_flow(x, t, equations)
@@ -71,8 +71,8 @@ end
 
 @inline function Trixi.get_boundary_outer_state(u_inner, cache, t,
                                                 boundary_condition::typeof(boundary_condition_outflow),
-                                                orientation_or_normal, direction, equations,
-                                                dg, indices...)
+                                                orientation_or_normal, direction,
+                                                mesh::P4estMesh{2}, equations, dg, indices...)
     return u_inner
 end
 
@@ -95,14 +95,10 @@ volume_flux = flux_ranocha
 polydeg = 3
 basis = LobattoLegendreBasis(polydeg)
 limiter_idp = SubcellLimiterIDP(equations, basis;
-                                local_minmax_variables_cons = ["rho"],
                                 positivity_variables_cons = ["rho"],
                                 positivity_variables_nonlinear = [pressure],
-                                positivity_correction_factor = 0.5,
-                                spec_entropy = true,
-                                bar_states = false,
-                                max_iterations_newton = 1000,
-                                newton_tolerances = (1.0e-14, 1.0e-15))
+                                spec_entropy = false,
+                                bar_states = false)
 volume_integral = VolumeIntegralSubcellLimiting(limiter_idp;
                                                 volume_flux_dg = volume_flux,
                                                 volume_flux_fv = surface_flux)
@@ -115,7 +111,7 @@ isfile(default_mesh_file) ||
              default_mesh_file)
 mesh_file = default_mesh_file
 
-mesh = P4estMesh{2}(mesh_file, initial_refinement_level = 1)
+mesh = P4estMesh{2}(mesh_file, initial_refinement_level = 0)
 
 semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, solver,
                                     boundary_conditions = boundary_conditions)

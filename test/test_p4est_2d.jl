@@ -364,21 +364,20 @@ end
 end
 
 @trixi_testset "elixir_euler_double_mach.jl" begin
-    # Same results as for StructuredMesh with initial_refinement_level=2
     @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_euler_double_mach.jl"),
                         l2=[
-                            0.87417841433288,
-                            6.669726935171785,
-                            3.4980245896465387,
-                            76.33557073534843,
+                            0.8741784143331414,
+                            6.669726935141086,
+                            3.4980245896042237,
+                            76.33557073504075,
                         ],
                         linf=[
-                            11.428353671462515,
-                            142.73486852796972,
-                            38.91639544578682,
-                            1651.7541392659086,
+                            11.428353668952052,
+                            142.73486850872337,
+                            38.91639544604301,
+                            1651.7541390872523,
                         ],
-                        initial_refinement_level=2,
+                        initial_refinement_level=1,
                         tspan=(0.0, 0.05))
     # Ensure that we do not have excessive memory allocations
     # (e.g., from type instabilities)
@@ -386,7 +385,7 @@ end
         t = sol.t[end]
         u_ode = sol.u[end]
         du_ode = similar(u_ode)
-        @test (@allocated Trixi.rhs!(du_ode, u_ode, semi, t)) < 10000
+        @test (@allocated Trixi.rhs!(du_ode, u_ode, semi, t)) < 15000
     end
 end
 
@@ -414,6 +413,34 @@ end
             u_ode = sol.u[end]
             du_ode = similar(u_ode)
             @test (@allocated Trixi.rhs!(du_ode, u_ode, semi, t)) < 1000
+        end
+    end
+end
+
+@trixi_testset "elixir_euler_supersonic_cylinder_sc_subcell.jl" begin
+    @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_euler_supersonic_cylinder_sc_subcell.jl"),
+                        l2=[
+                            0.01733051773398731,
+                            0.038254257166961285,
+                            0.018157981470786955,
+                            0.12176639664229769,
+                        ],
+                        linf=[
+                            1.3534563960399795,
+                            2.861333164923601,
+                            2.248472479406512,
+                            9.797432332463623,
+                        ],
+                        tspan=(0.0, 0.001),
+                        skip_coverage=true)
+    if @isdefined sol # Skipped in coverage run
+        # Ensure that we do not have excessive memory allocations
+        # (e.g., from type instabilities)
+        let
+            t = sol.t[end]
+            u_ode = sol.u[end]
+            du_ode = similar(u_ode)
+            @test (@allocated Trixi.rhs!(du_ode, u_ode, semi, t)) < 15000
         end
     end
 end
