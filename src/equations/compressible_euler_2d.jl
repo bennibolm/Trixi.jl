@@ -395,6 +395,7 @@ Should be used together with [`StructuredMesh`](@ref).
 end
 
 # TODO: Add docstring when about to merge.
+# Using with TreeMesh{2}
 @inline function characteristic_boundary_value_function(outer_boundary_value_function,
                                                         u_inner, orientation::Integer,
                                                         direction, x, t,
@@ -419,6 +420,7 @@ end
                                                         equations)
 end
 
+# Using with StructuredMesh{2}
 @inline function characteristic_boundary_value_function(outer_boundary_value_function,
                                                         u_inner,
                                                         normal_direction::AbstractVector,
@@ -442,6 +444,7 @@ end
                                                         equations)
 end
 
+# Using with P4estMesh{2}
 @inline function characteristic_boundary_value_function(outer_boundary_value_function,
                                                         u_inner,
                                                         normal_direction::AbstractVector,
