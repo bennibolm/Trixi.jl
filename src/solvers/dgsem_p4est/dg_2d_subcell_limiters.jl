@@ -188,7 +188,6 @@ end
                 flux_inner = flux(u_inner, normal_direction, equations)
                 flux_outer = flux(u_outer, normal_direction, equations)
 
-                # TODO: Correct order?
                 bar_state = 0.5 * (u_inner + u_outer) -
                             0.5 * (flux_outer - flux_inner) / lambda
                 if direction == 1
