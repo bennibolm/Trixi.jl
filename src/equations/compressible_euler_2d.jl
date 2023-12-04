@@ -462,9 +462,9 @@ end
                                                         equations)
 end
 
-# Inner function to distinguish between different mesh types.
-@inline function characteristic_boundary_value_function_inner(outer_boundary_value_function,
-                                                              u_inner, srho, vn, x, t,
+# Function to compute the outer state of the characteristics-based boundary condition. This function is called by all mesh types.
+@inline function calc_characteristic_boundary_value_function(outer_boundary_value_function,
+                                                             u_inner, srho, vn, x, t,
                                                               equations::CompressibleEulerEquations2D)
     # get pressure and Mach from state
     p = pressure(u_inner, equations)
