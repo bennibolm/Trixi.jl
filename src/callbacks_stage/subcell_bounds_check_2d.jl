@@ -256,7 +256,7 @@ end
 
                 # Limited bar states \bar{u}^{Lim} = \bar{u} + Δf^{Lim} / λ
                 # Checking the bounds for...
-                # - velocities and energy (phi):
+                # - velocities and total energy (phi):
                 #   \bar{phi}^{min} <= \bar{phi}^{Lim} / \bar{rho}^{Lim} <= \bar{phi}^{max}
                 # - pressure (p):
                 #   \bar{rho}^{Lim} \bar{rho * E}^{Lim} >= |\bar{rho * v}^{Lim}|^2 / 2
@@ -387,7 +387,7 @@ end
 
                 # Limited bar states \bar{u}^{Lim} = \bar{u} + Δf^{Lim} / λ
                 # Checking the bounds for...
-                # - conservative variables (phi):
+                # - conservative variables (noted as rho*phi):
                 #   \bar{rho*phi}^{min} <= \bar{rho*phi}^{Lim} <= \bar{rho*phi}^{max}
                 # - pressure (p):
                 #   \bar{rho}^{Lim} \bar{rho * E}^{Lim} >= |\bar{rho * v}^{Lim}|^2 / 2
