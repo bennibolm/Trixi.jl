@@ -52,12 +52,10 @@ function (limiter::SubcellLimiterIDP)(u::AbstractArray{<:Any, 4}, semi, dg::DGSE
         @trixi_timeit timer() "positivity" idp_positivity!(alpha, limiter, u, dt, semi)
     end
     if limiter.spec_entropy
-        @trixi_timeit timer() "spec_entropy" idp_spec_entropy!(alpha, limiter, u, t, dt,
-                                                               semi)
+        @trixi_timeit timer() "spec_entropy" idp_local_onesided!(alpha, limiter, u, t, dt, semi, entropy_spec)
     end
     if limiter.math_entropy
-        @trixi_timeit timer() "math_entropy" idp_math_entropy!(alpha, limiter, u, t, dt,
-                                                               semi)
+        @trixi_timeit timer() "math_entropy" idp_local_onesided!(alpha, limiter, u, t, dt, semi, entropy_math)
     end
 
     # Calculate alpha1 and alpha2
@@ -356,6 +354,16 @@ end
 
 ##############################################################################
 # Local minimum limiting of specific entropy
+
+@inline function idp_local_onesided!(alpha, limiter, u, t, dt, semi, variable)
+    if variable === entropy_spec
+        idp_spec_entropy!(alpha, limiter, u, t, dt, semi)
+    else
+        idp_math_entropy!(alpha, limiter, u, t, dt, semi)
+    end
+
+    return nothing
+end
 
 @inline function idp_spec_entropy!(alpha, limiter, u, t, dt, semi)
     _, equations, dg, cache = mesh_equations_solver_cache(semi)
