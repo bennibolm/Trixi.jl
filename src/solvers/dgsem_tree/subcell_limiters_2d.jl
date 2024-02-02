@@ -365,8 +365,8 @@ end
         for j in eachnode(dg), i in eachnode(dg)
             u_local = get_node_vars(u, equations, dg, i, j, element)
             newton_loops_alpha!(alpha, s_min[i, j, element], u_local, i, j, element,
-                                entropy_spec, initial_check_entropy_spec_newton_idp,
-                                final_check_standard_newton_idp, inverse_jacobian,
+                                entropy_spec, initial_check_local_onesided_newton_idp,
+                                final_check_local_onesided_newton_idp, inverse_jacobian,
                                 dt, equations, dg, cache, limiter)
         end
     end
@@ -389,8 +389,8 @@ end
         for j in eachnode(dg), i in eachnode(dg)
             u_local = get_node_vars(u, equations, dg, i, j, element)
             newton_loops_alpha!(alpha, s_max[i, j, element], u_local, i, j, element,
-                                entropy_math, initial_check_entropy_math_newton_idp,
-                                final_check_standard_newton_idp, inverse_jacobian,
+                                entropy_math, initial_check_local_onesided_newton_idp,
+                                final_check_local_onesided_newton_idp, inverse_jacobian,
                                 dt, equations, dg, cache, limiter)
         end
     end
@@ -573,7 +573,7 @@ end
     if isvalid(u_curr, equations)
         goal = goal_function_newton_idp(variable, bound, u_curr, equations)
 
-        initial_check(bound, goal, newton_abstol) && return nothing
+        initial_check(variable, bound, goal, newton_abstol) && return nothing
     end
 
     # Newton iterations
@@ -608,7 +608,7 @@ end
 
             # Check new beta for condition and update bounds
             goal = goal_function_newton_idp(variable, bound, u_curr, equations)
-            if initial_check(bound, goal, newton_abstol)
+            if initial_check(variable, bound, goal, newton_abstol)
                 # New beta fulfills condition
                 beta_L = beta
             else
@@ -652,11 +652,11 @@ end
 
 ### Auxiliary routines for Newton's bisection method ###
 # Initial checks
-@inline function initial_check_entropy_spec_newton_idp(bound, goal, newton_abstol)
+@inline function initial_check_local_onesided_newton_idp(::typeof(entropy_spec), bound, goal, newton_abstol)
     goal <= max(newton_abstol, abs(bound) * newton_abstol)
 end
 
-@inline function initial_check_entropy_math_newton_idp(bound, goal, newton_abstol)
+@inline function initial_check_local_onesided_newton_idp(::typeof(entropy_math), bound, goal, newton_abstol)
     goal >= -max(newton_abstol, abs(bound) * newton_abstol)
 end
 
@@ -672,7 +672,7 @@ end
 
 # Final checks
 # final check for entropy limiting
-@inline function final_check_standard_newton_idp(bound, goal, newton_abstol)
+@inline function final_check_local_onesided_newton_idp(bound, goal, newton_abstol)
     abs(goal) < max(newton_abstol, abs(bound) * newton_abstol)
 end
 
