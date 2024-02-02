@@ -357,51 +357,27 @@ end
 
 @inline function idp_local_onesided!(alpha, limiter, u, t, dt, semi, variable)
     if variable === entropy_spec
-        idp_spec_entropy!(alpha, limiter, u, t, dt, semi, variable, min)
+        idp_local_onesided!(alpha, limiter, u, t, dt, semi, variable, min)
     else
-        idp_math_entropy!(alpha, limiter, u, t, dt, semi, variable, max)
+        idp_local_onesided!(alpha, limiter, u, t, dt, semi, variable, max)
     end
 
     return nothing
 end
 
-@inline function idp_spec_entropy!(alpha, limiter, u, t, dt, semi, variable, bound_function)
+@inline function idp_local_onesided!(alpha, limiter, u, t, dt, semi, variable, bound_function)
     _, equations, dg, cache = mesh_equations_solver_cache(semi)
     (; variable_bounds) = limiter.cache.subcell_limiter_coefficients
-    s_min = variable_bounds[Symbol(string(variable), "_", string(bound_function))]
-    calc_bounds_onesided!(s_min, bound_function, variable, u, t, semi)
+    var_minmax = variable_bounds[Symbol(string(variable), "_", string(bound_function))]
+    calc_bounds_onesided!(var_minmax, bound_function, variable, u, t, semi)
 
     # Perform Newton's bisection method to find new alpha
     @threaded for element in eachelement(dg, cache)
         inverse_jacobian = cache.elements.inverse_jacobian[element]
         for j in eachnode(dg), i in eachnode(dg)
             u_local = get_node_vars(u, equations, dg, i, j, element)
-            newton_loops_alpha!(alpha, s_min[i, j, element], u_local, i, j, element,
-                                entropy_spec, initial_check_local_onesided_newton_idp,
-                                final_check_local_onesided_newton_idp, inverse_jacobian,
-                                dt, equations, dg, cache, limiter)
-        end
-    end
-
-    return nothing
-end
-
-###############################################################################
-# Local maximum limiting of mathematical entropy
-
-@inline function idp_math_entropy!(alpha, limiter, u, t, dt, semi, variable, bound_function)
-    _, equations, dg, cache = mesh_equations_solver_cache(semi)
-    (; variable_bounds) = limiter.cache.subcell_limiter_coefficients
-    s_max = variable_bounds[Symbol(string(variable), "_", string(bound_function))]
-    calc_bounds_onesided!(s_max, bound_function, variable, u, t, semi)
-
-    # Perform Newton's bisection method to find new alpha
-    @threaded for element in eachelement(dg, cache)
-        inverse_jacobian = cache.elements.inverse_jacobian[element]
-        for j in eachnode(dg), i in eachnode(dg)
-            u_local = get_node_vars(u, equations, dg, i, j, element)
-            newton_loops_alpha!(alpha, s_max[i, j, element], u_local, i, j, element,
-                                entropy_math, initial_check_local_onesided_newton_idp,
+            newton_loops_alpha!(alpha, var_minmax[i, j, element], u_local, i, j, element,
+                                variable, initial_check_local_onesided_newton_idp,
                                 final_check_local_onesided_newton_idp, inverse_jacobian,
                                 dt, equations, dg, cache, limiter)
         end
