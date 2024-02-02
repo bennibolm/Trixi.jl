@@ -368,7 +368,7 @@ end
 @inline function idp_spec_entropy!(alpha, limiter, u, t, dt, semi)
     _, equations, dg, cache = mesh_equations_solver_cache(semi)
     (; variable_bounds) = limiter.cache.subcell_limiter_coefficients
-    s_min = variable_bounds[:spec_entropy_min]
+    s_min = variable_bounds[Symbol("entropy_spec", "_", "min")]
     calc_bounds_onesided!(s_min, min, entropy_spec, u, t, semi)
 
     # Perform Newton's bisection method to find new alpha
@@ -392,7 +392,7 @@ end
 @inline function idp_math_entropy!(alpha, limiter, u, t, dt, semi)
     _, equations, dg, cache = mesh_equations_solver_cache(semi)
     (; variable_bounds) = limiter.cache.subcell_limiter_coefficients
-    s_max = variable_bounds[:math_entropy_max]
+    s_max = variable_bounds[Symbol("entropy_math", "_", "max")]
     calc_bounds_onesided!(s_max, max, entropy_math, u, t, semi)
 
     # Perform Newton's bisection method to find new alpha

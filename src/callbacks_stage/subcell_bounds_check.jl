@@ -145,11 +145,11 @@ end
     end
     if spec_entropy
         println("spec. entropy:\n- lower bound: ",
-                idp_bounds_delta_global[:spec_entropy_min])
+                idp_bounds_delta_global[Symbol("entropy_spec", "_", "min")])
     end
     if math_entropy
         println("math. entropy:\n- upper bound: ",
-                idp_bounds_delta_global[:math_entropy_max])
+                idp_bounds_delta_global[Symbol("entropy_math", "_", "max")])
     end
     if positivity
         for v in limiter.positivity_variables_cons

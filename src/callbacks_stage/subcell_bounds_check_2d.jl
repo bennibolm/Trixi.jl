@@ -44,7 +44,7 @@
         end
     end
     if spec_entropy
-        key = :spec_entropy_min
+        key = Symbol("entropy_spec", "_", "min")
         deviation_threaded = idp_bounds_delta_local[key]
         @threaded for element in eachelement(solver, cache)
             deviation = deviation_threaded[stride_size * Threads.threadid()]
@@ -57,7 +57,7 @@
         end
     end
     if math_entropy
-        key = :math_entropy_max
+        key = Symbol("entropy_math", "_", "max")
         deviation_threaded = idp_bounds_delta_local[key]
         @threaded for element in eachelement(solver, cache)
             deviation = deviation_threaded[stride_size * Threads.threadid()]
@@ -125,10 +125,10 @@
                 end
             end
             if spec_entropy
-                print(f, ", ", idp_bounds_delta_local[:spec_entropy_min][stride_size])
+                print(f, ", ", idp_bounds_delta_local[Symbol("entropy_spec", "_", "min")][stride_size])
             end
             if math_entropy
-                print(f, ", ", idp_bounds_delta_local[:math_entropy_max][stride_size])
+                print(f, ", ", idp_bounds_delta_local[Symbol("entropy_math", "_", "max")][stride_size])
             end
             if positivity
                 for v in limiter.positivity_variables_cons

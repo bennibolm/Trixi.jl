@@ -106,10 +106,10 @@ function SubcellLimiterIDP(equations::AbstractEquations, basis;
         end
     end
     if spec_entropy
-        bound_keys = (bound_keys..., :spec_entropy_min)
+        bound_keys = (bound_keys..., Symbol("entropy_spec", "_", "min"))
     end
     if math_entropy
-        bound_keys = (bound_keys..., :math_entropy_max)
+        bound_keys = (bound_keys..., Symbol("entropy_math", "_", "max"))
     end
     for v in positivity_variables_cons_
         if !(v in local_minmax_variables_cons_)
