@@ -179,13 +179,17 @@ end
     return nothing
 end
 
-@inline function calc_bounds_onesided!(var_minmax, minmax, typeminmax, variable, u, t,
-                                       semi)
+@inline function calc_bounds_onesided!(var_minmax, minmax, variable, u, t, semi)
     mesh, equations, dg, cache = mesh_equations_solver_cache(semi)
     # Calc bounds inside elements
     @threaded for element in eachelement(dg, cache)
+        # Reset bounds
         for j in eachnode(dg), i in eachnode(dg)
-            var_minmax[i, j, element] = typeminmax(eltype(var_minmax))
+            if minmax === max
+                var_minmax[i, j, element] = typemin(eltype(var_minmax))
+            else
+                var_minmax[i, j, element] = typemax(eltype(var_minmax))
+            end
         end
 
         # Calculate bounds at Gauss-Lobatto nodes using u
@@ -357,7 +361,7 @@ end
     _, equations, dg, cache = mesh_equations_solver_cache(semi)
     (; variable_bounds) = limiter.cache.subcell_limiter_coefficients
     s_min = variable_bounds[:spec_entropy_min]
-    calc_bounds_onesided!(s_min, min, typemax, entropy_spec, u, t, semi)
+    calc_bounds_onesided!(s_min, min, entropy_spec, u, t, semi)
 
     # Perform Newton's bisection method to find new alpha
     @threaded for element in eachelement(dg, cache)
@@ -381,7 +385,7 @@ end
     _, equations, dg, cache = mesh_equations_solver_cache(semi)
     (; variable_bounds) = limiter.cache.subcell_limiter_coefficients
     s_max = variable_bounds[:math_entropy_max]
-    calc_bounds_onesided!(s_max, max, typemin, entropy_math, u, t, semi)
+    calc_bounds_onesided!(s_max, max, entropy_math, u, t, semi)
 
     # Perform Newton's bisection method to find new alpha
     @threaded for element in eachelement(dg, cache)
