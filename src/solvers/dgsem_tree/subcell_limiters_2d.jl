@@ -357,19 +357,19 @@ end
 
 @inline function idp_local_onesided!(alpha, limiter, u, t, dt, semi, variable)
     if variable === entropy_spec
-        idp_spec_entropy!(alpha, limiter, u, t, dt, semi)
+        idp_spec_entropy!(alpha, limiter, u, t, dt, semi, variable, min)
     else
-        idp_math_entropy!(alpha, limiter, u, t, dt, semi)
+        idp_math_entropy!(alpha, limiter, u, t, dt, semi, variable, max)
     end
 
     return nothing
 end
 
-@inline function idp_spec_entropy!(alpha, limiter, u, t, dt, semi)
+@inline function idp_spec_entropy!(alpha, limiter, u, t, dt, semi, variable, bound_function)
     _, equations, dg, cache = mesh_equations_solver_cache(semi)
     (; variable_bounds) = limiter.cache.subcell_limiter_coefficients
-    s_min = variable_bounds[Symbol("entropy_spec", "_", "min")]
-    calc_bounds_onesided!(s_min, min, entropy_spec, u, t, semi)
+    s_min = variable_bounds[Symbol(string(variable), "_", string(bound_function))]
+    calc_bounds_onesided!(s_min, bound_function, variable, u, t, semi)
 
     # Perform Newton's bisection method to find new alpha
     @threaded for element in eachelement(dg, cache)
@@ -389,11 +389,11 @@ end
 ###############################################################################
 # Local maximum limiting of mathematical entropy
 
-@inline function idp_math_entropy!(alpha, limiter, u, t, dt, semi)
+@inline function idp_math_entropy!(alpha, limiter, u, t, dt, semi, variable, bound_function)
     _, equations, dg, cache = mesh_equations_solver_cache(semi)
     (; variable_bounds) = limiter.cache.subcell_limiter_coefficients
-    s_max = variable_bounds[Symbol("entropy_math", "_", "max")]
-    calc_bounds_onesided!(s_max, max, entropy_math, u, t, semi)
+    s_max = variable_bounds[Symbol(string(variable), "_", string(bound_function))]
+    calc_bounds_onesided!(s_max, bound_function, variable, u, t, semi)
 
     # Perform Newton's bisection method to find new alpha
     @threaded for element in eachelement(dg, cache)
