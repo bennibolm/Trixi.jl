@@ -28,7 +28,7 @@ including:
 - Local two-sided Zalesak-type limiting for conservative variables (`local_twosided_variables_cons`)
 - Positivity limiting for conservative variables (`positivity_variables_cons`) and nonlinear variables
 (`positivity_variables_nonlinear`)
-- One-sided limiting for nonlinear variables (e.g., `entropy_spec`, `entropy_math`)
+- Local one-sided limiting for nonlinear variables (e.g., `entropy_spec`, `entropy_math`)
 
 Conservative variables to be limited are passed as a vector of strings, e.g. `local_twosided_variables_cons = ["rho"]`
 and `positivity_variables_cons = ["rho"]`. For nonlinear variables the specific functions are
