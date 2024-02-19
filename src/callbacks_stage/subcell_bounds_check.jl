@@ -146,7 +146,7 @@ end
         for (variable, operator) in limiter.local_onesided_variables_nonlinear
             variable_string = string(variable)
             operator_string = string(operator)
-            println("$(variable_string):")
+            println("$variable_string:")
             println("- $operator_string bound: ",
                     idp_bounds_delta_global[Symbol(variable_string, "_",
                                                    operator_string)])

@@ -45,8 +45,8 @@ function (limiter::SubcellLimiterIDP)(u::AbstractArray{<:Any, 4}, semi, dg::DGSE
     @trixi_timeit timer() "reset alpha" reset_du!(alpha, dg, semi.cache)
 
     if limiter.local_twosided
-        @trixi_timeit timer() "local min/max" idp_local_twosided!(alpha, limiter,
-                                                                  u, t, dt, semi)
+        @trixi_timeit timer() "local twosided" idp_local_twosided!(alpha, limiter,
+                                                                   u, t, dt, semi)
     end
     if limiter.positivity
         @trixi_timeit timer() "positivity" idp_positivity!(alpha, limiter, u, dt, semi)
@@ -279,7 +279,7 @@ end
 end
 
 ###############################################################################
-# Local minimum/maximum limiting
+# Local two-sided limiting for conservative variables
 
 @inline function idp_local_twosided!(alpha, limiter, u, t, dt, semi)
     for variable in limiter.local_twosided_variables_cons
@@ -351,7 +351,7 @@ end
 end
 
 ##############################################################################
-# Local minimum limiting of specific entropy
+# Local one-sided limiting of nonlinear variables
 
 @inline function idp_local_onesided!(alpha, limiter, u, t, dt, semi)
     for (variable, operator) in limiter.local_onesided_variables_nonlinear
