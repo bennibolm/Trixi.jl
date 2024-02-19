@@ -644,7 +644,8 @@ end
     goal >= -max(newton_abstol, abs(bound) * newton_abstol)
 end
 
-@inline initial_check_nonnegative_newton_idp(bound, goal, newton_abstol) = goal <= 0
+@inline initial_check_nonnegative_newton_idp(variable, bound, goal, newton_abstol) = goal <=
+                                                                                     0
 
 # Goal and d(Goal)d(u) function
 @inline goal_function_newton_idp(variable, bound, u, equations) = bound -
@@ -655,7 +656,7 @@ end
 end
 
 # Final checks
-# final check for entropy limiting
+# final check for one-sided local limiting
 @inline function final_check_local_onesided_newton_idp(bound, goal, newton_abstol)
     abs(goal) < max(newton_abstol, abs(bound) * newton_abstol)
 end
