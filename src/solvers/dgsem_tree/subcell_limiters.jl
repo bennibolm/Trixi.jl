@@ -18,8 +18,7 @@ end
                       positivity_variables_cons = String[],
                       positivity_variables_nonlinear = [],
                       positivity_correction_factor = 0.1,
-                      spec_entropy = false,
-                      math_entropy = false,
+                      local_onesided_variables_nonlinear = NTuple{2, Function}[],
                       max_iterations_newton = 10,
                       newton_tolerances = (1.0e-12, 1.0e-14),
                       gamma_constant_newton = 2 * ndims(equations))
@@ -29,11 +28,13 @@ including:
 - Local maximum/minimum Zalesak-type limiting for conservative variables (`local_minmax_variables_cons`)
 - Positivity limiting for conservative variables (`positivity_variables_cons`) and nonlinear variables
 (`positivity_variables_nonlinear`)
-- One-sided limiting for specific and mathematical entropy (`spec_entropy`, `math_entropy`)
+- One-sided limiting for nonlinear variables (e.g., `entropy_spec`, `entropy_math`)
 
 Conservative variables to be limited are passed as a vector of strings, e.g. `local_minmax_variables_cons = ["rho"]`
 and `positivity_variables_cons = ["rho"]`. For nonlinear variables the specific functions are
-passed in a vector, e.g. `positivity_variables_nonlinear = [pressure]`.
+passed - to ensure posivity use a plain vector, e.g. `positivity_variables_nonlinear = [pressure]`,
+for a one-sided limiting pass the variable and the specific bound as a tuple within a vector, e.g.
+`local_onesided_variables_nonlinear = [(Trixi.entropy_spec, min)]`.
 
 The bounds are calculated using the low-order FV solution. The positivity limiter uses
 `positivity_correction_factor` such that `u^new >= positivity_correction_factor * u^FV`.
@@ -58,7 +59,8 @@ where `d = #dimensions`). See equation (20) of Pazner (2020) and equation (30) o
 !!! warning "Experimental implementation"
     This is an experimental feature and may change in future releases.
 """
-struct SubcellLimiterIDP{RealT <: Real, LimitingVariablesNonlinear, Cache} <:
+struct SubcellLimiterIDP{RealT <: Real, LimitingVariablesNonlinear,
+                         LimitingOnesidedVariablesNonlinear, Cache} <:
        AbstractSubcellLimiter
     local_minmax::Bool
     local_minmax_variables_cons::Vector{Int}                   # Local mininum/maximum principles for conservative variables
@@ -66,8 +68,8 @@ struct SubcellLimiterIDP{RealT <: Real, LimitingVariablesNonlinear, Cache} <:
     positivity_variables_cons::Vector{Int}                     # Positivity for conservative variables
     positivity_variables_nonlinear::LimitingVariablesNonlinear # Positivity for nonlinear variables
     positivity_correction_factor::RealT
-    spec_entropy::Bool
-    math_entropy::Bool
+    local_onesided::Bool
+    local_onesided_variables_nonlinear::LimitingOnesidedVariablesNonlinear
     cache::Cache
     max_iterations_newton::Int
     newton_tolerances::Tuple{RealT, RealT}  # Relative and absolute tolerances for Newton's method
@@ -80,16 +82,26 @@ function SubcellLimiterIDP(equations::AbstractEquations, basis;
                            positivity_variables_cons = String[],
                            positivity_variables_nonlinear = [],
                            positivity_correction_factor = 0.1,
-                           spec_entropy = false,
-                           math_entropy = false,
+                           local_onesided_variables_nonlinear = NTuple{2, Function}[],
                            max_iterations_newton = 10,
                            newton_tolerances = (1.0e-12, 1.0e-14),
                            gamma_constant_newton = 2 * ndims(equations))
     local_minmax = (length(local_minmax_variables_cons) > 0)
+    local_onesided = (length(local_onesided_variables_nonlinear) > 0)
     positivity = (length(positivity_variables_cons) +
                   length(positivity_variables_nonlinear) > 0)
-    if math_entropy && spec_entropy
-        error("Only one of the two can be selected: math_entropy/spec_entropy")
+
+    # When passing `min` or `max` in the elixir the specific function of Base is used.
+    # To speed up the simulation, we replace it with `Trixi.max` and `Trixi.min` respectively.
+    local_onesided_variables_nonlinear_ = Tuple{Function, Function}[]
+    for (variable, operator) in local_onesided_variables_nonlinear
+        if operator === Base.max
+            push!(local_onesided_variables_nonlinear_, tuple(variable, max))
+        elseif operator === Base.min
+            push!(local_onesided_variables_nonlinear_, tuple(variable, min))
+        else
+            error("Operator $operator is not a valid input. Use `max` or `min` instead.")
+        end
     end
 
     local_minmax_variables_cons_ = get_variable_index.(local_minmax_variables_cons,
@@ -105,11 +117,11 @@ function SubcellLimiterIDP(equations::AbstractEquations, basis;
                           Symbol(v_string, "_max"))
         end
     end
-    if spec_entropy
-        bound_keys = (bound_keys..., Symbol("entropy_spec", "_", "min"))
-    end
-    if math_entropy
-        bound_keys = (bound_keys..., Symbol("entropy_math", "_", "max"))
+    if local_onesided
+        for (variable, operator) in local_onesided_variables_nonlinear_
+            bound_keys = (bound_keys...,
+                          Symbol(string(variable), "_", string(operator)))
+        end
     end
     for v in positivity_variables_cons_
         if !(v in local_minmax_variables_cons_)
@@ -124,11 +136,13 @@ function SubcellLimiterIDP(equations::AbstractEquations, basis;
 
     SubcellLimiterIDP{typeof(positivity_correction_factor),
                       typeof(positivity_variables_nonlinear),
+                      typeof(local_onesided_variables_nonlinear_),
                       typeof(cache)}(local_minmax, local_minmax_variables_cons_,
                                      positivity, positivity_variables_cons_,
                                      positivity_variables_nonlinear,
                                      positivity_correction_factor,
-                                     spec_entropy, math_entropy,
+                                     local_onesided,
+                                     local_onesided_variables_nonlinear_,
                                      cache,
                                      max_iterations_newton, newton_tolerances,
                                      gamma_constant_newton)
@@ -136,10 +150,10 @@ end
 
 function Base.show(io::IO, limiter::SubcellLimiterIDP)
     @nospecialize limiter # reduce precompilation time
-    (; local_minmax, positivity, spec_entropy, math_entropy) = limiter
+    (; local_minmax, positivity, local_onesided) = limiter
 
     print(io, "SubcellLimiterIDP(")
-    if !(local_minmax || positivity || spec_entropy || math_entropy)
+    if !(local_minmax || positivity || local_onesided)
         print(io, "No limiter selected => pure DG method")
     else
         features = String[]
@@ -149,11 +163,8 @@ function Base.show(io::IO, limiter::SubcellLimiterIDP)
         if positivity
             push!(features, "positivity")
         end
-        if spec_entropy
-            push!(features, "specific entropy")
-        end
-        if math_entropy
-            push!(features, "mathematical entropy")
+        if local_onesided
+            push!(features, "local onesided")
         end
         join(io, features, ", ")
         print(io, "Limiter=($features), ")
@@ -164,12 +175,12 @@ end
 
 function Base.show(io::IO, ::MIME"text/plain", limiter::SubcellLimiterIDP)
     @nospecialize limiter # reduce precompilation time
-    (; local_minmax, positivity, spec_entropy, math_entropy) = limiter
+    (; local_minmax, positivity, local_onesided) = limiter
 
     if get(io, :compact, false)
         show(io, limiter)
     else
-        if !(local_minmax || positivity || spec_entropy || math_entropy)
+        if !(local_minmax || positivity || local_onesided)
             setup = ["Limiter" => "No limiter selected => pure DG method"]
         else
             setup = ["Limiter" => ""]
@@ -187,13 +198,10 @@ function Base.show(io::IO, ::MIME"text/plain", limiter::SubcellLimiterIDP)
                     "" => "- with positivity correction factor = $(limiter.positivity_correction_factor)",
                 ]
             end
-            if spec_entropy
-                setup = [setup..., "" => "Local minimum limiting for specific entropy"]
-            end
-            if math_entropy
+            if local_onesided
                 setup = [
                     setup...,
-                    "" => "Local maximum limiting for mathematical entropy",
+                    "" => "Local onesided limiting for nonlinear variables $(limiter.local_onesided_variables_nonlinear)",
                 ]
             end
             setup = [

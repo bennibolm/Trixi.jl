@@ -45,17 +45,15 @@ function (limiter::SubcellLimiterIDP)(u::AbstractArray{<:Any, 4}, semi, dg::DGSE
     @trixi_timeit timer() "reset alpha" reset_du!(alpha, dg, semi.cache)
 
     if limiter.local_minmax
-        @trixi_timeit timer() "local min/max limiting" idp_local_minmax!(alpha, limiter,
-                                                                         u, t, dt, semi)
+        @trixi_timeit timer() "local min/max" idp_local_minmax!(alpha, limiter,
+                                                                u, t, dt, semi)
     end
     if limiter.positivity
         @trixi_timeit timer() "positivity" idp_positivity!(alpha, limiter, u, dt, semi)
     end
-    if limiter.spec_entropy
-        @trixi_timeit timer() "spec_entropy" idp_local_onesided!(alpha, limiter, u, t, dt, semi, entropy_spec)
-    end
-    if limiter.math_entropy
-        @trixi_timeit timer() "math_entropy" idp_local_onesided!(alpha, limiter, u, t, dt, semi, entropy_math)
+    if limiter.local_onesided
+        @trixi_timeit timer() "local onesided" idp_local_onesided!(alpha, limiter,
+                                                                   u, t, dt, semi)
     end
 
     # Calculate alpha1 and alpha2
@@ -355,28 +353,28 @@ end
 ##############################################################################
 # Local minimum limiting of specific entropy
 
-@inline function idp_local_onesided!(alpha, limiter, u, t, dt, semi, variable)
-    if variable === entropy_spec
-        idp_local_onesided!(alpha, limiter, u, t, dt, semi, variable, min)
-    else
-        idp_local_onesided!(alpha, limiter, u, t, dt, semi, variable, max)
+@inline function idp_local_onesided!(alpha, limiter, u, t, dt, semi)
+    for (variable, operator) in limiter.local_onesided_variables_nonlinear
+        idp_local_onesided!(alpha, limiter, u, t, dt, semi, variable, operator)
     end
 
     return nothing
 end
 
-@inline function idp_local_onesided!(alpha, limiter, u, t, dt, semi, variable, bound_function)
+@inline function idp_local_onesided!(alpha, limiter, u, t, dt, semi, variable::F,
+                                     minmax) where {F}
     _, equations, dg, cache = mesh_equations_solver_cache(semi)
     (; variable_bounds) = limiter.cache.subcell_limiter_coefficients
-    var_minmax = variable_bounds[Symbol(string(variable), "_", string(bound_function))]
-    calc_bounds_onesided!(var_minmax, bound_function, variable, u, t, semi)
+    var_minmax = variable_bounds[Symbol(string(variable), "_", string(minmax))]
+    calc_bounds_onesided!(var_minmax, minmax, variable, u, t, semi)
 
     # Perform Newton's bisection method to find new alpha
     @threaded for element in eachelement(dg, cache)
         inverse_jacobian = cache.elements.inverse_jacobian[element]
         for j in eachnode(dg), i in eachnode(dg)
             u_local = get_node_vars(u, equations, dg, i, j, element)
-            newton_loops_alpha!(alpha, var_minmax[i, j, element], u_local, i, j, element,
+            newton_loops_alpha!(alpha, var_minmax[i, j, element], u_local,
+                                i, j, element,
                                 variable, initial_check_local_onesided_newton_idp,
                                 final_check_local_onesided_newton_idp, inverse_jacobian,
                                 dt, equations, dg, cache, limiter)
@@ -629,22 +627,20 @@ end
     end
 
     new_alpha = 1 - beta
-    if alpha[i, j, element] > new_alpha + newton_abstol
-        error("Alpha is getting smaller. old: $(alpha[i, j, element]), new: $new_alpha")
-    else
-        alpha[i, j, element] = new_alpha
-    end
+    alpha[i, j, element] = new_alpha
 
     return nothing
 end
 
 ### Auxiliary routines for Newton's bisection method ###
 # Initial checks
-@inline function initial_check_local_onesided_newton_idp(::typeof(entropy_spec), bound, goal, newton_abstol)
+@inline function initial_check_local_onesided_newton_idp(::typeof(entropy_spec), bound,
+                                                         goal, newton_abstol)
     goal <= max(newton_abstol, abs(bound) * newton_abstol)
 end
 
-@inline function initial_check_local_onesided_newton_idp(::typeof(entropy_math), bound, goal, newton_abstol)
+@inline function initial_check_local_onesided_newton_idp(::typeof(entropy_math), bound,
+                                                         goal, newton_abstol)
     goal >= -max(newton_abstol, abs(bound) * newton_abstol)
 end
 

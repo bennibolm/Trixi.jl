@@ -77,7 +77,7 @@ function init_callback(callback::BoundsCheckCallback, semi, limiter::SubcellLimi
         return nothing
     end
 
-    (; local_minmax, positivity, spec_entropy, math_entropy) = limiter
+    (; local_minmax, positivity, local_onesided) = limiter
     (; output_directory) = callback
     variables = varnames(cons2cons, semi.equations)
 
@@ -90,11 +90,10 @@ function init_callback(callback::BoundsCheckCallback, semi, limiter::SubcellLimi
                 print(f, ", " * variable_string * "_min, " * variable_string * "_max")
             end
         end
-        if spec_entropy
-            print(f, ", specEntr_min")
-        end
-        if math_entropy
-            print(f, ", mathEntr_max")
+        if local_onesided
+            for (variable, operator) in limiter.local_onesided_variables_nonlinear
+                print(f, ", " * string(variable) * "_" * string(operator))
+            end
         end
         if positivity
             for v in limiter.positivity_variables_cons
@@ -126,7 +125,7 @@ end
 
 @inline function finalize_callback(callback::BoundsCheckCallback, semi,
                                    limiter::SubcellLimiterIDP)
-    (; local_minmax, positivity, spec_entropy, math_entropy) = limiter
+    (; local_minmax, positivity, local_onesided) = limiter
     (; idp_bounds_delta_global) = limiter.cache
     variables = varnames(cons2cons, semi.equations)
 
@@ -143,13 +142,15 @@ end
                     idp_bounds_delta_global[Symbol(v_string, "_max")])
         end
     end
-    if spec_entropy
-        println("spec. entropy:\n- lower bound: ",
-                idp_bounds_delta_global[Symbol("entropy_spec", "_", "min")])
-    end
-    if math_entropy
-        println("math. entropy:\n- upper bound: ",
-                idp_bounds_delta_global[Symbol("entropy_math", "_", "max")])
+    if local_onesided
+        for (variable, operator) in limiter.local_onesided_variables_nonlinear
+            variable_string = string(variable)
+            operator_string = string(operator)
+            println("$(variable_string):")
+            println("- $operator_string bound: ",
+                    idp_bounds_delta_global[Symbol(variable_string, "_",
+                                                   operator_string)])
+        end
     end
     if positivity
         for v in limiter.positivity_variables_cons

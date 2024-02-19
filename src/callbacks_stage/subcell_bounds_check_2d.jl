@@ -8,7 +8,7 @@
 @inline function check_bounds(u, mesh::AbstractMesh{2}, equations, solver, cache,
                               limiter::SubcellLimiterIDP,
                               time, iter, output_directory, save_errors)
-    (; local_minmax, positivity, spec_entropy, math_entropy) = solver.volume_integral.limiter
+    (; local_minmax, positivity, local_onesided) = solver.volume_integral.limiter
     (; variable_bounds) = limiter.cache.subcell_limiter_coefficients
     (; idp_bounds_delta_local, idp_bounds_delta_global) = limiter.cache
 
@@ -43,30 +43,21 @@
             end
         end
     end
-    if spec_entropy
-        key = Symbol("entropy_spec", "_", "min")
-        deviation_threaded = idp_bounds_delta_local[key]
-        @threaded for element in eachelement(solver, cache)
-            deviation = deviation_threaded[stride_size * Threads.threadid()]
-            for j in eachnode(solver), i in eachnode(solver)
-                s = entropy_spec(get_node_vars(u, equations, solver, i, j, element),
+    if local_onesided
+        foreach(limiter.local_onesided_variables_nonlinear) do (variable, operator)
+            key = Symbol(string(variable), "_", string(operator))
+            factor = operator === max ? 1.0 : -1.0
+            deviation_threaded = idp_bounds_delta_local[key]
+            @threaded for element in eachelement(solver, cache)
+                deviation = deviation_threaded[stride_size * Threads.threadid()]
+                for j in eachnode(solver), i in eachnode(solver)
+                    v = variable(get_node_vars(u, equations, solver, i, j, element),
                                  equations)
-                deviation = max(deviation, variable_bounds[key][i, j, element] - s)
+                    deviation = max(deviation,
+                                    factor * (v - variable_bounds[key][i, j, element]))
+                end
+                deviation_threaded[stride_size * Threads.threadid()] = deviation
             end
-            deviation_threaded[stride_size * Threads.threadid()] = deviation
-        end
-    end
-    if math_entropy
-        key = Symbol("entropy_math", "_", "max")
-        deviation_threaded = idp_bounds_delta_local[key]
-        @threaded for element in eachelement(solver, cache)
-            deviation = deviation_threaded[stride_size * Threads.threadid()]
-            for j in eachnode(solver), i in eachnode(solver)
-                s = entropy_math(get_node_vars(u, equations, solver, i, j, element),
-                                 equations)
-                deviation = max(deviation, s - variable_bounds[key][i, j, element])
-            end
-            deviation_threaded[stride_size * Threads.threadid()] = deviation
         end
     end
     if positivity
@@ -124,11 +115,12 @@
                           idp_bounds_delta_local[Symbol(v_string, "_max")][stride_size])
                 end
             end
-            if spec_entropy
-                print(f, ", ", idp_bounds_delta_local[Symbol("entropy_spec", "_", "min")][stride_size])
-            end
-            if math_entropy
-                print(f, ", ", idp_bounds_delta_local[Symbol("entropy_math", "_", "max")][stride_size])
+            if local_onesided
+                for (variable, operator) in limiter.local_onesided_variables_nonlinear
+                    print(f, ", ",
+                          idp_bounds_delta_local[Symbol(string(variable), "_",
+                                                        string(operator))][stride_size])
+                end
             end
             if positivity
                 for v in limiter.positivity_variables_cons

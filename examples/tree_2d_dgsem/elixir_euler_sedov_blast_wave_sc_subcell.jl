@@ -43,7 +43,8 @@ volume_flux = flux_chandrashekar
 basis = LobattoLegendreBasis(3)
 limiter_idp = SubcellLimiterIDP(equations, basis;
                                 local_minmax_variables_cons = ["rho"],
-                                spec_entropy = true)
+                                local_onesided_variables_nonlinear = [(Trixi.entropy_spec,
+                                                                       min)])
 volume_integral = VolumeIntegralSubcellLimiting(limiter_idp;
                                                 volume_flux_dg = volume_flux,
                                                 volume_flux_fv = surface_flux)
