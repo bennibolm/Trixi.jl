@@ -14,7 +14,7 @@ end
 
 """
     SubcellLimiterIDP(equations::AbstractEquations, basis;
-                      local_minmax_variables_cons = String[],
+                      local_twosided_variables_cons = String[],
                       positivity_variables_cons = String[],
                       positivity_variables_nonlinear = [],
                       positivity_correction_factor = 0.1,
@@ -25,12 +25,12 @@ end
 
 Subcell invariant domain preserving (IDP) limiting used with [`VolumeIntegralSubcellLimiting`](@ref)
 including:
-- Local maximum/minimum Zalesak-type limiting for conservative variables (`local_minmax_variables_cons`)
+- Local two-sided Zalesak-type limiting for conservative variables (`local_twosided_variables_cons`)
 - Positivity limiting for conservative variables (`positivity_variables_cons`) and nonlinear variables
 (`positivity_variables_nonlinear`)
 - One-sided limiting for nonlinear variables (e.g., `entropy_spec`, `entropy_math`)
 
-Conservative variables to be limited are passed as a vector of strings, e.g. `local_minmax_variables_cons = ["rho"]`
+Conservative variables to be limited are passed as a vector of strings, e.g. `local_twosided_variables_cons = ["rho"]`
 and `positivity_variables_cons = ["rho"]`. For nonlinear variables the specific functions are
 passed - to ensure posivity use a plain vector, e.g. `positivity_variables_nonlinear = [pressure]`,
 for a one-sided limiting pass the variable and the specific bound as a tuple within a vector, e.g.
@@ -62,8 +62,8 @@ where `d = #dimensions`). See equation (20) of Pazner (2020) and equation (30) o
 struct SubcellLimiterIDP{RealT <: Real, LimitingVariablesNonlinear,
                          LimitingOnesidedVariablesNonlinear, Cache} <:
        AbstractSubcellLimiter
-    local_minmax::Bool
-    local_minmax_variables_cons::Vector{Int}                   # Local mininum/maximum principles for conservative variables
+    local_twosided::Bool
+    local_twosided_variables_cons::Vector{Int}                   # Local mininum/maximum principles for conservative variables
     positivity::Bool
     positivity_variables_cons::Vector{Int}                     # Positivity for conservative variables
     positivity_variables_nonlinear::LimitingVariablesNonlinear # Positivity for nonlinear variables
@@ -78,7 +78,7 @@ end
 
 # this method is used when the limiter is constructed as for shock-capturing volume integrals
 function SubcellLimiterIDP(equations::AbstractEquations, basis;
-                           local_minmax_variables_cons = String[],
+                           local_twosided_variables_cons = String[],
                            positivity_variables_cons = String[],
                            positivity_variables_nonlinear = [],
                            positivity_correction_factor = 0.1,
@@ -86,7 +86,7 @@ function SubcellLimiterIDP(equations::AbstractEquations, basis;
                            max_iterations_newton = 10,
                            newton_tolerances = (1.0e-12, 1.0e-14),
                            gamma_constant_newton = 2 * ndims(equations))
-    local_minmax = (length(local_minmax_variables_cons) > 0)
+    local_twosided = (length(local_twosided_variables_cons) > 0)
     local_onesided = (length(local_onesided_variables_nonlinear) > 0)
     positivity = (length(positivity_variables_cons) +
                   length(positivity_variables_nonlinear) > 0)
@@ -104,14 +104,14 @@ function SubcellLimiterIDP(equations::AbstractEquations, basis;
         end
     end
 
-    local_minmax_variables_cons_ = get_variable_index.(local_minmax_variables_cons,
-                                                       equations)
+    local_twosided_variables_cons_ = get_variable_index.(local_twosided_variables_cons,
+                                                         equations)
     positivity_variables_cons_ = get_variable_index.(positivity_variables_cons,
                                                      equations)
 
     bound_keys = ()
-    if local_minmax
-        for v in local_minmax_variables_cons_
+    if local_twosided
+        for v in local_twosided_variables_cons_
             v_string = string(v)
             bound_keys = (bound_keys..., Symbol(v_string, "_min"),
                           Symbol(v_string, "_max"))
@@ -124,7 +124,7 @@ function SubcellLimiterIDP(equations::AbstractEquations, basis;
         end
     end
     for v in positivity_variables_cons_
-        if !(v in local_minmax_variables_cons_)
+        if !(v in local_twosided_variables_cons_)
             bound_keys = (bound_keys..., Symbol(string(v), "_min"))
         end
     end
@@ -137,7 +137,7 @@ function SubcellLimiterIDP(equations::AbstractEquations, basis;
     SubcellLimiterIDP{typeof(positivity_correction_factor),
                       typeof(positivity_variables_nonlinear),
                       typeof(local_onesided_variables_nonlinear_),
-                      typeof(cache)}(local_minmax, local_minmax_variables_cons_,
+                      typeof(cache)}(local_twosided, local_twosided_variables_cons_,
                                      positivity, positivity_variables_cons_,
                                      positivity_variables_nonlinear,
                                      positivity_correction_factor,
@@ -150,14 +150,14 @@ end
 
 function Base.show(io::IO, limiter::SubcellLimiterIDP)
     @nospecialize limiter # reduce precompilation time
-    (; local_minmax, positivity, local_onesided) = limiter
+    (; local_twosided, positivity, local_onesided) = limiter
 
     print(io, "SubcellLimiterIDP(")
-    if !(local_minmax || positivity || local_onesided)
+    if !(local_twosided || positivity || local_onesided)
         print(io, "No limiter selected => pure DG method")
     else
         features = String[]
-        if local_minmax
+        if local_twosided
             push!(features, "local min/max")
         end
         if positivity
@@ -175,19 +175,19 @@ end
 
 function Base.show(io::IO, ::MIME"text/plain", limiter::SubcellLimiterIDP)
     @nospecialize limiter # reduce precompilation time
-    (; local_minmax, positivity, local_onesided) = limiter
+    (; local_twosided, positivity, local_onesided) = limiter
 
     if get(io, :compact, false)
         show(io, limiter)
     else
-        if !(local_minmax || positivity || local_onesided)
+        if !(local_twosided || positivity || local_onesided)
             setup = ["Limiter" => "No limiter selected => pure DG method"]
         else
             setup = ["Limiter" => ""]
-            if local_minmax
+            if local_twosided
                 setup = [
                     setup...,
-                    "" => "Local maximum/minimum limiting for conservative variables $(limiter.local_minmax_variables_cons)",
+                    "" => "Local maximum/minimum limiting for conservative variables $(limiter.local_twosided_variables_cons)",
                 ]
             end
             if positivity

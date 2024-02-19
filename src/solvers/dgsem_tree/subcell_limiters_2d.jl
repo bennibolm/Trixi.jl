@@ -44,9 +44,9 @@ function (limiter::SubcellLimiterIDP)(u::AbstractArray{<:Any, 4}, semi, dg::DGSE
     # TODO: Do not abuse `reset_du!` but maybe implement a generic `set_zero!`
     @trixi_timeit timer() "reset alpha" reset_du!(alpha, dg, semi.cache)
 
-    if limiter.local_minmax
-        @trixi_timeit timer() "local min/max" idp_local_minmax!(alpha, limiter,
-                                                                u, t, dt, semi)
+    if limiter.local_twosided
+        @trixi_timeit timer() "local min/max" idp_local_twosided!(alpha, limiter,
+                                                                  u, t, dt, semi)
     end
     if limiter.positivity
         @trixi_timeit timer() "positivity" idp_positivity!(alpha, limiter, u, dt, semi)
@@ -281,15 +281,15 @@ end
 ###############################################################################
 # Local minimum/maximum limiting
 
-@inline function idp_local_minmax!(alpha, limiter, u, t, dt, semi)
-    for variable in limiter.local_minmax_variables_cons
-        idp_local_minmax!(alpha, limiter, u, t, dt, semi, variable)
+@inline function idp_local_twosided!(alpha, limiter, u, t, dt, semi)
+    for variable in limiter.local_twosided_variables_cons
+        idp_local_twosided!(alpha, limiter, u, t, dt, semi, variable)
     end
 
     return nothing
 end
 
-@inline function idp_local_minmax!(alpha, limiter, u, t, dt, semi, variable)
+@inline function idp_local_twosided!(alpha, limiter, u, t, dt, semi, variable)
     _, _, dg, cache = mesh_equations_solver_cache(semi)
     (; antidiffusive_flux1_L, antidiffusive_flux2_L, antidiffusive_flux1_R, antidiffusive_flux2_R) = cache.antidiffusive_fluxes
     (; inverse_weights) = dg.basis
@@ -431,8 +431,8 @@ end
             end
 
             # Compute bound
-            if limiter.local_minmax &&
-               variable in limiter.local_minmax_variables_cons &&
+            if limiter.local_twosided &&
+               variable in limiter.local_twosided_variables_cons &&
                var_min[i, j, element] >= positivity_correction_factor * var
                 # Local limiting is more restrictive that positivity limiting
                 # => Skip positivity limiting for this node

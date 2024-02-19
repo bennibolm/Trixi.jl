@@ -8,7 +8,7 @@
 @inline function check_bounds(u, mesh::AbstractMesh{2}, equations, solver, cache,
                               limiter::SubcellLimiterIDP,
                               time, iter, output_directory, save_errors)
-    (; local_minmax, positivity, local_onesided) = solver.volume_integral.limiter
+    (; local_twosided, positivity, local_onesided) = solver.volume_integral.limiter
     (; variable_bounds) = limiter.cache.subcell_limiter_coefficients
     (; idp_bounds_delta_local, idp_bounds_delta_global) = limiter.cache
 
@@ -21,8 +21,8 @@
     # Since there are no processors with caches over 128B, we use `n = 128B / size(uEltype)`
     stride_size = div(128, sizeof(eltype(u))) # = n
 
-    if local_minmax
-        for v in limiter.local_minmax_variables_cons
+    if local_twosided
+        for v in limiter.local_twosided_variables_cons
             v_string = string(v)
             key_min = Symbol(v_string, "_min")
             key_max = Symbol(v_string, "_max")
@@ -62,7 +62,7 @@
     end
     if positivity
         for v in limiter.positivity_variables_cons
-            if v in limiter.local_minmax_variables_cons
+            if v in limiter.local_twosided_variables_cons
                 continue
             end
             key = Symbol(string(v), "_min")
@@ -106,8 +106,8 @@
         # Print to output file
         open("$output_directory/deviations.txt", "a") do f
             print(f, iter, ", ", time)
-            if local_minmax
-                for v in limiter.local_minmax_variables_cons
+            if local_twosided
+                for v in limiter.local_twosided_variables_cons
                     v_string = string(v)
                     print(f, ", ",
                           idp_bounds_delta_local[Symbol(v_string, "_min")][stride_size],
@@ -124,7 +124,7 @@
             end
             if positivity
                 for v in limiter.positivity_variables_cons
-                    if v in limiter.local_minmax_variables_cons
+                    if v in limiter.local_twosided_variables_cons
                         continue
                     end
                     print(f, ", ",

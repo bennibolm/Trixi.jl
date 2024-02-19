@@ -77,15 +77,15 @@ function init_callback(callback::BoundsCheckCallback, semi, limiter::SubcellLimi
         return nothing
     end
 
-    (; local_minmax, positivity, local_onesided) = limiter
+    (; local_twosided, positivity, local_onesided) = limiter
     (; output_directory) = callback
     variables = varnames(cons2cons, semi.equations)
 
     mkpath(output_directory)
     open("$output_directory/deviations.txt", "a") do f
         print(f, "# iter, simu_time")
-        if local_minmax
-            for v in limiter.local_minmax_variables_cons
+        if local_twosided
+            for v in limiter.local_twosided_variables_cons
                 variable_string = string(variables[v])
                 print(f, ", " * variable_string * "_min, " * variable_string * "_max")
             end
@@ -97,7 +97,7 @@ function init_callback(callback::BoundsCheckCallback, semi, limiter::SubcellLimi
         end
         if positivity
             for v in limiter.positivity_variables_cons
-                if v in limiter.local_minmax_variables_cons
+                if v in limiter.local_twosided_variables_cons
                     continue
                 end
                 print(f, ", " * string(variables[v]) * "_min")
@@ -125,15 +125,15 @@ end
 
 @inline function finalize_callback(callback::BoundsCheckCallback, semi,
                                    limiter::SubcellLimiterIDP)
-    (; local_minmax, positivity, local_onesided) = limiter
+    (; local_twosided, positivity, local_onesided) = limiter
     (; idp_bounds_delta_global) = limiter.cache
     variables = varnames(cons2cons, semi.equations)
 
     println("─"^100)
     println("Maximum deviation from bounds:")
     println("─"^100)
-    if local_minmax
-        for v in limiter.local_minmax_variables_cons
+    if local_twosided
+        for v in limiter.local_twosided_variables_cons
             v_string = string(v)
             println("$(variables[v]):")
             println("- lower bound: ",
@@ -154,7 +154,7 @@ end
     end
     if positivity
         for v in limiter.positivity_variables_cons
-            if v in limiter.local_minmax_variables_cons
+            if v in limiter.local_twosided_variables_cons
                 continue
             end
             println(string(variables[v]) * ":\n- positivity: ",
