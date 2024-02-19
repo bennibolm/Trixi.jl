@@ -18,7 +18,7 @@ end
                       positivity_variables_cons = String[],
                       positivity_variables_nonlinear = [],
                       positivity_correction_factor = 0.1,
-                      local_onesided_variables_nonlinear = NTuple{2, Function}[],
+                      local_onesided_variables_nonlinear = [],
                       max_iterations_newton = 10,
                       newton_tolerances = (1.0e-12, 1.0e-14),
                       gamma_constant_newton = 2 * ndims(equations))
@@ -82,7 +82,7 @@ function SubcellLimiterIDP(equations::AbstractEquations, basis;
                            positivity_variables_cons = String[],
                            positivity_variables_nonlinear = [],
                            positivity_correction_factor = 0.1,
-                           local_onesided_variables_nonlinear = NTuple{2, Function}[],
+                           local_onesided_variables_nonlinear = [],
                            max_iterations_newton = 10,
                            newton_tolerances = (1.0e-12, 1.0e-14),
                            gamma_constant_newton = 2 * ndims(equations))
