@@ -92,7 +92,7 @@ function SubcellLimiterIDP(equations::AbstractEquations, basis;
                   length(positivity_variables_nonlinear) > 0)
 
     # When passing `min` or `max` in the elixir the specific function of Base is used.
-    # To speed up the simulation, we replace it with `Trixi.max` and `Trixi.min` respectively.
+    # To speed up the simulation, we replace it with `Trixi.min` and `Trixi.max` respectively.
     local_onesided_variables_nonlinear_ = Tuple{Function, Function}[]
     for (variable, operator) in local_onesided_variables_nonlinear
         if operator === Base.max
