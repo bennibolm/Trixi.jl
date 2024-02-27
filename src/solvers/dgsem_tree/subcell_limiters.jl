@@ -38,7 +38,8 @@ To use these three limiting options use the following structure:
 For ***nonlinear variables***, the wanted variable functions are passed within a vector: To ensure
 positivity use a plain vector including the desired variables, e.g. `positivity_variables_nonlinear = [pressure]`.
 For local one-sided limiting pass the variable function combined with the requested bound
-(`min` or `max`) as a tuple, e.g. `local_onesided_variables_nonlinear = [(Trixi.entropy_spec, min)]`.
+(`min` or `max`) as a tuple. For instance, to impose a lower local bound on the specific entropy
+use `local_onesided_variables_nonlinear = [(Trixi.entropy_spec, min)]`.
 
 The bounds are calculated using the low-order FV solution. The positivity limiter uses
 `positivity_correction_factor` such that `u^new >= positivity_correction_factor * u^FV`.
@@ -103,6 +104,8 @@ function SubcellLimiterIDP(equations::AbstractEquations, basis;
             push!(local_onesided_variables_nonlinear_, tuple(variable, max))
         elseif min_or_max === Base.min
             push!(local_onesided_variables_nonlinear_, tuple(variable, min))
+        elseif min_or_max === Trixi.max || min_or_max === Trixi.min
+            push!(local_onesided_variables_nonlinear_, tuple(variable, min_or_max))
         else
             error("Parameter $min_or_max is not a valid input. Use `max` or `min` instead.")
         end
