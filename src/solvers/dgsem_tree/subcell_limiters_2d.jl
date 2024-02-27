@@ -362,7 +362,7 @@ end
 end
 
 @inline function idp_local_onesided!(alpha, limiter, u, t, dt, semi, variable::F,
-                                     min_or_max) where {F}
+                                     min_or_max::M) where {F, M}
     _, equations, dg, cache = mesh_equations_solver_cache(semi)
     (; variable_bounds) = limiter.cache.subcell_limiter_coefficients
     var_minmax = variable_bounds[Symbol(string(variable), "_", string(min_or_max))]
@@ -374,8 +374,8 @@ end
         for j in eachnode(dg), i in eachnode(dg)
             u_local = get_node_vars(u, equations, dg, i, j, element)
             newton_loops_alpha!(alpha, var_minmax[i, j, element], u_local,
-                                i, j, element,
-                                variable, initial_check_local_onesided_newton_idp,
+                                i, j, element, variable, min_or_max,
+                                initial_check_local_onesided_newton_idp,
                                 final_check_local_onesided_newton_idp, inverse_jacobian,
                                 dt, equations, dg, cache, limiter)
         end
@@ -494,7 +494,7 @@ end
 
             # Perform Newton's bisection method to find new alpha
             newton_loops_alpha!(alpha, var_min[i, j, element], u_local, i, j, element,
-                                variable, initial_check_nonnegative_newton_idp,
+                                variable, min, initial_check_nonnegative_newton_idp,
                                 final_check_nonnegative_newton_idp, inverse_jacobian,
                                 dt, equations, dg, cache, limiter)
         end
@@ -503,7 +503,7 @@ end
     return nothing
 end
 
-@inline function newton_loops_alpha!(alpha, bound, u, i, j, element, variable,
+@inline function newton_loops_alpha!(alpha, bound, u, i, j, element, variable, min_or_max,
                                      initial_check, final_check, inverse_jacobian, dt,
                                      equations, dg, cache, limiter)
     (; inverse_weights) = dg.basis
@@ -515,7 +515,7 @@ end
     antidiffusive_flux = gamma_constant_newton * inverse_jacobian * inverse_weights[i] *
                          get_node_vars(antidiffusive_flux1_R, equations, dg, i, j,
                                        element)
-    newton_loop!(alpha, bound, u, i, j, element, variable, initial_check, final_check,
+    newton_loop!(alpha, bound, u, i, j, element, variable, min_or_max, initial_check, final_check,
                  equations, dt, limiter, antidiffusive_flux)
 
     # positive xi direction
@@ -523,14 +523,14 @@ end
                          inverse_weights[i] *
                          get_node_vars(antidiffusive_flux1_L, equations, dg, i + 1, j,
                                        element)
-    newton_loop!(alpha, bound, u, i, j, element, variable, initial_check, final_check,
+    newton_loop!(alpha, bound, u, i, j, element, variable, min_or_max, initial_check, final_check,
                  equations, dt, limiter, antidiffusive_flux)
 
     # negative eta direction
     antidiffusive_flux = gamma_constant_newton * inverse_jacobian * inverse_weights[j] *
                          get_node_vars(antidiffusive_flux2_R, equations, dg, i, j,
                                        element)
-    newton_loop!(alpha, bound, u, i, j, element, variable, initial_check, final_check,
+    newton_loop!(alpha, bound, u, i, j, element, variable, min_or_max, initial_check, final_check,
                  equations, dt, limiter, antidiffusive_flux)
 
     # positive eta direction
@@ -538,13 +538,13 @@ end
                          inverse_weights[j] *
                          get_node_vars(antidiffusive_flux2_L, equations, dg, i, j + 1,
                                        element)
-    newton_loop!(alpha, bound, u, i, j, element, variable, initial_check, final_check,
+    newton_loop!(alpha, bound, u, i, j, element, variable, min_or_max, initial_check, final_check,
                  equations, dt, limiter, antidiffusive_flux)
 
     return nothing
 end
 
-@inline function newton_loop!(alpha, bound, u, i, j, element, variable, initial_check,
+@inline function newton_loop!(alpha, bound, u, i, j, element, variable, min_or_max, initial_check,
                               final_check, equations, dt, limiter, antidiffusive_flux)
     newton_reltol, newton_abstol = limiter.newton_tolerances
 
@@ -559,7 +559,7 @@ end
     if isvalid(u_curr, equations)
         goal = goal_function_newton_idp(variable, bound, u_curr, equations)
 
-        initial_check(variable, bound, goal, newton_abstol) && return nothing
+        initial_check(min_or_max, bound, goal, newton_abstol) && return nothing
     end
 
     # Newton iterations
@@ -594,7 +594,7 @@ end
 
             # Check new beta for condition and update bounds
             goal = goal_function_newton_idp(variable, bound, u_curr, equations)
-            if initial_check(variable, bound, goal, newton_abstol)
+            if initial_check(min_or_max, bound, goal, newton_abstol)
                 # New beta fulfills condition
                 beta_L = beta
             else
@@ -634,18 +634,17 @@ end
 
 ### Auxiliary routines for Newton's bisection method ###
 # Initial checks
-@inline function initial_check_local_onesided_newton_idp(::typeof(entropy_spec), bound,
+@inline function initial_check_local_onesided_newton_idp(::typeof(min), bound,
                                                          goal, newton_abstol)
     goal <= max(newton_abstol, abs(bound) * newton_abstol)
 end
 
-@inline function initial_check_local_onesided_newton_idp(::typeof(entropy_math), bound,
+@inline function initial_check_local_onesided_newton_idp(::typeof(max), bound,
                                                          goal, newton_abstol)
     goal >= -max(newton_abstol, abs(bound) * newton_abstol)
 end
 
-@inline initial_check_nonnegative_newton_idp(variable, bound, goal, newton_abstol) = goal <=
-                                                                                     0
+@inline initial_check_nonnegative_newton_idp(min_or_max, bound, goal, newton_abstol) = goal <= 0
 
 # Goal and d(Goal)d(u) function
 @inline goal_function_newton_idp(variable, bound, u, equations) = bound -
