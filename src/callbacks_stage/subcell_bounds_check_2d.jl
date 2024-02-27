@@ -53,9 +53,11 @@
                     v = variable(get_node_vars(u, equations, solver, i, j, element),
                                  equations)
                     if min_or_max === max
-                        deviation = max(deviation, v - variable_bounds[key][i, j, element])
+                        deviation = max(deviation,
+                                        v - variable_bounds[key][i, j, element])
                     else # min_or_max === min
-                        deviation = max(deviation, variable_bounds[key][i, j, element] - v)
+                        deviation = max(deviation,
+                                        variable_bounds[key][i, j, element] - v)
                     end
                 end
                 deviation_threaded[stride_size * Threads.threadid()] = deviation

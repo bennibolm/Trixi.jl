@@ -194,20 +194,20 @@ end
             var_minmax[i, j, element] = min_or_max(var_minmax[i, j, element], var)
 
             if i > 1
-                var_minmax[i - 1, j, element] = min_or_max(var_minmax[i - 1, j, element],
-                                                           var)
+                var_minmax[i - 1, j, element] = min_or_max(var_minmax[i - 1, j,
+                                                                      element], var)
             end
             if i < nnodes(dg)
-                var_minmax[i + 1, j, element] = min_or_max(var_minmax[i + 1, j, element],
-                                                           var)
+                var_minmax[i + 1, j, element] = min_or_max(var_minmax[i + 1, j,
+                                                                      element], var)
             end
             if j > 1
-                var_minmax[i, j - 1, element] = min_or_max(var_minmax[i, j - 1, element],
-                                                           var)
+                var_minmax[i, j - 1, element] = min_or_max(var_minmax[i, j - 1,
+                                                                      element], var)
             end
             if j < nnodes(dg)
-                var_minmax[i, j + 1, element] = min_or_max(var_minmax[i, j + 1, element],
-                                                           var)
+                var_minmax[i, j + 1, element] = min_or_max(var_minmax[i, j + 1,
+                                                                      element], var)
             end
         end
     end
@@ -242,8 +242,8 @@ end
 
             var_minmax[index_right..., right] = min_or_max(var_minmax[index_right...,
                                                                       right], var_left)
-            var_minmax[index_left..., left] = min_or_max(var_minmax[index_left..., left],
-                                                         var_right)
+            var_minmax[index_left..., left] = min_or_max(var_minmax[index_left...,
+                                                                    left], var_right)
         end
     end
 
@@ -503,9 +503,10 @@ end
     return nothing
 end
 
-@inline function newton_loops_alpha!(alpha, bound, u, i, j, element, variable, min_or_max,
-                                     initial_check, final_check, inverse_jacobian, dt,
-                                     equations, dg, cache, limiter)
+@inline function newton_loops_alpha!(alpha, bound, u, i, j, element, variable,
+                                     min_or_max, initial_check, final_check,
+                                     inverse_jacobian, dt, equations, dg, cache,
+                                     limiter)
     (; inverse_weights) = dg.basis
     (; antidiffusive_flux1_L, antidiffusive_flux2_L, antidiffusive_flux1_R, antidiffusive_flux2_R) = cache.antidiffusive_fluxes
 
@@ -515,37 +516,38 @@ end
     antidiffusive_flux = gamma_constant_newton * inverse_jacobian * inverse_weights[i] *
                          get_node_vars(antidiffusive_flux1_R, equations, dg, i, j,
                                        element)
-    newton_loop!(alpha, bound, u, i, j, element, variable, min_or_max, initial_check, final_check,
-                 equations, dt, limiter, antidiffusive_flux)
+    newton_loop!(alpha, bound, u, i, j, element, variable, min_or_max, initial_check,
+                 final_check, equations, dt, limiter, antidiffusive_flux)
 
     # positive xi direction
     antidiffusive_flux = -gamma_constant_newton * inverse_jacobian *
                          inverse_weights[i] *
                          get_node_vars(antidiffusive_flux1_L, equations, dg, i + 1, j,
                                        element)
-    newton_loop!(alpha, bound, u, i, j, element, variable, min_or_max, initial_check, final_check,
-                 equations, dt, limiter, antidiffusive_flux)
+    newton_loop!(alpha, bound, u, i, j, element, variable, min_or_max, initial_check,
+                 final_check, equations, dt, limiter, antidiffusive_flux)
 
     # negative eta direction
     antidiffusive_flux = gamma_constant_newton * inverse_jacobian * inverse_weights[j] *
                          get_node_vars(antidiffusive_flux2_R, equations, dg, i, j,
                                        element)
-    newton_loop!(alpha, bound, u, i, j, element, variable, min_or_max, initial_check, final_check,
-                 equations, dt, limiter, antidiffusive_flux)
+    newton_loop!(alpha, bound, u, i, j, element, variable, min_or_max, initial_check,
+                 final_check, equations, dt, limiter, antidiffusive_flux)
 
     # positive eta direction
     antidiffusive_flux = -gamma_constant_newton * inverse_jacobian *
                          inverse_weights[j] *
                          get_node_vars(antidiffusive_flux2_L, equations, dg, i, j + 1,
                                        element)
-    newton_loop!(alpha, bound, u, i, j, element, variable, min_or_max, initial_check, final_check,
-                 equations, dt, limiter, antidiffusive_flux)
+    newton_loop!(alpha, bound, u, i, j, element, variable, min_or_max, initial_check,
+                 final_check, equations, dt, limiter, antidiffusive_flux)
 
     return nothing
 end
 
-@inline function newton_loop!(alpha, bound, u, i, j, element, variable, min_or_max, initial_check,
-                              final_check, equations, dt, limiter, antidiffusive_flux)
+@inline function newton_loop!(alpha, bound, u, i, j, element, variable, min_or_max,
+                              initial_check, final_check, equations, dt, limiter,
+                              antidiffusive_flux)
     newton_reltol, newton_abstol = limiter.newton_tolerances
 
     beta = 1 - alpha[i, j, element]
@@ -644,7 +646,8 @@ end
     goal >= -max(newton_abstol, abs(bound) * newton_abstol)
 end
 
-@inline initial_check_nonnegative_newton_idp(min_or_max, bound, goal, newton_abstol) = goal <= 0
+@inline initial_check_nonnegative_newton_idp(min_or_max, bound, goal, newton_abstol) = goal <=
+                                                                                       0
 
 # Goal and d(Goal)d(u) function
 @inline goal_function_newton_idp(variable, bound, u, equations) = bound -
