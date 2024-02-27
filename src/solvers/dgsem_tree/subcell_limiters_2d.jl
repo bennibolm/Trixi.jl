@@ -175,13 +175,13 @@ end
     return nothing
 end
 
-@inline function calc_bounds_onesided!(var_minmax, minmax, variable, u, t, semi)
+@inline function calc_bounds_onesided!(var_minmax, min_or_max, variable, u, t, semi)
     mesh, equations, dg, cache = mesh_equations_solver_cache(semi)
     # Calc bounds inside elements
     @threaded for element in eachelement(dg, cache)
         # Reset bounds
         for j in eachnode(dg), i in eachnode(dg)
-            if minmax === max
+            if min_or_max === max
                 var_minmax[i, j, element] = typemin(eltype(var_minmax))
             else
                 var_minmax[i, j, element] = typemax(eltype(var_minmax))
@@ -191,32 +191,32 @@ end
         # Calculate bounds at Gauss-Lobatto nodes using u
         for j in eachnode(dg), i in eachnode(dg)
             var = variable(get_node_vars(u, equations, dg, i, j, element), equations)
-            var_minmax[i, j, element] = minmax(var_minmax[i, j, element], var)
+            var_minmax[i, j, element] = min_or_max(var_minmax[i, j, element], var)
 
             if i > 1
-                var_minmax[i - 1, j, element] = minmax(var_minmax[i - 1, j, element],
-                                                       var)
+                var_minmax[i - 1, j, element] = min_or_max(var_minmax[i - 1, j, element],
+                                                           var)
             end
             if i < nnodes(dg)
-                var_minmax[i + 1, j, element] = minmax(var_minmax[i + 1, j, element],
-                                                       var)
+                var_minmax[i + 1, j, element] = min_or_max(var_minmax[i + 1, j, element],
+                                                           var)
             end
             if j > 1
-                var_minmax[i, j - 1, element] = minmax(var_minmax[i, j - 1, element],
-                                                       var)
+                var_minmax[i, j - 1, element] = min_or_max(var_minmax[i, j - 1, element],
+                                                           var)
             end
             if j < nnodes(dg)
-                var_minmax[i, j + 1, element] = minmax(var_minmax[i, j + 1, element],
-                                                       var)
+                var_minmax[i, j + 1, element] = min_or_max(var_minmax[i, j + 1, element],
+                                                           var)
             end
         end
     end
 
     # Values at element boundary
-    calc_bounds_onesided_interface!(var_minmax, minmax, variable, u, t, semi, mesh)
+    calc_bounds_onesided_interface!(var_minmax, min_or_max, variable, u, t, semi, mesh)
 end
 
-@inline function calc_bounds_onesided_interface!(var_minmax, minmax, variable, u, t,
+@inline function calc_bounds_onesided_interface!(var_minmax, min_or_max, variable, u, t,
                                                  semi, mesh::TreeMesh2D)
     _, equations, dg, cache = mesh_equations_solver_cache(semi)
     (; boundary_conditions) = semi
@@ -240,10 +240,10 @@ end
             var_right = variable(get_node_vars(u, equations, dg, index_right..., right),
                                  equations)
 
-            var_minmax[index_right..., right] = minmax(var_minmax[index_right...,
-                                                                  right], var_left)
-            var_minmax[index_left..., left] = minmax(var_minmax[index_left..., left],
-                                                     var_right)
+            var_minmax[index_right..., right] = min_or_max(var_minmax[index_right...,
+                                                                      right], var_left)
+            var_minmax[index_left..., left] = min_or_max(var_minmax[index_left..., left],
+                                                         var_right)
         end
     end
 
@@ -270,8 +270,8 @@ end
                                                index..., element)
             var_outer = variable(u_outer, equations)
 
-            var_minmax[index..., element] = minmax(var_minmax[index..., element],
-                                                   var_outer)
+            var_minmax[index..., element] = min_or_max(var_minmax[index..., element],
+                                                       var_outer)
         end
     end
 
@@ -279,7 +279,7 @@ end
 end
 
 ###############################################################################
-# Local two-sided limiting for conservative variables
+# Local two-sided limiting of conservative variables
 
 @inline function idp_local_twosided!(alpha, limiter, u, t, dt, semi)
     for variable in limiter.local_twosided_variables_cons
@@ -354,19 +354,19 @@ end
 # Local one-sided limiting of nonlinear variables
 
 @inline function idp_local_onesided!(alpha, limiter, u, t, dt, semi)
-    for (variable, operator) in limiter.local_onesided_variables_nonlinear
-        idp_local_onesided!(alpha, limiter, u, t, dt, semi, variable, operator)
+    for (variable, min_or_max) in limiter.local_onesided_variables_nonlinear
+        idp_local_onesided!(alpha, limiter, u, t, dt, semi, variable, min_or_max)
     end
 
     return nothing
 end
 
 @inline function idp_local_onesided!(alpha, limiter, u, t, dt, semi, variable::F,
-                                     minmax) where {F}
+                                     min_or_max) where {F}
     _, equations, dg, cache = mesh_equations_solver_cache(semi)
     (; variable_bounds) = limiter.cache.subcell_limiter_coefficients
-    var_minmax = variable_bounds[Symbol(string(variable), "_", string(minmax))]
-    calc_bounds_onesided!(var_minmax, minmax, variable, u, t, semi)
+    var_minmax = variable_bounds[Symbol(string(variable), "_", string(min_or_max))]
+    calc_bounds_onesided!(var_minmax, min_or_max, variable, u, t, semi)
 
     # Perform Newton's bisection method to find new alpha
     @threaded for element in eachelement(dg, cache)

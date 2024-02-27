@@ -98,13 +98,13 @@ function SubcellLimiterIDP(equations::AbstractEquations, basis;
     # When passing `min` or `max` in the elixir the specific function of Base is used.
     # To speed up the simulation, we replace it with `Trixi.min` and `Trixi.max` respectively.
     local_onesided_variables_nonlinear_ = Tuple{Function, Function}[]
-    for (variable, operator) in local_onesided_variables_nonlinear
-        if operator === Base.max
+    for (variable, min_or_max) in local_onesided_variables_nonlinear
+        if min_or_max === Base.max
             push!(local_onesided_variables_nonlinear_, tuple(variable, max))
-        elseif operator === Base.min
+        elseif min_or_max === Base.min
             push!(local_onesided_variables_nonlinear_, tuple(variable, min))
         else
-            error("Operator $operator is not a valid input. Use `max` or `min` instead.")
+            error("Parameter $min_or_max is not a valid input. Use `max` or `min` instead.")
         end
     end
 
@@ -122,9 +122,9 @@ function SubcellLimiterIDP(equations::AbstractEquations, basis;
         end
     end
     if local_onesided
-        for (variable, operator) in local_onesided_variables_nonlinear_
+        for (variable, min_or_max) in local_onesided_variables_nonlinear_
             bound_keys = (bound_keys...,
-                          Symbol(string(variable), "_", string(operator)))
+                          Symbol(string(variable), "_", string(min_or_max)))
         end
     end
     for v in positivity_variables_cons_
@@ -203,8 +203,8 @@ function Base.show(io::IO, ::MIME"text/plain", limiter::SubcellLimiterIDP)
                 ]
             end
             if local_onesided
-                for (variable, operator) in limiter.local_onesided_variables_nonlinear
-                    setup = [setup..., "" => "Local $operator limiting for $variable"]
+                for (variable, min_or_max) in limiter.local_onesided_variables_nonlinear
+                    setup = [setup..., "" => "Local $min_or_max limiting for $variable"]
                 end
             end
             setup = [

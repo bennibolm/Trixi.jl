@@ -44,17 +44,19 @@
         end
     end
     if local_onesided
-        foreach(limiter.local_onesided_variables_nonlinear) do (variable, operator)
-            key = Symbol(string(variable), "_", string(operator))
-            factor = operator === max ? 1.0 : -1.0
+        foreach(limiter.local_onesided_variables_nonlinear) do (variable, min_or_max)
+            key = Symbol(string(variable), "_", string(min_or_max))
             deviation_threaded = idp_bounds_delta_local[key]
             @threaded for element in eachelement(solver, cache)
                 deviation = deviation_threaded[stride_size * Threads.threadid()]
                 for j in eachnode(solver), i in eachnode(solver)
                     v = variable(get_node_vars(u, equations, solver, i, j, element),
                                  equations)
-                    deviation = max(deviation,
-                                    factor * (v - variable_bounds[key][i, j, element]))
+                    if min_or_max === max
+                        deviation = max(deviation, v - variable_bounds[key][i, j, element])
+                    else # min_or_max === min
+                        deviation = max(deviation, variable_bounds[key][i, j, element] - v)
+                    end
                 end
                 deviation_threaded[stride_size * Threads.threadid()] = deviation
             end
@@ -116,10 +118,10 @@
                 end
             end
             if local_onesided
-                for (variable, operator) in limiter.local_onesided_variables_nonlinear
+                for (variable, min_or_max) in limiter.local_onesided_variables_nonlinear
                     print(f, ", ",
                           idp_bounds_delta_local[Symbol(string(variable), "_",
-                                                        string(operator))][stride_size])
+                                                        string(min_or_max))][stride_size])
                 end
             end
             if positivity
