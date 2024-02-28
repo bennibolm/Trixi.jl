@@ -361,8 +361,8 @@ end
     return nothing
 end
 
-@inline function idp_local_onesided!(alpha, limiter, u, t, dt, semi, variable::F,
-                                     min_or_max::M) where {F, M}
+@inline function idp_local_onesided!(alpha, limiter, u, t, dt, semi, variable,
+                                     min_or_max)
     _, equations, dg, cache = mesh_equations_solver_cache(semi)
     (; variable_bounds) = limiter.cache.subcell_limiter_coefficients
     var_minmax = variable_bounds[Symbol(string(variable), "_", string(min_or_max))]
