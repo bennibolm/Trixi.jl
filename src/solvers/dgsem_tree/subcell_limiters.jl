@@ -96,7 +96,7 @@ function SubcellLimiterIDP(equations::AbstractEquations, basis;
     positivity = (length(positivity_variables_cons) +
                   length(positivity_variables_nonlinear) > 0)
 
-    # When passing `min` or `max` in the elixir the specific function of Base is used.
+    # When passing `min` or `max` in the elixir, the specific function of Base is used.
     # To speed up the simulation, we replace it with `Trixi.min` and `Trixi.max` respectively.
     local_onesided_variables_nonlinear_ = Tuple{Function, Function}[]
     for (variable, min_or_max) in local_onesided_variables_nonlinear
@@ -110,6 +110,7 @@ function SubcellLimiterIDP(equations::AbstractEquations, basis;
             error("Parameter $min_or_max is not a valid input. Use `max` or `min` instead.")
         end
     end
+    local_onesided_variables_nonlinear_ = Tuple(local_onesided_variables_nonlinear_)
 
     local_twosided_variables_cons_ = get_variable_index.(local_twosided_variables_cons,
                                                          equations)
