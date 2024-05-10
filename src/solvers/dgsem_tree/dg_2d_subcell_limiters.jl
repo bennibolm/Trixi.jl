@@ -866,7 +866,7 @@ end
     (; variable_bounds) = limiter.cache.subcell_limiter_coefficients
     (; bar_states1, bar_states2) = limiter.cache.container_bar_states
 
-    # Local two-sided limiting for conservatie variables
+    # Local two-sided limiting for conservative variables
     if limiter.local_twosided
         for v in limiter.local_twosided_variables_cons
             v_string = string(v)

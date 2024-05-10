@@ -565,7 +565,7 @@ end
     end
 
     # Compute bound
-    if limiter.local_minmax &&
+    if limiter.local_twosided &&
        variable in limiter.local_twosided_variables_cons &&
        var_min[i, j, element] >= positivity_correction_factor * var
         # Local limiting is more restrictive that positivity limiting
