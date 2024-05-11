@@ -417,8 +417,8 @@ end
     @test_nowarn show(stdout, indicator_hg)
 
     limiter_idp = SubcellLimiterIDP(true, [1], true, [1], ["variable"], 0.1,
-                                    true, [(Trixi.entropy_guermond_etal, min)], true, "cache",
-                                    1, (1.0, 1.0), 1.0, true, 1.0, nothing)
+                                    true, [(Trixi.entropy_guermond_etal, min)], true,
+                                    "cache", 1, (1.0, 1.0), 1.0, true, 1.0, nothing)
     @test_nowarn show(stdout, limiter_idp)
 
     limiter_mcl = SubcellLimiterMCL("cache", true, true, true, true, true, true, true,
