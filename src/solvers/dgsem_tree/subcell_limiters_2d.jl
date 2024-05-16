@@ -855,14 +855,16 @@ function create_cache(limiter::Type{SubcellLimiterMCL}, equations::AbstractEquat
     # Memory for bounds checking routine with `BoundsCheckCallback`.
     # Local variable contains the maximum deviation since the last export.
     # [min / max, variable]
-    mcl_bounds_delta_local = zeros(real(basis), 2,
-                                   nvariables(equations) + positivity_limiter_pressure)
+    mcl_bounds_delta_local_threaded = [zeros(real(basis), 2,
+                                             nvariables(equations) +
+                                             positivity_limiter_pressure)
+                                       for _ in 1:Threads.nthreads()]
     # Global variable contains the total maximum deviation.
     # [min / max, variable]
     mcl_bounds_delta_global = zeros(real(basis), 2,
                                     nvariables(equations) + positivity_limiter_pressure)
 
     return (; subcell_limiter_coefficients, container_bar_states,
-            mcl_bounds_delta_local, mcl_bounds_delta_global)
+            mcl_bounds_delta_local_threaded, mcl_bounds_delta_global)
 end
 end # @muladd
