@@ -861,7 +861,6 @@ end
     end
 end
 
-
 @trixi_testset "elixir_euler_sedov_blast_wave_sc_subcell.jl (local bounds)" begin
     @test_trixi_include(joinpath(EXAMPLES_DIR,
                                  "elixir_euler_sedov_blast_wave_sc_subcell.jl"),
