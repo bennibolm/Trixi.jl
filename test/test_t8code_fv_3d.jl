@@ -97,8 +97,8 @@ end
         @test_trixi_include(joinpath(EXAMPLES_DIR,
                                      "elixir_advection_gauss.jl"),
                             order=1,
-                            l2=[0.1515258539168874],
-                            linf=[0.43164936150417055])
+                            l2=[0.03422041780251932],
+                            linf=[0.7655163504661142])
         # Ensure that we do not have excessive memory allocations
         # (e.g., from type instabilities)
         let
@@ -111,8 +111,8 @@ end
     @trixi_testset "second-order FV" begin
         @test_trixi_include(joinpath(EXAMPLES_DIR,
                                      "elixir_advection_gauss.jl"),
-                            l2=[0.04076672839289378],
-                            linf=[0.122537463101035582])
+                            l2=[0.02129708543319383],
+                            linf=[0.5679262915623222])
         # Ensure that we do not have excessive memory allocations
         # (e.g., from type instabilities)
         let

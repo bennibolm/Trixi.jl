@@ -65,7 +65,7 @@ function initial_condition_convergence_test(x, t,
 end
 
 # Calculates translated coordinates `x` for a periodic domain
-function x_trans_periodic_3d(x, domain_length = SVector(2, 2, 2),
+function x_trans_periodic_3d(x, domain_length = SVector(10, 10, 10),
                              center = SVector(0, 0, 0))
     x_normalized = x .- center
     x_shifted = x_normalized .% domain_length
