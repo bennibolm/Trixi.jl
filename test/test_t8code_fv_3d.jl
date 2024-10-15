@@ -49,7 +49,7 @@ mkdir(outdir)
     @trixi_testset "first-order FV" begin
         @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_advection_basic.jl"),
                             order=1,
-                            initial_refinement_level=2+2,
+                            initial_refinement_level=2 + 2,
                             l2=[0.2848617953369851],
                             linf=[0.3721898718954475])
         # Ensure that we do not have excessive memory allocations
@@ -63,7 +63,7 @@ mkdir(outdir)
     end
     @trixi_testset "second-order FV" begin
         @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_advection_basic.jl"),
-                            initial_refinement_level=2+2,
+                            initial_refinement_level=2 + 2,
                             l2=[0.10381089565603231],
                             linf=[0.13787405651527007])
         # Ensure that we do not have excessive memory allocations
@@ -77,7 +77,7 @@ mkdir(outdir)
     end
     @trixi_testset "second-order FV, extended reconstruction stencil" begin
         @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_advection_basic.jl"),
-                            initial_refinement_level=1+2,
+                            initial_refinement_level=1 + 2,
                             extended_reconstruction_stencil=true,
                             l2=[0.3282177575292713],
                             linf=[0.39002345444858333])
@@ -177,14 +177,14 @@ end
                                 0.0351299673616484,
                                 0.0351299673616484,
                                 0.03512996736164839,
-                                0.1601847269543808,
+                                0.1601847269543808
                             ],
                             linf=[
                                 0.07175521415072939,
                                 0.04648499338897771,
                                 0.04648499338897816,
                                 0.04648499338897816,
-                                0.2235470564880404,
+                                0.2235470564880404
                             ])
         # Ensure that we do not have excessive memory allocations
         # (e.g., from type instabilities)
@@ -203,14 +203,14 @@ end
                                 0.010791416898840429,
                                 0.010791416898840464,
                                 0.010791416898840377,
-                                0.036995680347196136,
+                                0.036995680347196136
                             ],
                             linf=[
                                 0.01982294164697862,
                                 0.01840725612418126,
                                 0.01840725612418148,
                                 0.01840725612418148,
-                                0.05736595182767079,
+                                0.05736595182767079
                             ])
         # Ensure that we do not have excessive memory allocations
         # (e.g., from type instabilities)
@@ -230,14 +230,14 @@ end
                                 0.03596196296013507,
                                 0.03616867188152877,
                                 0.03616867188152873,
-                                0.14939041550302212,
+                                0.14939041550302212
                             ],
                             linf=[
                                 0.07943789383956079,
                                 0.06389365911606859,
                                 0.06469291944863809,
                                 0.0646929194486372,
-                                0.23507781748792533,
+                                0.23507781748792533
                             ])
         # Ensure that we do not have excessive memory allocations
         # (e.g., from type instabilities)

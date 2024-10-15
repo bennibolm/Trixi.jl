@@ -389,7 +389,7 @@ function T8codeMesh(trees_per_dimension, eclass;
     cmesh = cmesh_ref[]
 
     @assert(allequal(trees_per_dimension),
-                "Different trees per dimensions are not supported for quad mesh. `trees_per_dimension`: $trees_per_dimension")
+            "Different trees per dimensions are not supported for quad mesh. `trees_per_dimension`: $trees_per_dimension")
     num_trees = prod(trees_per_dimension) * 1 # 1 = number of trees for single hypercube with quads
 
     vertices_per_tree = 2^NDIMS # number of vertices (=corners) in one tree
@@ -425,8 +425,11 @@ function T8codeMesh(trees_per_dimension, eclass;
         coordinates_tree_y = range(-1.0, 1.0, length = trees_per_dimension[2] + 1)
         coordinates_tree_z = range(-1.0, 1.0, length = trees_per_dimension[3] + 1)
 
-        for itree_z in 1:trees_per_dimension[3], itree_y in 1:trees_per_dimension[2], itree_x in 1:trees_per_dimension[1]
-            index = trees_per_dimension[1] * trees_per_dimension[2] * 3 * vertices_per_tree * (itree_z - 1) +
+        for itree_z in 1:trees_per_dimension[3], itree_y in 1:trees_per_dimension[2],
+            itree_x in 1:trees_per_dimension[1]
+
+            index = trees_per_dimension[1] * trees_per_dimension[2] * 3 *
+                    vertices_per_tree * (itree_z - 1) +
                     trees_per_dimension[1] * 3 * vertices_per_tree * (itree_y - 1) +
                     3 * vertices_per_tree * (itree_x - 1) + 1
 
@@ -494,7 +497,8 @@ function T8codeMesh(trees_per_dimension, eclass;
         offset_vertices = 3 * vertices_per_tree * (itree - 1)
         t8_cmesh_set_tree_class(cmesh, itree - 1, eclass)
         t8_cmesh_set_tree_vertices(cmesh, itree - 1,
-                                    @views(vertices[(1 + offset_vertices):end]), vertices_per_tree)
+                                   @views(vertices[(1 + offset_vertices):end]),
+                                   vertices_per_tree)
     end
 
     if NDIMS == 2
@@ -1808,7 +1812,8 @@ function cmesh_new_quad(; trees_per_dimension = (1, 1),
 end
 
 function cmesh_new_quad_3d(; trees_per_dimension = (1, 1, 1),
-                           coordinates_min = (-1.0, -1.0, -1.0), coordinates_max = (1.0, 1.0, 1.0),
+                           coordinates_min = (-1.0, -1.0, -1.0),
+                           coordinates_max = (1.0, 1.0, 1.0),
                            periodicity = (true, true, true))::t8_cmesh_t
     # This is how the cmesh looks like. The numbers are the tree numbers:
     #     +---+

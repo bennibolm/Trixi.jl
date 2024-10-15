@@ -26,7 +26,8 @@ function mapping(xi, eta, zeta)
     return SVector(x, y, z)
 end
 
-function trixi_t8_mapping(cmesh, gtreeid, ref_coords, num_coords, out_coords, tree_data, user_data)
+function trixi_t8_mapping(cmesh, gtreeid, ref_coords, num_coords, out_coords,
+                          tree_data, user_data)
     ltreeid = t8_cmesh_get_local_id(cmesh, gtreeid)
     eclass = t8_cmesh_get_tree_class(cmesh, ltreeid)
     T8code.t8_geom_compute_linear_geometry(eclass, tree_data,
