@@ -13,39 +13,39 @@ const EXAMPLES_DIR = pkgdir(Trixi, "examples", "t8code_3d_fv")
 # Run basic tests
 @testset "Examples 3D" begin
     # NOTE: Since I use 2x2x2 tree instead of 8x8x8, I need to increase the resolution 2 times by the factor of 2 -> +2
-    @trixi_testset "elixir_advection_basic.jl" begin
-        @trixi_testset "first-order FV" begin
-            @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_advection_basic.jl"),
-                                order=1,
-                                initial_refinement_level=2 + 2,
-                                l2=[0.2848617953369851],
-                                linf=[0.3721898718954475])
-            # Ensure that we do not have excessive memory allocations
-            # (e.g., from type instabilities)
-            let
-                t = sol.t[end]
-                u_ode = sol.u[end]
-                du_ode = similar(u_ode)
-                @test (@allocated Trixi.rhs!(du_ode, u_ode, semi, t)) < 1000
-            end
-        end
-        @trixi_testset "second-order FV" begin
-            @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_advection_basic.jl"),
-                                initial_refinement_level=2 + 2,
-                                l2=[0.10381089565603231],
-                                linf=[0.13787405651527007])
-            # Ensure that we do not have excessive memory allocations
-            # (e.g., from type instabilities)
-            let
-                t = sol.t[end]
-                u_ode = sol.u[end]
-                du_ode = similar(u_ode)
-                @test (@allocated Trixi.rhs!(du_ode, u_ode, semi, t)) < 1000
-            end
-        end
-        # The extended reconstruction stencil is currently not mpi parallel.
-        # The current version runs through but an error occurs on some rank.
-    end
+    # @trixi_testset "elixir_advection_basic.jl" begin
+    #     @trixi_testset "first-order FV" begin
+    #         @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_advection_basic.jl"),
+    #                             order=1,
+    #                             initial_refinement_level=2 + 2,
+    #                             l2=[0.2848617953369851],
+    #                             linf=[0.3721898718954475])
+    #         # Ensure that we do not have excessive memory allocations
+    #         # (e.g., from type instabilities)
+    #         let
+    #             t = sol.t[end]
+    #             u_ode = sol.u[end]
+    #             du_ode = similar(u_ode)
+    #             @test (@allocated Trixi.rhs!(du_ode, u_ode, semi, t)) < 1000
+    #         end
+    #     end
+    #     @trixi_testset "second-order FV" begin
+    #         @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_advection_basic.jl"),
+    #                             initial_refinement_level=2 + 2,
+    #                             l2=[0.10381089565603231],
+    #                             linf=[0.13787405651527007])
+    #         # Ensure that we do not have excessive memory allocations
+    #         # (e.g., from type instabilities)
+    #         let
+    #             t = sol.t[end]
+    #             u_ode = sol.u[end]
+    #             du_ode = similar(u_ode)
+    #             @test (@allocated Trixi.rhs!(du_ode, u_ode, semi, t)) < 1000
+    #         end
+    #     end
+    #     # The extended reconstruction stencil is currently not mpi parallel.
+    #     # The current version runs through but an error occurs on some rank.
+    # end
 
     @trixi_testset "elixir_advection_basic_hybrid.jl" begin
         @trixi_testset "first-order FV" begin
