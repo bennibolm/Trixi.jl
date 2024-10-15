@@ -16,10 +16,9 @@ mkdir(outdir)
 
 # The are some reasons why the FV tests fail on the CI runs:
 # - T8code.jl is no dependency of the Trixi test environment. So `using T8code` within the `advection_basic` elixir throws an error.
-#   (But: When removing this line, e.g. code like `trixi_t8_mapping_c` (with unknown types) or unknown eclasses failes)
+#   (But: When removing this line, e.g. code like `trixi_t8_mapping_c` (with unknown types) or unknown eclasses fails)
 # - `load_tree_data = @t8_load_tree_data(t8_geom_load_tree_data_vertices)` is required.
 #    Sadly, the macro is not yet in the latest T8code.jl release (but for instance in `jmark/bumb-t8code-3.0.0` or `bennibolm/t8-trixi-fv-scheme`).
-
 
 @testset "T8codeMesh2D" begin
 #! format: noindent
