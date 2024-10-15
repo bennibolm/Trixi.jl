@@ -43,21 +43,6 @@ const EXAMPLES_DIR = pkgdir(Trixi, "examples", "t8code_2d_fv")
         end
         # The extended reconstruction stencil is currently not mpi parallel.
         # The current version runs through but an error occurs on some rank.
-        # @trixi_testset "second-order FV, extended reconstruction stencil" begin
-        #     @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_advection_basic.jl"),
-        #                         order=2,
-        #                         extended_reconstruction_stencil=true,
-        #                         l2=[0.020331012873518642],
-        #                         linf=[0.05571209803860677])
-        #     # Ensure that we do not have excessive memory allocations
-        #     # (e.g., from type instabilities)
-        #     let
-        #         t = sol.t[end]
-        #         u_ode = sol.u[end]
-        #         du_ode = similar(u_ode)
-        #         @test (@allocated Trixi.rhs!(du_ode, u_ode, semi, t)) < 1000
-        #     end
-        # end
     end
 
     @trixi_testset "elixir_advection_gauss.jl" begin
