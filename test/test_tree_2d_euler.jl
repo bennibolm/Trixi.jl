@@ -532,6 +532,7 @@ end
 
 @trixi_testset "elixir_euler_sedov_blast_wave_sc_subcell.jl" begin
     rm(joinpath("out", "deviations.txt"), force = true)
+    rm(joinpath("out", "alphas.txt"), force = true)
     @test_trixi_include(joinpath(EXAMPLES_DIR,
                                  "elixir_euler_sedov_blast_wave_sc_subcell.jl"),
                         l2=[
@@ -563,6 +564,20 @@ end
         # Run without coverage takes 381 time steps.
         @test startswith(lines[end], "381")
     end
+    lines = readlines(joinpath("out", "alphas.txt"))
+    @test lines[1] ==
+          "# iter, simu_time, alpha_max, alpha_avg"
+    cmd = string(Base.julia_cmd())
+    coverage = occursin("--code-coverage", cmd) &&
+               !occursin("--code-coverage=none", cmd)
+    if coverage
+        # Run with coverage takes 6 time steps.
+        @test startswith(lines[end], "6, 0.014")
+        @test occursin(r"1.0, 0.953", lines[end])
+    else
+        # Run without coverage takes 381 time steps.
+        @test startswith(lines[end], "381, 1.0, 1.0, 0.544")
+    end
     # Ensure that we do not have excessive memory allocations
     # (e.g., from type instabilities)
     let
@@ -579,6 +594,8 @@ end
 
 @trixi_testset "elixir_euler_sedov_blast_wave_MCL.jl" begin
     rm(joinpath("out", "deviations.txt"), force = true)
+    rm(joinpath("out", "alphas_mean.txt"), force = true)
+    rm(joinpath("out", "alphas_min.txt"), force = true)
     @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_euler_sedov_blast_wave_MCL.jl"),
                         l2=[
                             0.4740321851943766,
@@ -608,6 +625,32 @@ end
     else
         # Run without coverage takes 349 time steps.
         @test startswith(lines[end], "349")
+    end
+    lines = readlines(joinpath("out", "alphas_mean.txt"))
+    @test lines[1] ==
+          "# iter, simu_time, alpha_min_rho, alpha_avg_rho, alpha_min_rho_v1, alpha_avg_rho_v1, alpha_min_rho_v2, alpha_avg_rho_v2, alpha_min_rho_e, alpha_avg_rho_e, alpha_min_pressure, alpha_avg_pressure, alpha_min_entropy, alpha_avg_entropy"
+    cmd = string(Base.julia_cmd())
+    coverage = occursin("--code-coverage", cmd) &&
+               !occursin("--code-coverage=none", cmd)
+    if coverage
+        # Run with coverage takes 6 time steps.
+        @test startswith(lines[end], "6, 0.014")
+    else
+        # Run without coverage takes 349 time steps.
+        @test startswith(lines[end], "349, 1.0, 0.0002")
+    end
+    lines = readlines(joinpath("out", "alphas_min.txt"))
+    @test lines[1] ==
+          "# iter, simu_time, alpha_min_rho, alpha_avg_rho, alpha_min_rho_v1, alpha_avg_rho_v1, alpha_min_rho_v2, alpha_avg_rho_v2, alpha_min_rho_e, alpha_avg_rho_e, alpha_min_pressure, alpha_avg_pressure, alpha_min_entropy, alpha_avg_entropy"
+    cmd = string(Base.julia_cmd())
+    coverage = occursin("--code-coverage", cmd) &&
+               !occursin("--code-coverage=none", cmd)
+    if coverage
+        # Run with coverage takes 6 time steps.
+        @test startswith(lines[end], "6, 0.014")
+    else
+        # Run without coverage takes 349 time steps.
+        @test startswith(lines[end], "349, 1.0, -0.0, 0.773")
     end
     # Ensure that we do not have excessive memory allocations
     # (e.g., from type instabilities)
