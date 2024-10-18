@@ -564,6 +564,8 @@ end
         # Run without coverage takes 381 time steps.
         @test startswith(lines[end], "381")
     end
+
+    # Test alphas.txt
     lines = readlines(joinpath("out", "alphas.txt"))
     @test lines[1] ==
           "# iter, simu_time, alpha_max, alpha_avg"
@@ -613,6 +615,7 @@ end
                         initial_refinement_level=4,
                         coverage_override=(maxiters = 6,),
                         save_errors=true)
+    # Test deviations.txt
     lines = readlines(joinpath("out", "deviations.txt"))
     @test lines[1] ==
           "# iter, simu_time, rho_min, rho_max, rho_v1_min, rho_v1_max, rho_v2_min, rho_v2_max, rho_e_min, rho_e_max, pressure_min"
@@ -626,6 +629,8 @@ end
         # Run without coverage takes 349 time steps.
         @test startswith(lines[end], "349")
     end
+
+    # Test alphas_mean.txt
     lines = readlines(joinpath("out", "alphas_mean.txt"))
     @test lines[1] ==
           "# iter, simu_time, alpha_min_rho, alpha_avg_rho, alpha_min_rho_v1, alpha_avg_rho_v1, alpha_min_rho_v2, alpha_avg_rho_v2, alpha_min_rho_e, alpha_avg_rho_e, alpha_min_pressure, alpha_avg_pressure, alpha_min_entropy, alpha_avg_entropy"
@@ -639,6 +644,8 @@ end
         # Run without coverage takes 349 time steps.
         @test startswith(lines[end], "349, 1.0, 0.0002")
     end
+
+    # Test alphas_min.txt
     lines = readlines(joinpath("out", "alphas_min.txt"))
     @test lines[1] ==
           "# iter, simu_time, alpha_min_rho, alpha_avg_rho, alpha_min_rho_v1, alpha_avg_rho_v1, alpha_min_rho_v2, alpha_avg_rho_v2, alpha_min_rho_e, alpha_avg_rho_e, alpha_min_pressure, alpha_avg_pressure, alpha_min_entropy, alpha_avg_entropy"

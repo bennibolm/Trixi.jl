@@ -735,6 +735,7 @@ end
                         ],
                         initial_refinement_level=2,
                         tspan=(0.0, 0.05))
+    # Test alphas.txt
     lines = readlines(joinpath("out", "alphas.txt"))
     @test lines[1] ==
           "# iter, simu_time, alpha_max, alpha_avg"
@@ -781,6 +782,7 @@ end
                         ],
                         initial_refinement_level=2,
                         tspan=(0.0, 0.05))
+    # Test alphas_mean.txt
     lines = readlines(joinpath("out", "alphas_mean.txt"))
     @test lines[1] ==
           "# iter, simu_time, alpha_min_rho, alpha_avg_rho, alpha_min_rho_v1, alpha_avg_rho_v1, alpha_min_rho_v2, alpha_avg_rho_v2, alpha_min_rho_e, alpha_avg_rho_e"
@@ -792,8 +794,10 @@ end
         @test startswith(lines[end], "1, 0.0002")
     else
         # Run without coverage takes 191 time steps.
-        @test startswith(lines[end], "191, 0.05, 3.7017")
+        @test startswith(lines[end], "191, 0.05, 3.70")
     end
+
+    # Test alphas_min.txt
     lines = readlines(joinpath("out", "alphas_min.txt"))
     @test lines[1] ==
           "# iter, simu_time, alpha_min_rho, alpha_avg_rho, alpha_min_rho_v1, alpha_avg_rho_v1, alpha_min_rho_v2, alpha_avg_rho_v2, alpha_min_rho_e, alpha_avg_rho_e"

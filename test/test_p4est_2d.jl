@@ -351,6 +351,7 @@ end
                             6.268843623142863
                         ],
                         tspan=(0.0, 0.3))
+    # Test alphas.txt
     lines = readlines(joinpath("out", "alphas.txt"))
     @test lines[1] ==
           "# iter, simu_time, alpha_max, alpha_avg"
