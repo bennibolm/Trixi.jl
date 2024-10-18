@@ -363,8 +363,8 @@ end
         @test startswith(lines[end], "6, 0.005")
         @test occursin(r"1.0, 0.968", lines[end])
     else
-        # Run without coverage takes 128 time steps.
-        @test startswith(lines[end], "128, 0.1, 1.0, 0.902")
+        # Run without coverage takes 85 time steps.
+        @test startswith(lines[end], "85, 0.3, 1.0, 0.57771")
     end
     # Ensure that we do not have excessive memory allocations
     # (e.g., from type instabilities)
