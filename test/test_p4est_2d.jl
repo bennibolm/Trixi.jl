@@ -365,8 +365,8 @@ end
         # Run without coverage takes 85 time steps.
         @test startswith(lines[end], "85, 0.3, 1.0, 0.57771")
     end
-    @test length(split(lines[end], ",")) == 4
-    @test any(occursin.(r"NaN", lines)) == false
+    @test count(",", lines[end]) == 3
+    @test !any(occursin.(r"NaN", lines))
     # Ensure that we do not have excessive memory allocations
     # (e.g., from type instabilities)
     let

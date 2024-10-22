@@ -749,8 +749,8 @@ end
         # Run without coverage takes 193 time steps.
         @test startswith(lines[end], "193, 0.05, 1.0, 0.3160")
     end
-    @test length(split(lines[end], ",")) == 4
-    @test any(occursin.(r"NaN", lines)) == false
+    @test count(",", lines[end]) == 3
+    @test !any(occursin.(r"NaN", lines))
     # Ensure that we do not have excessive memory allocations
     # (e.g., from type instabilities)
     let
@@ -797,8 +797,8 @@ end
         # Run without coverage takes 191 time steps.
         @test startswith(lines[end], "191, 0.05, 3.70")
     end
-    @test length(split(lines[end], ",")) == 10
-    @test any(occursin.(r"NaN", lines)) == false
+    @test count(",", lines[end]) == 9
+    @test !any(occursin.(r"NaN", lines))
 
     # Test alphas_min.txt
     lines = readlines(joinpath("out", "alphas_min.txt"))
@@ -811,8 +811,8 @@ end
         # Run without coverage takes 191 time steps.
         @test startswith(lines[end], "191, 0.05, -0.0, 0.7216")
     end
-    @test length(split(lines[end], ",")) == 10
-    @test any(occursin.(r"NaN", lines)) == false
+    @test count(",", lines[end]) == 9
+    @test !any(occursin.(r"NaN", lines))
     # Ensure that we do not have excessive memory allocations
     # (e.g., from type instabilities)
     let
