@@ -744,12 +744,13 @@ end
                !occursin("--code-coverage=none", cmd)
     if coverage
         # Run with coverage takes 1 time steps.
-        @test startswith(lines[end], "1, 0.0002")
-        @test occursin(r"1.0, 0.9809", lines[end])
+        @test occursin(r"1, 0.0002[0-9]*, 1.0, 0.9809", lines[end])
     else
         # Run without coverage takes 193 time steps.
         @test startswith(lines[end], "193, 0.05, 1.0, 0.3160")
     end
+    @test length(split(lines[end], ",")) == 4
+    @test any(occursin.(r"NaN", lines)) == false
     # Ensure that we do not have excessive memory allocations
     # (e.g., from type instabilities)
     let
@@ -796,6 +797,8 @@ end
         # Run without coverage takes 191 time steps.
         @test startswith(lines[end], "191, 0.05, 3.70")
     end
+    @test length(split(lines[end], ",")) == 10
+    @test any(occursin.(r"NaN", lines)) == false
 
     # Test alphas_min.txt
     lines = readlines(joinpath("out", "alphas_min.txt"))
@@ -811,6 +814,8 @@ end
         # Run without coverage takes 191 time steps.
         @test startswith(lines[end], "191, 0.05, -0.0, 0.7216")
     end
+    @test length(split(lines[end], ",")) == 10
+    @test any(occursin.(r"NaN", lines)) == false
     # Ensure that we do not have excessive memory allocations
     # (e.g., from type instabilities)
     let

@@ -359,13 +359,14 @@ end
     coverage = occursin("--code-coverage", cmd) &&
                !occursin("--code-coverage=none", cmd)
     if coverage
-        # Run with coverage takes 6 time steps.
-        @test startswith(lines[end], "6, 0.005")
-        @test occursin(r"1.0, 0.968", lines[end])
+        # Run with coverage takes 1 time step.
+        @test occursin(r"1, 0.00404[0-9]*, 1.0, 0.96795", lines[end])
     else
         # Run without coverage takes 85 time steps.
         @test startswith(lines[end], "85, 0.3, 1.0, 0.57771")
     end
+    @test length(split(lines[end], ",")) == 4
+    @test any(occursin.(r"NaN", lines)) == false
     # Ensure that we do not have excessive memory allocations
     # (e.g., from type instabilities)
     let
