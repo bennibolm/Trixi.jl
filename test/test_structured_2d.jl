@@ -804,9 +804,6 @@ end
     lines = readlines(joinpath("out", "alphas_min.txt"))
     @test lines[1] ==
           "# iter, simu_time, alpha_min_rho, alpha_avg_rho, alpha_min_rho_v1, alpha_avg_rho_v1, alpha_min_rho_v2, alpha_avg_rho_v2, alpha_min_rho_e, alpha_avg_rho_e"
-    cmd = string(Base.julia_cmd())
-    coverage = occursin("--code-coverage", cmd) &&
-               !occursin("--code-coverage=none", cmd)
     if coverage
         # Run with coverage takes 1 time steps.
         @test startswith(lines[end], "1, 0.0002") # TODO
