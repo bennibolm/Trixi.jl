@@ -162,43 +162,44 @@ end
 function rhs!(du, u, t, mesh::T8codeMesh, equations,
               boundary_conditions, source_terms::Source,
               solver::FV, cache) where {Source}
+    println("1. Start of actual rhs!")
     # Reset du
     @trixi_timeit timer() "reset ∂u/∂t" du.=zero(eltype(du))
-
+    println("2. actual rhs!")
     # Exchange solution between MPI ranks
     @trixi_timeit timer() "exchange_solution_data!" exchange_solution_data!(u, mesh,
                                                                             equations,
                                                                             solver,
                                                                             cache)
-
+    println("3. of actual rhs!")
     @trixi_timeit timer() "gradient reconstruction" calc_gradient_reconstruction!(u,
                                                                                   mesh,
                                                                                   equations,
                                                                                   solver,
                                                                                   cache)
-
+    println("4. of actual rhs!")
     # Prolong solution to interfaces
     @trixi_timeit timer() "prolong2interfaces" begin
         prolong2interfaces!(cache, mesh, equations, solver)
     end
-
+    println("5. of actual rhs!")
     # Calculate interface fluxes
     @trixi_timeit timer() "interface flux" begin
         calc_interface_flux!(du, mesh, have_nonconservative_terms(equations), equations,
                              solver, cache)
     end
-
+    println("6. of actual rhs!")
     # Prolong solution to boundaries
     @trixi_timeit timer() "prolong2boundaries!" begin
         prolong2boundaries!(cache, mesh, equations, solver)
     end
-
+    println("7. of actual rhs!")
     # Calculate boundary fluxes
     @trixi_timeit timer() "calc boundary flux" begin
         calc_boundary_flux!(du, cache, t, boundary_conditions, mesh,
                             equations, solver)
     end
-
+    println("8. of actual rhs!")
     @trixi_timeit timer() "volume" begin
         for element in eachelement(mesh, solver, cache)
             volume = cache.elements.volume[element]
@@ -207,12 +208,12 @@ function rhs!(du, u, t, mesh::T8codeMesh, equations,
             end
         end
     end
-
+    println("9. of actual rhs!")
     # Calculate source terms
     @trixi_timeit timer() "source terms" begin
         calc_sources!(du, u, t, source_terms, mesh, equations, solver, cache)
     end
-
+    println("10. End of actual rhs!")
     return nothing
 end
 
