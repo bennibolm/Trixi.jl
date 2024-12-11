@@ -59,6 +59,7 @@ end
 
 # This method is called as callback during the time integration.
 @inline function (stepsize_callback::StepsizeCallback)(integrator)
+    println("Start of stepsize_callback")
     # TODO: Taal decide, shall we set the time step even if the integrator is adaptive?
     if !integrator.opts.adaptive
         t = integrator.t
@@ -77,6 +78,7 @@ end
 
     # avoid re-evaluating possible FSAL stages
     u_modified!(integrator, false)
+    println("End of stepsize_callback")
     return nothing
 end
 

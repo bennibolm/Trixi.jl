@@ -75,6 +75,8 @@ end
 
 # this method is called when the callback is activated
 function (alive_callback::AliveCallback)(integrator)
+
+    println("Start of alive callback")
     # Checking for floating point equality is OK here as `DifferentialEquations.jl`
     # sets the time exactly to the final time in the last iteration
     if isfinished(integrator) && mpi_isroot()
@@ -98,6 +100,8 @@ function (alive_callback::AliveCallback)(integrator)
 
     # avoid re-evaluating possible FSAL stages
     u_modified!(integrator, false)
+
+    println("End of alive callback")
     return nothing
 end
 end # @muladd
