@@ -257,6 +257,7 @@ function save_solution_file(u, time, dt, timestep,
                             system = "")
     @unpack output_directory, solution_variables = solution_callback
 
+    println("Start of save_solution_file")
     # Filename based on current time step
     if isempty(system)
         filename = joinpath(output_directory, @sprintf("solution_%09d.h5", timestep))
@@ -269,6 +270,7 @@ function save_solution_file(u, time, dt, timestep,
     Trixi.output_data_to_vtu(mesh, equations, solver,
                              cache.communication_data.solution_data, filename,
                              solution_variables)
+    println("End of save_solution_file")
 
     return filename
 end
