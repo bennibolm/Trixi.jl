@@ -34,6 +34,7 @@ mutable struct T8codeFVElementContainer{NDIMS, RealT <: Real, uEltype <: Real}
 end
 
 @inline Base.ndims(::T8codeFVElementContainer{NDIMS}) where {NDIMS} = NDIMS
+@inline nelements(elements::T8codeFVElementContainer) = length(elements.num_faces)
 @inline function Base.eltype(::T8codeFVElementContainer{NDIMS, RealT, uEltype}) where {
                                                                                        NDIMS,
                                                                                        RealT,

@@ -45,7 +45,8 @@ Base.summary(io::IO, solver::FV) = print(io, "FV(order=$(solver.order))")
 
 @inline ndofs(mesh, solver::FV, cache) = nelements(mesh, solver, cache)
 
-@inline nelements(mesh::T8codeMesh, solver::FV, cache) = ncells(mesh)
+@inline nelements(mesh::T8codeMesh, solver::FV, cache) = nelements(solver, cache)
+@inline nelements(solver::FV, cache) = nelements(cache.elements)
 @inline function ndofsglobal(mesh, solver::FV, cache)
     nelementsglobal(mesh, solver, cache)
 end
