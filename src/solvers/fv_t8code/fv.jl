@@ -43,7 +43,7 @@ Base.summary(io::IO, solver::FV) = print(io, "FV(order=$(solver.order))")
 
 @inline Base.real(solver::FV{RealT}) where {RealT} = RealT
 
-@inline ndofs(mesh, solver::FV, cache) = ncells(mesh)
+@inline ndofs(mesh, solver::FV, cache) = nelements(mesh, solver, cache)
 
 @inline nelements(mesh::T8codeMesh, solver::FV, cache) = ncells(mesh)
 @inline function ndofsglobal(mesh, solver::FV, cache)
