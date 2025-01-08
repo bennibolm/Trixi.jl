@@ -1848,11 +1848,15 @@ function fill_mesh_info_fv!(mesh::T8codeMesh, interfaces, boundaries, mortars,
                         mortars.neighbor_ids[end, local_num_mortars] = current_index + 1
 
                         if orientation == 0
-                            mortars.neighbor_ids[1, local_num_mortars] = neighbor_ielements[1] + 1
-                            mortars.neighbor_ids[2, local_num_mortars] = neighbor_ielements[2] + 1
+                            mortars.neighbor_ids[1, local_num_mortars] = neighbor_ielements[1] +
+                                                                         1
+                            mortars.neighbor_ids[2, local_num_mortars] = neighbor_ielements[2] +
+                                                                         1
                         else
-                            mortars.neighbor_ids[1, local_num_mortars] = neighbor_ielements[2] + 1
-                            mortars.neighbor_ids[2, local_num_mortars] = neighbor_ielements[1] + 1
+                            mortars.neighbor_ids[1, local_num_mortars] = neighbor_ielements[2] +
+                                                                         1
+                            mortars.neighbor_ids[2, local_num_mortars] = neighbor_ielements[1] +
+                                                                         1
                         end
 
                         mortars.faces[end, local_num_mortars] = iface + 1

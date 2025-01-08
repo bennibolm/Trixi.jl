@@ -859,13 +859,19 @@ function prolong2mortars!(cache, mesh::T8codeMesh{2}, equations, solver::FV)
                 face_midpoint_element_small = domain_data[element_small].face_midpoints[face_element_small]
                 midpoint_element_small = domain_data[element_small].midpoint
 
-                vector_element_large = face_midpoint_element_large .- midpoint_element_large
-                vector_element_small = face_midpoint_element_small .- midpoint_element_small
+                vector_element_large = face_midpoint_element_large .-
+                                       midpoint_element_large
+                vector_element_small = face_midpoint_element_small .-
+                                       midpoint_element_small
                 for v in eachvariable(equations)
                     gradient_v_element_large = gradient_data[element_large].reconstruction_gradient_limited[v]
                     gradient_v_element_small = gradient_data[element_small].reconstruction_gradient_limited[v]
-                    mortars.u[2, v, position, mortar] = solution_data[element_large].u[v] + dot(gradient_v_element_large, vector_element_large)
-                    mortars.u[1, v, position, mortar] = solution_data[element_small].u[v] + dot(gradient_v_element_small, vector_element_small)
+                    mortars.u[2, v, position, mortar] = solution_data[element_large].u[v] +
+                                                        dot(gradient_v_element_large,
+                                                            vector_element_large)
+                    mortars.u[1, v, position, mortar] = solution_data[element_small].u[v] +
+                                                        dot(gradient_v_element_small,
+                                                            vector_element_small)
                 end
             end
         else
@@ -876,7 +882,8 @@ function prolong2mortars!(cache, mesh::T8codeMesh{2}, equations, solver::FV)
     return nothing
 end
 
-function calc_mortar_flux!(du, mesh::T8codeMesh, nonconservative_terms::False, equations, solver::FV, cache)
+function calc_mortar_flux!(du, mesh::T8codeMesh, nonconservative_terms::False,
+                           equations, solver::FV, cache)
     (; surface_flux) = solver
     (; elements, mortars) = cache
 

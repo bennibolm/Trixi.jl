@@ -86,7 +86,7 @@ function coarsen_elements!(u::AbstractArray{<:Any, 2}, element_id,
     acc += get_node_vars(old_u, equations, solver, upper_right_id) #* reverse_upper[1, 1] * reverse_upper[1, 1]
 
     # Update value
-    set_node_vars!(u, 1/4 * acc, equations, solver, element_id)
+    set_node_vars!(u, 1 / 4 * acc, equations, solver, element_id)
 end
 
 # Coarsen and refine elements in the FV solver based on a difference list.
@@ -128,10 +128,9 @@ function adapt!(u_ode::AbstractVector, adaptor, mesh::T8codeMesh{2}, equations,
 
         while old_index <= old_nelems && new_index <= new_nelems
             if difference[old_index] > 0 # Refine.
-                # TODO: Weiß t8code jetzt hiervon schon? wie bekomme ich die elemente gesplittet in T8code?
-
                 # Refine element and store solution directly in new data structure.
-                refine_element!(u, new_index, old_u, old_index, adaptor, equations, solver)
+                refine_element!(u, new_index, old_u, old_index, adaptor,
+                                equations, solver)
 
                 # Increment `old_index` on the original mesh and the `new_index`
                 # on the refined mesh with the number of children, i.e., T8_CHILDREN = 4

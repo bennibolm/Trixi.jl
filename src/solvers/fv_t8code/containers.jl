@@ -39,7 +39,6 @@ function reinitialize_containers!(mesh::T8codeMesh, equations, solver::FV, cache
                                      cache.communication_data, mesh, equations, solver)
     end
 
-
     return nothing
 end
 
@@ -426,12 +425,13 @@ function init_reconstruction_stencil!(elements, interfaces, boundaries, mortars,
             # TODO: How to handle periodic boundaries?
             length_face_small = elements.face_areas[face_element_small, element_small]
             # Not at boundary
-            if sqrt(sum(abs.(face_midpoint_element_large - face_midpoint_element_small).^2)) < length_face_small
+            if sqrt(sum(abs.(face_midpoint_element_large - face_midpoint_element_small) .^
+                        2)) < length_face_small
                 distance = midpoint_element_small .- midpoint_element_large
             else # At boundary
                 # TODO: See above
                 distance = (face_midpoint_element_large .- midpoint_element_large) .+
-                        (midpoint_element_small .- face_midpoint_element_small)
+                           (midpoint_element_small .- face_midpoint_element_small)
             end
             append!(reconstruction_stencil[element_large], element_small)
             push!(reconstruction_distance[element_large], distance)
@@ -589,7 +589,7 @@ function Base.resize!(mortars::T8codeFVMortarContainer, capacity)
 
     resize!(_faces, (2^(n_dims - 1) + 1) * capacity)
     mortars.faces = unsafe_wrap(Array, pointer(_faces),
-                                       (2^(n_dims - 1) + 1, capacity))
+                                (2^(n_dims - 1) + 1, capacity))
 
     return nothing
 end
