@@ -28,7 +28,7 @@ mesh = T8codeMesh(trees_per_dimension, element_class,
 
 semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, solver)
 
-tspan = (0.0, 5.0)
+tspan = (0.0, 1.0)
 ode = semidiscretize(semi, tspan)
 
 summary_callback = SummaryCallback()
@@ -39,7 +39,7 @@ analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
 
 alive_callback = AliveCallback(analysis_interval = analysis_interval)
 
-save_solution = SaveSolutionCallback(interval = 1,
+save_solution = SaveSolutionCallback(interval = 10,
                                      solution_variables = cons2prim)
 
 amr_controller = ControllerThreeLevel(semi, IndicatorMax(semi, variable = first),
@@ -47,7 +47,7 @@ amr_controller = ControllerThreeLevel(semi, IndicatorMax(semi, variable = first)
                                       med_level = 3, med_threshold = 0.1,
                                       max_level = 5, max_threshold = 0.6)
 amr_callback = AMRCallback(semi, amr_controller,
-                           interval = 1,
+                           interval = 5,
                            adapt_initial_condition = true,
                            adapt_initial_condition_only_refine = true)
 
