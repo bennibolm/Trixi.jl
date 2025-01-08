@@ -1724,7 +1724,7 @@ function fill_mesh_info!(mesh::T8codeMesh, interfaces, mortars, boundaries,
     return nothing
 end
 
-function fill_mesh_info_fv!(mesh::T8codeMesh, interfaces, boundaries,
+function fill_mesh_info_fv!(mesh::T8codeMesh, interfaces, boundaries, mortars,
                             boundary_names; mpi_mesh_info = nothing)
     @assert t8_forest_is_committed(mesh.forest) != 0
 
@@ -1739,12 +1739,11 @@ function fill_mesh_info_fv!(mesh::T8codeMesh, interfaces, boundaries,
     local_num_mortars = 0
     local_num_boundary = 0
 
-    local_num_mpi_conform = 0
-    local_num_mpi_mortars = 0
-
     # Helper variables to compute unique global MPI interface/mortar ids.
     max_level = t8_forest_get_maxlevel(mesh.forest) #UInt64
     max_tree_num_elements = UInt64(2^ndims(mesh))^max_level
+
+    cmesh = t8_forest_get_cmesh(mesh.forest)
 
     # Loop over all local trees.
     for itree in 0:(num_local_trees - 1)
@@ -1795,11 +1794,11 @@ function fill_mesh_info_fv!(mesh::T8codeMesh, interfaces, boundaries,
                 #
                 #   else: // It must be an interface or mortar.
                 #
-                #     if `local interface`:
+                #     if `interface`:
                 #       <fill interface info>
-                #     elseif `local mortar from larger element point of view`:
-                #       <throw error> Not supported yet
-                #     else: // `local mortar from smaller elements point of view`
+                #     elseif `mortar from larger element point of view`:
+                #       <fill mortar info>
+                #     else: // `mortar from smaller elements point of view`
                 #       <skip> // We only count local mortars once.
                 #
                 #   // end
@@ -1816,6 +1815,21 @@ function fill_mesh_info_fv!(mesh::T8codeMesh, interfaces, boundaries,
                 else # Interface or mortar.
                     neighbor_level = t8_element_level(neighbor_scheme, neighbor_leaves[1])
 
+                    # Compute the `orientation` of the touching faces.
+                    if t8_element_is_root_boundary(eclass_scheme, element, iface) == 1
+                        itree_in_cmesh = t8_forest_ltreeid_to_cmesh_ltreeid(mesh.forest,
+                                                                            itree)
+                        iface_in_tree = t8_element_tree_face(eclass_scheme, element, iface)
+                        orientation_ref = Ref{Cint}()
+
+                        t8_cmesh_get_face_neighbor(cmesh, itree_in_cmesh, iface_in_tree,
+                                                   C_NULL,
+                                                   orientation_ref)
+                        orientation = orientation_ref[]
+                    else
+                        orientation = zero(Cint)
+                    end
+
                     # Local interface: The second condition ensures we only visit the interface once.
                     if level == neighbor_level && current_index <= neighbor_ielements[1]
                         local_num_conform += 1
@@ -1829,7 +1843,27 @@ function fill_mesh_info_fv!(mesh::T8codeMesh, interfaces, boundaries,
 
                         # Local mortar.
                     elseif level < neighbor_level
-                        error("Mortars are not supported yet!")
+                        local_num_mortars += 1
+                        # Last entry is the large element.
+                        mortars.neighbor_ids[end, local_num_mortars] = current_index + 1
+
+                        if orientation == 0
+                            mortars.neighbor_ids[1, local_num_mortars] = neighbor_ielements[1] + 1
+                            mortars.neighbor_ids[2, local_num_mortars] = neighbor_ielements[2] + 1
+                        else
+                            mortars.neighbor_ids[1, local_num_mortars] = neighbor_ielements[2] + 1
+                            mortars.neighbor_ids[2, local_num_mortars] = neighbor_ielements[1] + 1
+                        end
+
+                        mortars.faces[end, local_num_mortars] = iface + 1
+                        if orientation == 0
+                            mortars.faces[1, local_num_mortars] = dual_faces[1] + 1
+                            mortars.faces[2, local_num_mortars] = dual_faces[2] + 1
+                        else
+                            mortars.faces[1, local_num_mortars] = dual_faces[2] + 1
+                            mortars.faces[2, local_num_mortars] = dual_faces[1] + 1
+                        end
+                        # else: `level > neighbor_level` is skipped since we visit the mortar interface only once.
                     end
                 end
 

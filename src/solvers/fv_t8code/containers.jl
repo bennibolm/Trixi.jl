@@ -5,6 +5,44 @@
 @muladd begin
 #! format: noindent
 
+function reinitialize_containers!(mesh::T8codeMesh, equations, solver::FV, cache)
+    # Re-initialize elements container.
+    @unpack elements = cache
+    resize!(elements, ncells(mesh))
+    init_elements!(elements, mesh, solver)
+
+    count_required_surfaces!(mesh)
+    # Resize interfaces container.
+    @unpack interfaces = cache
+    resize!(interfaces, mesh.ninterfaces)
+
+    # Resize mortars container.
+    @unpack mortars = cache
+    resize!(mortars, mesh.nmortars)
+
+    # Resize boundaries container.
+    @unpack boundaries = cache
+    resize!(boundaries, mesh.nboundaries)
+
+    fill_mesh_info_fv!(mesh, interfaces, boundaries, mortars,
+                       mesh.boundary_names)
+
+    (; solution_data, domain_data, gradient_data) = cache.communication_data
+    resize!(solution_data, ncells(mesh))
+    resize!(domain_data, ncells(mesh))
+    resize!(gradient_data, ncells(mesh))
+    exchange_domain_data!(cache.communication_data, elements, mesh, equations, solver)
+
+    # Reinitialize reconstruction stencil
+    if !solver.extended_reconstruction_stencil
+        init_reconstruction_stencil!(elements, interfaces, boundaries, mortars,
+                                     cache.communication_data, mesh, equations, solver)
+    end
+
+
+    return nothing
+end
+
 # Container data structure (structure-of-arrays style) for DG elements
 mutable struct T8codeFVElementContainer{NDIMS, RealT <: Real, uEltype <: Real}
     level::Vector{Cint}     # [element]
@@ -59,11 +97,11 @@ function Base.resize!(elements::T8codeFVElementContainer, capacity)
     resize!(elements.num_faces, capacity)
 
     resize!(_midpoint, n_dims * capacity)
-    elements.midpoint = unsafe_wrap(Array, pointer(_midpoint), (ndims, capacity))
+    elements.midpoint = unsafe_wrap(Array, pointer(_midpoint), (n_dims, capacity))
 
     resize!(_face_midpoints, n_dims * max_number_faces * capacity)
     elements.face_midpoints = unsafe_wrap(Array, pointer(_face_midpoints),
-                                          (ndims, max_number_faces, capacity))
+                                          (n_dims, max_number_faces, capacity))
 
     resize!(_face_areas, max_number_faces * capacity)
     elements.face_areas = unsafe_wrap(Array, pointer(_face_areas),
@@ -71,7 +109,7 @@ function Base.resize!(elements::T8codeFVElementContainer, capacity)
 
     resize!(_face_normals, n_dims * max_number_faces * capacity)
     elements.face_normals = unsafe_wrap(Array, pointer(_face_normals),
-                                        (ndims, max_number_faces, capacity))
+                                        (n_dims, max_number_faces, capacity))
 
     resize!(elements.reconstruction_stencil, capacity)
     resize!(elements.reconstruction_distance, capacity)
@@ -82,16 +120,16 @@ function Base.resize!(elements::T8codeFVElementContainer, capacity)
                                                           (max_number_faces, capacity))
 
     resize!(_reconstruction_gradient,
-            n_dims * n_variables * (max_number_faces + 1) * capacity)
+            n_dims * n_variables * (2 * max_number_faces + 1) * capacity)
     elements.reconstruction_gradient = unsafe_wrap(Array,
                                                    pointer(_reconstruction_gradient),
-                                                   (ndims, n_variables,
-                                                    (max_number_faces + 1), capacity))
+                                                   (n_dims, n_variables,
+                                                    2 * max_number_faces + 1, capacity))
 
     resize!(_reconstruction_gradient_limited, n_dims * n_variables * capacity)
     elements.reconstruction_gradient_limited = unsafe_wrap(Array,
                                                            pointer(_reconstruction_gradient_limited),
-                                                           (ndims, n_variables,
+                                                           (n_dims, n_variables,
                                                             capacity))
 
     return nothing
@@ -326,14 +364,13 @@ end
     return nothing
 end
 
-function init_reconstruction_stencil!(elements, interfaces, boundaries,
+function init_reconstruction_stencil!(elements, interfaces, boundaries, mortars,
                                       communication_data,
                                       mesh, equations, solver::FV)
     if solver.order != 2
         return nothing
     end
     (; reconstruction_stencil, reconstruction_distance) = elements
-    (; neighbor_ids, faces) = interfaces
     (; domain_data) = communication_data
 
     # Create empty vectors for every element
@@ -342,6 +379,7 @@ function init_reconstruction_stencil!(elements, interfaces, boundaries,
         reconstruction_distance[element] = []
     end
 
+    (; neighbor_ids, faces) = interfaces
     for interface in axes(neighbor_ids, 2)
         element1 = neighbor_ids[1, interface]
         element2 = neighbor_ids[2, interface]
@@ -366,6 +404,42 @@ function init_reconstruction_stencil!(elements, interfaces, boundaries,
         if element2 <= ncells(mesh)
             append!(reconstruction_stencil[element2], element1)
             push!(reconstruction_distance[element2], -distance)
+        end
+    end
+
+    (; neighbor_ids, faces) = mortars
+    for mortar in axes(neighbor_ids, 2)
+        element_large = neighbor_ids[end, mortar]
+        face_element_large = faces[end, mortar]
+
+        midpoint_element_large = domain_data[element_large].midpoint
+
+        for position in 1:(2^(ndims(mesh) - 1))
+            element_small = neighbor_ids[position, mortar]
+            face_element_small = faces[position, mortar]
+            midpoint_element_small = domain_data[element_small].midpoint
+            face_midpoint_element_small = domain_data[element_small].face_midpoints[face_element_small]
+
+            # TODO: The face midpoint of the large element is not the correct here.
+            face_midpoint_element_large = domain_data[element_large].face_midpoints[face_element_large]
+
+            # TODO: How to handle periodic boundaries?
+            length_face_small = elements.face_areas[face_element_small, element_small]
+            # Not at boundary
+            if sqrt(sum(abs.(face_midpoint_element_large - face_midpoint_element_small).^2)) < length_face_small
+                distance = midpoint_element_small .- midpoint_element_large
+            else # At boundary
+                # TODO: See above
+                distance = (face_midpoint_element_large .- midpoint_element_large) .+
+                        (midpoint_element_small .- face_midpoint_element_small)
+            end
+            append!(reconstruction_stencil[element_large], element_small)
+            push!(reconstruction_distance[element_large], distance)
+            # only if element_small is local element
+            if element_small <= ncells(mesh)
+                append!(reconstruction_stencil[element_small], element_large)
+                push!(reconstruction_distance[element_small], -distance)
+            end
         end
     end
 
@@ -482,6 +556,71 @@ function init_boundaries(mesh::T8codeMesh, equations, solver::FV, uEltype)
     boundaries = T8codeFVBoundaryContainer{uEltype}(u, neighbor_ids, faces, names, _u)
 
     return boundaries
+end
+
+mutable struct T8codeFVMortarContainer{NDIMS, uEltype <: Real} <: AbstractContainer
+    u::Array{uEltype, 4}        # [small/large side, variable, position, mortar]
+    neighbor_ids::Matrix{Int}   # [position, mortar]
+    faces::Matrix{Int}          # [position, mortar]
+
+    # internal `resize!`able storage
+    _u::Vector{uEltype}
+    _neighbor_ids::Vector{Int}
+    _faces::Vector{Int}
+end
+
+@inline nmortars(mortars::T8codeFVMortarContainer) = size(mortars.neighbor_ids, 2)
+@inline Base.ndims(::T8codeFVMortarContainer{NDIMS}) where {NDIMS} = NDIMS
+
+# See explanation of Base.resize! for the element container
+function Base.resize!(mortars::T8codeFVMortarContainer, capacity)
+    @unpack _u, _neighbor_ids, _faces = mortars
+
+    n_dims = ndims(mortars)
+    n_variables = size(mortars.u, 2)
+
+    resize!(_u, 2 * n_variables * 2^(n_dims - 1) * capacity)
+    mortars.u = unsafe_wrap(Array, pointer(_u),
+                            (2, n_variables, 2^(n_dims - 1), capacity))
+
+    resize!(_neighbor_ids, (2^(n_dims - 1) + 1) * capacity)
+    mortars.neighbor_ids = unsafe_wrap(Array, pointer(_neighbor_ids),
+                                       (2^(n_dims - 1) + 1, capacity))
+
+    resize!(_faces, (2^(n_dims - 1) + 1) * capacity)
+    mortars.faces = unsafe_wrap(Array, pointer(_faces),
+                                       (2^(n_dims - 1) + 1, capacity))
+
+    return nothing
+end
+
+# Create mortar container and initialize mortar data.
+function init_mortars(mesh::T8codeMesh, equations, solver::FV, uEltype)
+    NDIMS = ndims(mesh)
+
+    # Initialize container
+    n_mortars = count_required_surfaces(mesh).mortars
+    if mpi_parallel(mesh) == true
+        n_mortars += count_required_surfaces(mesh).mpi_mortars
+    end
+
+    _u = Vector{uEltype}(undef,
+                         2 * nvariables(equations) * 2^(NDIMS - 1) * n_mortars)
+    u = unsafe_wrap(Array, pointer(_u),
+                    (2, nvariables(equations), 2^(NDIMS - 1), n_mortars))
+
+    _neighbor_ids = Vector{Int}(undef, (2^(NDIMS - 1) + 1) * n_mortars)
+    neighbor_ids = unsafe_wrap(Array, pointer(_neighbor_ids),
+                               (2^(NDIMS - 1) + 1, n_mortars))
+
+    _faces = Vector{NTuple{NDIMS, Symbol}}(undef, (2^(NDIMS - 1) + 1) * n_mortars)
+    faces = unsafe_wrap(Array, pointer(_faces),
+                        (2^(NDIMS - 1) + 1, n_mortars))
+
+    mortars = T8codeFVMortarContainer{NDIMS, uEltype}(u, neighbor_ids, faces,
+                                                      _u, _neighbor_ids, _faces)
+
+    return mortars
 end
 
 function init_communication_data!(mesh::T8codeMesh, equations)

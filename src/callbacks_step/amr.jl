@@ -736,7 +736,7 @@ function (amr_callback::AMRCallback)(u_ode::AbstractVector, mesh::P4estMesh,
 end
 
 function (amr_callback::AMRCallback)(u_ode::AbstractVector, mesh::T8codeMesh,
-                                     equations, dg::DG, cache, semi,
+                                     equations, dg::Union{DG, FV}, cache, semi,
                                      t, iter;
                                      only_refine = false, only_coarsen = false,
                                      passive_args = ())
@@ -1010,6 +1010,47 @@ function (controller::ControllerThreeLevel)(u::AbstractArray{<:Any},
     return controller_value
 end
 
+function (controller::ControllerThreeLevel)(u::AbstractArray{<:Any},
+                                            mesh, equations, solver::FV, cache;
+                                            kwargs...)
+    @unpack controller_value = controller.cache
+    # The parameter mesh is different to the DG version.
+    resize!(controller_value, nelements(mesh, solver, cache))
+
+    alpha = controller.indicator(u, mesh, equations, solver, cache; kwargs...)
+    current_levels = current_element_levels(mesh, solver, cache)
+
+    # The parameter mesh is different to the DG version.
+    @threaded for element in eachelement(mesh, solver, cache)
+        current_level = current_levels[element]
+
+        # set target level
+        target_level = current_level
+        if alpha[element] > controller.max_threshold
+            target_level = controller.max_level
+        elseif alpha[element] > controller.med_threshold
+            if controller.med_level > 0
+                target_level = controller.med_level
+                # otherwise, target_level = current_level
+                # set med_level = -1 to implicitly use med_level = current_level
+            end
+        else
+            target_level = controller.base_level
+        end
+
+        # compare target level with actual level to set controller
+        if current_level < target_level
+            controller_value[element] = 1 # refine!
+        elseif current_level > target_level
+            controller_value[element] = -1 # coarsen!
+        else
+            controller_value[element] = 0 # we're good
+        end
+    end
+
+    return controller_value
+end
+
 """
     ControllerThreeLevelCombined(semi, indicator_primary, indicator_secondary;
                                  base_level=1,
@@ -1160,4 +1201,6 @@ include("amr_dg.jl")
 include("amr_dg1d.jl")
 include("amr_dg2d.jl")
 include("amr_dg3d.jl")
+
+include("amr_fv2d.jl")
 end # @muladd
