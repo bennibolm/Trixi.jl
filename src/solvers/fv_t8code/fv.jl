@@ -832,10 +832,9 @@ function calc_boundary_flux!(du, cache, t, boundary_condition::BC, boundary_inde
     return nothing
 end
 
-function prolong2mortars!(cache, mesh::T8codeMesh{2}, equations, solver::FV)
-    (; elements, mortars, communication_data) = cache
+function prolong2mortars!(cache, mesh::T8codeMesh, equations, solver::FV)
+    (; mortars, communication_data) = cache
     (; solution_data, domain_data, gradient_data) = communication_data
-    # (; midpoint, face_midpoints, reconstruction_gradient_limited) = elements
 
     for mortar in eachmortar(solver, cache)
         element_large = mortars.neighbor_ids[end, mortar]
