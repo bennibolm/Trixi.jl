@@ -53,7 +53,8 @@ end
 
 function coarsen_elements!(u::AbstractArray{<:Any, 2}, element_id,
                            old_u, old_element_id,
-                           adaptor::Nothing, equations, solver::FV)
+                           adaptor::Nothing, equations::AbstractEquations{2},
+                           solver::FV)
     # @unpack reverse_upper, reverse_lower = adaptor
 
     # Store old element ids
@@ -167,13 +168,5 @@ function adapt!(u_ode::AbstractVector, adaptor, mesh::T8codeMesh{2}, equations,
     end # GC.@preserve old_u_ode
 
     return nothing
-end
-
-# this method is called when an `ControllerThreeLevel` is constructed
-function create_cache(::Type{ControllerThreeLevel},
-                      mesh::T8codeMesh{2}, equations,
-                      solver::FV, cache)
-    controller_value = Vector{Int}(undef, nelements(mesh, solver, cache))
-    return (; controller_value)
 end
 end # @muladd

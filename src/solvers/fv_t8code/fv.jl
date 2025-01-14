@@ -893,7 +893,7 @@ function calc_mortar_flux!(du, mesh::T8codeMesh, nonconservative_terms::False,
         normal = get_node_coords(elements.face_normals, equations, solver,
                                  face_large, element_large)
 
-        for position in 1:2
+        for position in 1:(2^(ndims(mesh) - 1))
             element_small = mortars.neighbor_ids[position, mortar]
             face_small = mortars.faces[position, mortar]
 
@@ -962,8 +962,10 @@ function T8codeMesh(cmesh::Ptr{t8_cmesh}, solver::FV; kwargs...)
     T8codeMesh(cmesh; polydeg = 0, kwargs...)
 end
 
-include("indicators_2d.jl")
+include("indicators.jl")
 
 # Container data structures
 include("containers.jl")
+include("containers_2d.jl")
+include("containers_3d.jl")
 end # @muladd

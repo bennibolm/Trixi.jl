@@ -118,12 +118,13 @@ function Base.resize!(elements::T8codeFVElementContainer, capacity)
                                                           pointer(_reconstruction_corner_elements),
                                                           (max_number_faces, capacity))
 
+    max_neighbors_per_face = 2^(n_dims - 1)
     resize!(_reconstruction_gradient,
-            n_dims * n_variables * (2 * max_number_faces + 1) * capacity)
+            n_dims * n_variables * (max_neighbors_per_face * max_number_faces + 1) * capacity)
     elements.reconstruction_gradient = unsafe_wrap(Array,
                                                    pointer(_reconstruction_gradient),
                                                    (n_dims, n_variables,
-                                                    2 * max_number_faces + 1, capacity))
+                                                   max_neighbors_per_face * max_number_faces + 1, capacity))
 
     resize!(_reconstruction_gradient_limited, n_dims * n_variables * capacity)
     elements.reconstruction_gradient_limited = unsafe_wrap(Array,
@@ -423,12 +424,13 @@ function init_reconstruction_stencil!(elements, interfaces, boundaries, mortars,
             face_midpoint_element_large = domain_data[element_large].face_midpoints[face_element_large]
 
             # TODO: How to handle periodic boundaries?
-            length_face_small = elements.face_areas[face_element_small, element_small]
-            # Not at boundary
-            if sqrt(sum(abs.(face_midpoint_element_large - face_midpoint_element_small) .^
-                        2)) < length_face_small
+            # Hacky solution to figure out if mortar is at periodic boundary
+            distance_face_large2face_small = sqrt(sum(abs.(face_midpoint_element_large .- face_midpoint_element_small) .^ 2))
+            distance_face_large2mid_large = sqrt(sum(abs.(face_midpoint_element_large .- midpoint_element_small) .^ 2))
+            # Not at periodic boundary
+            if distance_face_large2face_small < distance_face_large2mid_large
                 distance = midpoint_element_small .- midpoint_element_large
-            else # At boundary
+            else # At periodic boundary
                 # TODO: See above
                 distance = (face_midpoint_element_large .- midpoint_element_large) .+
                            (midpoint_element_small .- face_midpoint_element_small)

@@ -1202,5 +1202,7 @@ include("amr_dg1d.jl")
 include("amr_dg2d.jl")
 include("amr_dg3d.jl")
 
+include("amr_fv.jl")
 include("amr_fv2d.jl")
+include("amr_fv3d.jl")
 end # @muladd

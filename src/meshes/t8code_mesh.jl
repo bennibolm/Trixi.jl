@@ -1846,27 +1846,13 @@ function fill_mesh_info_fv!(mesh::T8codeMesh, interfaces, boundaries, mortars,
                         local_num_mortars += 1
                         # Last entry is the large element.
                         mortars.neighbor_ids[end, local_num_mortars] = current_index + 1
+                        init_mortar_neighbor_ids!(mortars, iface, dual_faces[1],
+                                                  orientation, neighbor_ielements,
+                                                  local_num_mortars)
 
-                        if orientation == 0
-                            mortars.neighbor_ids[1, local_num_mortars] = neighbor_ielements[1] +
-                                                                         1
-                            mortars.neighbor_ids[2, local_num_mortars] = neighbor_ielements[2] +
-                                                                         1
-                        else
-                            mortars.neighbor_ids[1, local_num_mortars] = neighbor_ielements[2] +
-                                                                         1
-                            mortars.neighbor_ids[2, local_num_mortars] = neighbor_ielements[1] +
-                                                                         1
-                        end
+                        init_mortar_faces!(mortars, (dual_faces, iface), orientation,
+                                           local_num_mortars)
 
-                        mortars.faces[end, local_num_mortars] = iface + 1
-                        if orientation == 0
-                            mortars.faces[1, local_num_mortars] = dual_faces[1] + 1
-                            mortars.faces[2, local_num_mortars] = dual_faces[2] + 1
-                        else
-                            mortars.faces[1, local_num_mortars] = dual_faces[2] + 1
-                            mortars.faces[2, local_num_mortars] = dual_faces[1] + 1
-                        end
                         # else: `level > neighbor_level` is skipped since we visit the mortar interface only once.
                     end
                 end

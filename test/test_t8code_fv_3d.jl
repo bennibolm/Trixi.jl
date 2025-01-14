@@ -96,6 +96,38 @@ end
     end
 end
 
+@trixi_testset "elixir_advection_amr.jl" begin
+    @trixi_testset "first-order FV" begin
+        @test_trixi_include(joinpath(EXAMPLES_DIR,
+                                     "elixir_advection_amr.jl"),
+                            order=1,
+                            l2=[0.036187250213578236],
+                            linf=[0.2352594244477838])
+        # Ensure that we do not have excessive memory allocations
+        # (e.g., from type instabilities)
+        let
+            t = sol.t[end]
+            u_ode = sol.u[end]
+            du_ode = similar(u_ode)
+            @test (@allocated Trixi.rhs!(du_ode, u_ode, semi, t)) < 1000
+        end
+    end
+    @trixi_testset "second-order FV" begin
+        @test_trixi_include(joinpath(EXAMPLES_DIR,
+                                     "elixir_advection_amr.jl"),
+                            l2=[0.013166109132824377],
+                            linf=[0.08606560587093615])
+        # Ensure that we do not have excessive memory allocations
+        # (e.g., from type instabilities)
+        let
+            t = sol.t[end]
+            u_ode = sol.u[end]
+            du_ode = similar(u_ode)
+            @test (@allocated Trixi.rhs!(du_ode, u_ode, semi, t)) < 1000
+        end
+    end
+end
+
 @trixi_testset "elixir_advection_basic_hybrid.jl" begin
     @trixi_testset "first-order FV" begin
         @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_advection_basic_hybrid.jl"),

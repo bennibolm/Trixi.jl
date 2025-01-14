@@ -6,7 +6,7 @@
 #! format: noindent
 
 # this method is used when the indicator is constructed as for AMR
-function create_cache(typ::Type{IndicatorMax}, mesh, equations::AbstractEquations{2},
+function create_cache(typ::Type{IndicatorMax}, mesh, equations,
                       solver::FV, cache)
     alpha = Vector{real(mesh)}()
 
@@ -15,8 +15,7 @@ function create_cache(typ::Type{IndicatorMax}, mesh, equations::AbstractEquation
     return (; alpha, indicator_threaded)
 end
 
-function (indicator_max::IndicatorMax)(u::AbstractArray{<:Any, 2},
-                                       mesh, equations, solver::FV, cache;
+function (indicator_max::IndicatorMax)(u, mesh, equations, solver::FV, cache;
                                        kwargs...)
     @unpack alpha, indicator_threaded = indicator_max.cache
     resize!(alpha, nelements(mesh, solver, cache))
