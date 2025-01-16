@@ -1830,7 +1830,7 @@ function fill_mesh_info_fv!(mesh::T8codeMesh, interfaces, boundaries, mortars,
                         orientation = zero(Cint)
                     end
 
-                    # Local interface: The second condition ensures we only visit the interface once.
+                    # Interface: The second condition ensures we only visit the interface once.
                     if level == neighbor_level && current_index <= neighbor_ielements[1]
                         local_num_conform += 1
                         interfaces.neighbor_ids[1, local_num_conform] = current_index +
@@ -1841,7 +1841,7 @@ function fill_mesh_info_fv!(mesh::T8codeMesh, interfaces, boundaries, mortars,
                         interfaces.faces[1, local_num_conform] = iface + 1
                         interfaces.faces[2, local_num_conform] = dual_faces[1] + 1
 
-                        # Local mortar.
+                        # Mortar: from larger element point of view; larger element is local element
                     elseif level < neighbor_level
                         local_num_mortars += 1
                         # Last entry is the large element.
