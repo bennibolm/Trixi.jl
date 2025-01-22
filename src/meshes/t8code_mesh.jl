@@ -1880,7 +1880,8 @@ function fill_mesh_info_fv!(mesh::T8codeMesh, interfaces, boundaries, mortars,
                         other_indices = neighbor_ielements .+ 1
                         my_face = iface + 1
                         other_faces = dual_faces .+ 1
-                        init_mortar_neighbor_ids!(mortars, my_index, other_indices, local_num_mortars)
+                        init_mortar_neighbor_ids!(mortars, my_index, other_indices,
+                                                  local_num_mortars)
 
                         init_mortar_faces!(mortars, my_face, other_faces, local_num_mortars)
 
@@ -1897,24 +1898,31 @@ function fill_mesh_info_fv!(mesh::T8codeMesh, interfaces, boundaries, mortars,
                             if !((other_face, other_index) in visited_mortars)
                                 local_num_mortars += 1
 
-                                init_mortar_neighbor_ids_first!(mortars, my_index, other_index, local_num_mortars)
+                                init_mortar_neighbor_ids_first!(mortars, my_index,
+                                                                other_index,
+                                                                local_num_mortars)
 
-                                init_mortar_faces_first!(mortars, my_face, other_face, local_num_mortars)
+                                init_mortar_faces_first!(mortars, my_face, other_face,
+                                                         local_num_mortars)
 
                                 push!(visited_mortars, (other_face, other_index))
                                 push!(visited_mortar_ids, local_num_mortars)
                             else
-                                mortar_index = findall(==((other_face, other_index)), visited_mortars)
+                                mortar_index = findall(==((other_face, other_index)),
+                                                       visited_mortars)
                                 @assert length(mortar_index) == 1
                                 mortar_index = mortar_index[1]
 
                                 mortar_id = visited_mortar_ids[mortar_index]
-                                init_mortar_neighbor_ids_fill!(mortars, my_index, other_index, mortar_id)
+                                init_mortar_neighbor_ids_fill!(mortars, my_index,
+                                                               other_index, mortar_id)
 
-                                init_mortar_faces_fill!(mortars, my_face, other_face, mortar_id)
+                                init_mortar_faces_fill!(mortars, my_face, other_face,
+                                                        mortar_id)
 
                                 # If all small element were added to the mortar, remove mortar from lists.
-                                if mortars.n_local_elements_small[mortar_id] == 2^(ndims(mesh) - 1)
+                                if mortars.n_local_elements_small[mortar_id] ==
+                                   2^(ndims(mesh) - 1)
                                     deleteat!(visited_mortars, mortar_index)
                                     deleteat!(visited_mortar_ids, mortar_index)
                                 end

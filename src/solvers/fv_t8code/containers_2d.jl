@@ -58,7 +58,8 @@ end
     return nothing
 end
 
-@inline function init_mortar_faces_first!(mortars::T8codeFVMortarContainer{2}, my_face, other_face, mortar_id)
+@inline function init_mortar_faces_first!(mortars::T8codeFVMortarContainer{2},
+                                          my_face, other_face, mortar_id)
     mortars.faces[end, mortar_id] = other_face
     mortars.faces[1, mortar_id] = my_face
     mortars.faces[2, mortar_id] = -1
@@ -66,7 +67,8 @@ end
     return nothing
 end
 
-@inline function init_mortar_faces_fill!(mortars::T8codeFVMortarContainer{2}, my_face, other_face, mortar_id)
+@inline function init_mortar_faces_fill!(mortars::T8codeFVMortarContainer{2},
+                                         my_face, other_face, mortar_id)
     @assert mortars.faces[end, mortar_id] == other_face
     @assert mortars.faces[2, mortar_id] == -1
     mortars.faces[2, mortar_id] = my_face

@@ -741,8 +741,10 @@ struct T8codeReconstructionContainer{NDIMS, NFACES}
     face_areas::SVector{NFACES, Cdouble}
     face_normals::NTuple{NFACES, SVector{NDIMS, Cdouble}}
 
-    function T8codeReconstructionContainer(midpoint, face_midpoints, face_areas, face_normals)
-        new{length(midpoint), length(face_midpoints)}(midpoint, face_midpoints, face_areas, face_normals)
+    function T8codeReconstructionContainer(midpoint, face_midpoints, face_areas,
+                                           face_normals)
+        new{length(midpoint), length(face_midpoints)}(midpoint, face_midpoints,
+                                                      face_areas, face_normals)
     end
 end
 
@@ -769,7 +771,7 @@ function exchange_domain_data!(communication_data, elements, mesh, equations, so
         face_midpoints_tuple_ = NTuple{mesh.max_number_faces,
                                        eltype(face_midpoints_tuple)}(face_midpoints_tuple)
         face_normals_tuple_ = NTuple{mesh.max_number_faces,
-                                       eltype(face_normals_tuple)}(face_normals_tuple)
+                                     eltype(face_normals_tuple)}(face_normals_tuple)
         domain_data[element] = T8codeReconstructionContainer(get_node_coords(midpoint,
                                                                              equations,
                                                                              solver,

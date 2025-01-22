@@ -55,7 +55,7 @@ end
 end
 
 @inline function init_mortar_faces!(mortars::T8codeFVMortarContainer{3},
-                                     my_face, other_faces, mortar_id)
+                                    my_face, other_faces, mortar_id)
     mortars.faces[end, mortar_id] = my_face
 
     mortars.faces[1, mortar_id] = other_faces[1]
