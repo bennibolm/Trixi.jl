@@ -1787,7 +1787,9 @@ function fill_mesh_info_fv!(mesh::T8codeMesh, interfaces, boundaries, mortars,
     max_level = t8_forest_get_maxlevel(mesh.forest) #UInt64
     max_tree_num_elements = UInt64(2^ndims(mesh))^max_level
 
-    cmesh = t8_forest_get_cmesh(mesh.forest)
+    # These two variables help to fill (partly MPI-) mortars properly.
+    visited_mortars = Tuple{Int, Int}[]
+    visited_mortar_ids = Int[]
 
     # Loop over all local trees.
     for itree in 0:(num_local_trees - 1)
@@ -1859,21 +1861,6 @@ function fill_mesh_info_fv!(mesh::T8codeMesh, interfaces, boundaries, mortars,
                 else # Interface or mortar.
                     neighbor_level = t8_element_level(neighbor_scheme, neighbor_leaves[1])
 
-                    # Compute the `orientation` of the touching faces.
-                    if t8_element_is_root_boundary(eclass_scheme, element, iface) == 1
-                        itree_in_cmesh = t8_forest_ltreeid_to_cmesh_ltreeid(mesh.forest,
-                                                                            itree)
-                        iface_in_tree = t8_element_tree_face(eclass_scheme, element, iface)
-                        orientation_ref = Ref{Cint}()
-
-                        t8_cmesh_get_face_neighbor(cmesh, itree_in_cmesh, iface_in_tree,
-                                                   C_NULL,
-                                                   orientation_ref)
-                        orientation = orientation_ref[]
-                    else
-                        orientation = zero(Cint)
-                    end
-
                     # Interface: The second condition ensures we only visit the interface once.
                     if level == neighbor_level && current_index <= neighbor_ielements[1]
                         local_num_conform += 1
@@ -1889,15 +1876,50 @@ function fill_mesh_info_fv!(mesh::T8codeMesh, interfaces, boundaries, mortars,
                     elseif level < neighbor_level
                         local_num_mortars += 1
                         # Last entry is the large element.
-                        mortars.neighbor_ids[end, local_num_mortars] = current_index + 1
-                        init_mortar_neighbor_ids!(mortars, iface, dual_faces[1],
-                                                  orientation, neighbor_ielements,
-                                                  local_num_mortars)
+                        my_index = current_index + 1
+                        other_indices = neighbor_ielements .+ 1
+                        my_face = iface + 1
+                        other_faces = dual_faces .+ 1
+                        init_mortar_neighbor_ids!(mortars, my_index, other_indices, local_num_mortars)
 
-                        init_mortar_faces!(mortars, (dual_faces, iface), orientation,
-                                           local_num_mortars)
+                        init_mortar_faces!(mortars, my_face, other_faces, local_num_mortars)
 
-                        # else: `level > neighbor_level` is skipped since we visit the mortar interface only once.
+                        # Mortar: from smaller element point of view
+                    elseif level > neighbor_level
+                        @assert length(neighbor_ielements) == 1
+                        @assert length(dual_faces) == 1
+                        my_index = current_index + 1
+                        my_face = iface + 1
+                        other_index = neighbor_ielements[1] + 1
+                        other_face = dual_faces[1] + 1
+                        # only if large element is ghost element. Otherwise, the mortar is already considered above
+                        if is_ghost_cell(other_index, mesh)
+                            if !((other_face, other_index) in visited_mortars)
+                                local_num_mortars += 1
+
+                                init_mortar_neighbor_ids_first!(mortars, my_index, other_index, local_num_mortars)
+
+                                init_mortar_faces_first!(mortars, my_face, other_face, local_num_mortars)
+
+                                push!(visited_mortars, (other_face, other_index))
+                                push!(visited_mortar_ids, local_num_mortars)
+                            else
+                                mortar_index = findall(==((other_face, other_index)), visited_mortars)
+                                @assert length(mortar_index) == 1
+                                mortar_index = mortar_index[1]
+
+                                mortar_id = visited_mortar_ids[mortar_index]
+                                init_mortar_neighbor_ids_fill!(mortars, my_index, other_index, mortar_id)
+
+                                init_mortar_faces_fill!(mortars, my_face, other_face, mortar_id)
+
+                                # If all small element were added to the mortar, remove mortar from lists.
+                                if mortars.n_local_elements_small[mortar_id] == 2^(ndims(mesh) - 1)
+                                    deleteat!(visited_mortars, mortar_index)
+                                    deleteat!(visited_mortar_ids, mortar_index)
+                                end
+                            end
+                        end
                     end
                 end
 

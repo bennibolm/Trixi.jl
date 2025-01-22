@@ -839,7 +839,8 @@ function prolong2mortars!(cache, mesh::T8codeMesh, equations, solver::FV)
     for mortar in eachmortar(solver, cache)
         element_large = mortars.neighbor_ids[end, mortar]
         if solver.order == 1
-            for position in 1:(2^(ndims(mesh) - 1))
+            n_positions = mortars.n_local_elements_small[mortar]
+            for position in 1:n_positions
                 element_small = mortars.neighbor_ids[position, mortar]
                 for v in eachvariable(equations)
                     mortars.u[2, v, position, mortar] = solution_data[element_large].u[v]
@@ -852,7 +853,8 @@ function prolong2mortars!(cache, mesh::T8codeMesh, equations, solver::FV)
             face_midpoint_element_large = domain_data[element_large].face_midpoints[face_element_large]
             midpoint_element_large = domain_data[element_large].midpoint
 
-            for position in 1:(2^(ndims(mesh) - 1))
+            n_positions = mortars.n_local_elements_small[mortar]
+            for position in 1:n_positions
                 element_small = mortars.neighbor_ids[position, mortar]
                 face_element_small = mortars.faces[position, mortar]
                 face_midpoint_element_small = domain_data[element_small].face_midpoints[face_element_small]
@@ -893,7 +895,8 @@ function calc_mortar_flux!(du, mesh::T8codeMesh, nonconservative_terms::False,
         normal = get_node_coords(elements.face_normals, equations, solver,
                                  face_large, element_large)
 
-        for position in 1:(2^(ndims(mesh) - 1))
+        n_positions = mortars.n_local_elements_small[mortar]
+        for position in 1:n_positions
             element_small = mortars.neighbor_ids[position, mortar]
             face_small = mortars.faces[position, mortar]
 
@@ -902,7 +905,9 @@ function calc_mortar_flux!(du, mesh::T8codeMesh, nonconservative_terms::False,
             flux = surface_flux(u_large, u_small, normal, equations)
             for v in eachvariable(equations)
                 flux_ = elements.face_areas[face_small, element_small] * flux[v]
-                du[v, element_large] -= flux_
+                if !is_ghost_cell(element_large, mesh)
+                    du[v, element_large] -= flux_
+                end
                 if !is_ghost_cell(element_small, mesh)
                     du[v, element_small] += flux_
                 end

@@ -14,11 +14,11 @@ function reinitialize_containers!(mesh::T8codeMesh, equations, solver::FV, cache
     count_required_surfaces!(mesh)
     # Resize interfaces container.
     @unpack interfaces = cache
-    resize!(interfaces, mesh.ninterfaces)
+    resize!(interfaces, mesh.ninterfaces + mesh.nmpiinterfaces)
 
     # Resize mortars container.
     @unpack mortars = cache
-    resize!(mortars, mesh.nmortars)
+    resize!(mortars, mesh.nmortars + mesh.nmpimortars)
 
     # Resize boundaries container.
     @unpack boundaries = cache
@@ -28,9 +28,10 @@ function reinitialize_containers!(mesh::T8codeMesh, equations, solver::FV, cache
                        mesh.boundary_names)
 
     (; solution_data, domain_data, gradient_data) = cache.communication_data
-    resize!(solution_data, ncells(mesh))
-    resize!(domain_data, ncells(mesh))
-    resize!(gradient_data, ncells(mesh))
+    num_ghost_elements = t8_forest_get_num_ghosts(mesh.forest)
+    resize!(solution_data, ncells(mesh) + num_ghost_elements)
+    resize!(domain_data, ncells(mesh) + num_ghost_elements)
+    resize!(gradient_data, ncells(mesh) + num_ghost_elements)
     exchange_domain_data!(cache.communication_data, elements, mesh, equations, solver)
 
     # Reinitialize reconstruction stencil
@@ -403,20 +404,21 @@ function init_reconstruction_stencil!(elements, interfaces, boundaries, mortars,
         append!(reconstruction_stencil[element1], element2)
         push!(reconstruction_distance[element1], distance)
         # only if element2 is local element
-        if element2 <= ncells(mesh)
+        if !is_ghost_cell(element2, mesh)
             append!(reconstruction_stencil[element2], element1)
             push!(reconstruction_distance[element2], -distance)
         end
     end
 
-    (; neighbor_ids, faces) = mortars
+    (; neighbor_ids, faces, n_local_elements_small) = mortars
     for mortar in axes(neighbor_ids, 2)
         element_large = neighbor_ids[end, mortar]
         face_element_large = faces[end, mortar]
 
         midpoint_element_large = domain_data[element_large].midpoint
 
-        for position in 1:(2^(ndims(mesh) - 1))
+        n_positions = n_local_elements_small[mortar]
+        for position in 1:n_positions
             element_small = neighbor_ids[position, mortar]
             face_element_small = faces[position, mortar]
             midpoint_element_small = domain_data[element_small].midpoint
@@ -440,10 +442,13 @@ function init_reconstruction_stencil!(elements, interfaces, boundaries, mortars,
                 distance = (face_midpoint_element_large .- midpoint_element_large) .+
                            (midpoint_element_small .- face_midpoint_element_small)
             end
-            append!(reconstruction_stencil[element_large], element_small)
-            push!(reconstruction_distance[element_large], distance)
-            # only if element_small is local element
-            if element_small <= ncells(mesh)
+
+            # Add info only if element is local element
+            if !is_ghost_cell(element_large, mesh)
+                append!(reconstruction_stencil[element_large], element_small)
+                push!(reconstruction_distance[element_large], distance)
+            end
+            if !is_ghost_cell(element_small, mesh)
                 append!(reconstruction_stencil[element_small], element_large)
                 push!(reconstruction_distance[element_small], -distance)
             end
@@ -566,9 +571,10 @@ function init_boundaries(mesh::T8codeMesh, equations, solver::FV, uEltype)
 end
 
 mutable struct T8codeFVMortarContainer{NDIMS, uEltype <: Real} <: AbstractContainer
-    u::Array{uEltype, 4}        # [small/large side, variable, position, mortar]
-    neighbor_ids::Matrix{Int}   # [position, mortar]
-    faces::Matrix{Int}          # [position, mortar]
+    u::Array{uEltype, 4}                # [small/large side, variable, position, mortar]
+    neighbor_ids::Matrix{Int}           # [position, mortar]
+    faces::Matrix{Int}                  # [position, mortar]
+    n_local_elements_small::Vector{Int} # [mortar]
 
     # internal `resize!`able storage
     _u::Vector{uEltype}
@@ -598,6 +604,8 @@ function Base.resize!(mortars::T8codeFVMortarContainer, capacity)
     mortars.faces = unsafe_wrap(Array, pointer(_faces),
                                 (2^(n_dims - 1) + 1, capacity))
 
+    resize!(mortars.n_local_elements_small, capacity)
+
     return nothing
 end
 
@@ -624,8 +632,11 @@ function init_mortars(mesh::T8codeMesh, equations, solver::FV, uEltype)
     faces = unsafe_wrap(Array, pointer(_faces),
                         (2^(NDIMS - 1) + 1, n_mortars))
 
+    n_local_elements_small = Vector{Int}(undef, n_mortars)
+
     mortars = T8codeFVMortarContainer{NDIMS, uEltype}(u, neighbor_ids, faces,
-                                                      _u, _neighbor_ids, _faces)
+                                                      _u, _neighbor_ids, _faces,
+                                                      n_local_elements_small)
 
     return mortars
 end

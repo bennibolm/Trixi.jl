@@ -5,171 +5,87 @@
 @muladd begin
 #! format: noindent
 
-@inline function init_mortar_neighbor_ids!(mortars::T8codeFVMortarContainer{3}, my_face,
-                                           other_face, orientation, neighbor_ielements,
-                                           mortar_id)
-    # For more information see init_mortar_neighbor_ids! for DGSEM
-    lower = my_face <= other_face
-    my_right_handed = my_face in (1, 2, 5)
-    other_right_handed = other_face in (1, 2, 5)
-    flipped = my_right_handed == other_right_handed
-    if !flipped
-        if orientation == 0
-            # Corner 0 of other side matches corner 0 of my side
-            #   2┌──────┐3   2┌──────┐3
-            #    │      │     │      │
-            #    │      │     │      │
-            #   0└──────┘1   0└──────┘1
-            #     η            η
-            #     ↑            ↑
-            #     │            │
-            #     └───> ξ      └───> ξ
+@inline function init_mortar_neighbor_ids!(mortars::T8codeFVMortarContainer{3},
+                                           my_index, other_indices, mortar_id)
+    # Here, the large element is local on the current rank. Therefore, we have information about all small ones.
+    mortars.neighbor_ids[end, mortar_id] = my_index
 
-            mortars.neighbor_ids[1, mortar_id] = neighbor_ielements[1] + 1
-            mortars.neighbor_ids[2, mortar_id] = neighbor_ielements[2] + 1
-            mortars.neighbor_ids[3, mortar_id] = neighbor_ielements[3] + 1
-            mortars.neighbor_ids[4, mortar_id] = neighbor_ielements[4] + 1
+    mortars.neighbor_ids[1, mortar_id] = other_indices[1]
+    mortars.neighbor_ids[2, mortar_id] = other_indices[2]
+    mortars.neighbor_ids[3, mortar_id] = other_indices[3]
+    mortars.neighbor_ids[4, mortar_id] = other_indices[4]
 
-        elseif ((lower && orientation == 2) # Corner 0 of my side matches corner 2 of other side
-                ||
-                (!lower && orientation == 1)) # Corner 0 of other side matches corner 1 of my side
-            #   2┌──────┐3   0┌──────┐2
-            #    │      │     │      │
-            #    │      │     │      │
-            #   0└──────┘1   1└──────┘3
-            #     η            ┌───> η
-            #     ↑            │
-            #     │            ↓
-            #     └───> ξ      ξ
+    # Set `n_local_elements_small[mortar_id]` to the maximum = 2^(ndims - 1) = 4.
+    mortars.n_local_elements_small[mortar_id] = 4
 
-            mortars.neighbor_ids[1, mortar_id] = neighbor_ielements[2] + 1
-            mortars.neighbor_ids[2, mortar_id] = neighbor_ielements[4] + 1
-            mortars.neighbor_ids[3, mortar_id] = neighbor_ielements[1] + 1
-            mortars.neighbor_ids[4, mortar_id] = neighbor_ielements[3] + 1
-
-        elseif ((lower && orientation == 1) # Corner 0 of my side matches corner 1 of other side
-                ||
-                (!lower && orientation == 2)) # Corner 0 of other side matches corner 2 of my side
-            #   2┌──────┐3   3┌──────┐1
-            #    │      │     │      │
-            #    │      │     │      │
-            #   0└──────┘1   2└──────┘0
-            #     η                 ξ
-            #     ↑                 ↑
-            #     │                 │
-            #     └───> ξ     η <───┘
-
-            mortars.neighbor_ids[1, mortar_id] = neighbor_ielements[3] + 1
-            mortars.neighbor_ids[2, mortar_id] = neighbor_ielements[1] + 1
-            mortars.neighbor_ids[3, mortar_id] = neighbor_ielements[4] + 1
-            mortars.neighbor_ids[4, mortar_id] = neighbor_ielements[2] + 1
-
-        else # orientation == 3
-            # Corner 0 of my side matches corner 3 of other side and
-            # corner 0 of other side matches corner 3 of my side.
-            #   2┌──────┐3   1┌──────┐0
-            #    │      │     │      │
-            #    │      │     │      │
-            #   0└──────┘1   3└──────┘2
-            #     η           ξ <───┐
-            #     ↑                 │
-            #     │                 ↓
-            #     └───> ξ           η
-
-            mortars.neighbor_ids[1, mortar_id] = neighbor_ielements[4] + 1
-            mortars.neighbor_ids[2, mortar_id] = neighbor_ielements[3] + 1
-            mortars.neighbor_ids[3, mortar_id] = neighbor_ielements[2] + 1
-            mortars.neighbor_ids[4, mortar_id] = neighbor_ielements[1] + 1
-        end
-    else # flipped
-        if orientation == 0
-            # Corner 0 of other side matches corner 0 of my side
-            #   2┌──────┐3   1┌──────┐3
-            #    │      │     │      │
-            #    │      │     │      │
-            #   0└──────┘1   0└──────┘2
-            #     η            ξ
-            #     ↑            ↑
-            #     │            │
-            #     └───> ξ      └───> η
-
-            mortars.neighbor_ids[1, mortar_id] = neighbor_ielements[1] + 1
-            mortars.neighbor_ids[2, mortar_id] = neighbor_ielements[3] + 1
-            mortars.neighbor_ids[3, mortar_id] = neighbor_ielements[2] + 1
-            mortars.neighbor_ids[4, mortar_id] = neighbor_ielements[4] + 1
-
-        elseif orientation == 2
-            # Corner 0 of my side matches corner 2 of other side and
-            # corner 0 of other side matches corner 2 of my side.
-            #   2┌──────┐3   0┌──────┐1
-            #    │      │     │      │
-            #    │      │     │      │
-            #   0└──────┘1   2└──────┘3
-            #     η            ┌───> ξ
-            #     ↑            │
-            #     │            ↓
-            #     └───> ξ      η
-
-            mortars.neighbor_ids[1, mortar_id] = neighbor_ielements[3] + 1
-            mortars.neighbor_ids[2, mortar_id] = neighbor_ielements[4] + 1
-            mortars.neighbor_ids[3, mortar_id] = neighbor_ielements[1] + 1
-            mortars.neighbor_ids[4, mortar_id] = neighbor_ielements[2] + 1
-
-        elseif orientation == 1
-            # Corner 0 of my side matches corner 1 of other side and
-            # corner 0 of other side matches corner 1 of my side.
-            #   2┌──────┐3   3┌──────┐2
-            #    │      │     │      │
-            #    │      │     │      │
-            #   0└──────┘1   1└──────┘0
-            #     η                 η
-            #     ↑                 ↑
-            #     │                 │
-            #     └───> ξ     ξ <───┘
-
-            mortars.neighbor_ids[1, mortar_id] = neighbor_ielements[2] + 1
-            mortars.neighbor_ids[2, mortar_id] = neighbor_ielements[1] + 1
-            mortars.neighbor_ids[3, mortar_id] = neighbor_ielements[4] + 1
-            mortars.neighbor_ids[4, mortar_id] = neighbor_ielements[3] + 1
-
-        else # orientation == 3
-            # Corner 0 of my side matches corner 3 of other side and
-            # corner 0 of other side matches corner 3 of my side.
-            #   2┌──────┐3   2┌──────┐0
-            #    │      │     │      │
-            #    │      │     │      │
-            #   0└──────┘1   3└──────┘1
-            #     η           η <───┐
-            #     ↑                 │
-            #     │                 ↓
-            #     └───> ξ           ξ
-
-            mortars.neighbor_ids[1, mortar_id] = neighbor_ielements[4] + 1
-            mortars.neighbor_ids[2, mortar_id] = neighbor_ielements[2] + 1
-            mortars.neighbor_ids[3, mortar_id] = neighbor_ielements[3] + 1
-            mortars.neighbor_ids[4, mortar_id] = neighbor_ielements[1] + 1
-        end
-    end
+    return nothing
 end
 
-@inline function init_mortar_faces!(mortars::T8codeFVMortarContainer{3}, faces,
-                                    orientation, mortar_id)
-    dual_faces, iface = faces
+@inline function init_mortar_neighbor_ids_first!(mortars::T8codeFVMortarContainer{3},
+                                                 my_index, other_index, mortar_id)
+    # Here, the large element is a ghost element.
+    # The element `my_index` is local on the current rank and is the first one at this mortar.
+    # Only add the information about the large element and this first one.
+    mortars.neighbor_ids[end, mortar_id] = other_index
 
-    # TODO: Test this with more complicated meshes
-    # what should happen for orientation = 1, 2 or 3
-    mortars.faces[end, mortar_id] = iface + 1
-    if orientation == 0
-        mortars.faces[1, mortar_id] = dual_faces[1] + 1
-        mortars.faces[2, mortar_id] = dual_faces[2] + 1
-        mortars.faces[3, mortar_id] = dual_faces[3] + 1
-        mortars.faces[4, mortar_id] = dual_faces[4] + 1
-    else
-        mortars.faces[1, mortar_id] = dual_faces[4] + 1
-        mortars.faces[2, mortar_id] = dual_faces[3] + 1
-        mortars.faces[3, mortar_id] = dual_faces[2] + 1
-        mortars.faces[4, mortar_id] = dual_faces[1] + 1
-    end
+    mortars.neighbor_ids[1, mortar_id] = my_index
+    mortars.neighbor_ids[2, mortar_id] = -1
+    mortars.neighbor_ids[3, mortar_id] = -1
+    mortars.neighbor_ids[4, mortar_id] = -1
+
+    mortars.n_local_elements_small[mortar_id] = 1
+
+    return nothing
+end
+
+@inline function init_mortar_neighbor_ids_fill!(mortars::T8codeFVMortarContainer{3},
+                                                my_index, other_index, mortar_id)
+    # Here, the large element is a ghost element.
+    # The element `my_index` is local on the current rank, but there were already element(s) before at this mortar.
+    # Check the information of the large element and add the new information.
+    @assert mortars.neighbor_ids[end, mortar_id] == other_index
+
+    elements_added_to_mortar = mortars.n_local_elements_small[mortar_id]
+    @assert mortars.neighbor_ids[elements_added_to_mortar + 1, mortar_id] == -1
+    mortars.neighbor_ids[elements_added_to_mortar + 1, mortar_id] = my_index
+
+    mortars.n_local_elements_small[mortar_id] += 1
+
+    return nothing
+end
+
+@inline function init_mortar_faces!(mortars::T8codeFVMortarContainer{3},
+                                     my_face, other_faces, mortar_id)
+    mortars.faces[end, mortar_id] = my_face
+
+    mortars.faces[1, mortar_id] = other_faces[1]
+    mortars.faces[2, mortar_id] = other_faces[2]
+    mortars.faces[3, mortar_id] = other_faces[3]
+    mortars.faces[4, mortar_id] = other_faces[4]
+
+    return nothing
+end
+
+@inline function init_mortar_faces_first!(mortars::T8codeFVMortarContainer{3},
+                                          my_face, other_face, mortar_id)
+    mortars.faces[end, mortar_id] = other_face
+
+    mortars.faces[1, mortar_id] = my_face
+    mortars.faces[2, mortar_id] = -1
+    mortars.faces[3, mortar_id] = -1
+    mortars.faces[4, mortar_id] = -1
+
+    return nothing
+end
+
+@inline function init_mortar_faces_fill!(mortars::T8codeFVMortarContainer{3},
+                                         my_face, other_face, mortar_id)
+    @assert mortars.faces[end, mortar_id] == other_face
+
+    elements_added_to_mortar = mortars.n_local_elements_small[mortar_id]
+    @assert mortars.faces[elements_added_to_mortar, mortar_id] == -1
+    mortars.faces[elements_added_to_mortar, mortar_id] = my_face
+
     return nothing
 end
 end # @muladd
