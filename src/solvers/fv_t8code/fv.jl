@@ -886,15 +886,14 @@ end
 function calc_mortar_flux!(du, mesh::T8codeMesh, nonconservative_terms::False,
                            equations, solver::FV, cache)
     (; surface_flux) = solver
-    (; elements, mortars) = cache
+    (; mortars, communication_data) = cache
+    (; domain_data) = communication_data
 
     for mortar in eachmortar(solver, cache)
         element_large = mortars.neighbor_ids[end, mortar]
         face_large = mortars.faces[end, mortar]
 
-        normal = get_node_coords(elements.face_normals, equations, solver,
-                                 face_large, element_large)
-
+        normal = domain_data[element_large].face_normals[face_large]
         n_positions = mortars.n_local_elements_small[mortar]
         for position in 1:n_positions
             element_small = mortars.neighbor_ids[position, mortar]
@@ -904,7 +903,8 @@ function calc_mortar_flux!(du, mesh::T8codeMesh, nonconservative_terms::False,
             u_small = view(mortars.u, 1, :, position, mortar)
             flux = surface_flux(u_large, u_small, normal, equations)
             for v in eachvariable(equations)
-                flux_ = elements.face_areas[face_small, element_small] * flux[v]
+                face_area = domain_data[element_small].face_areas[face_small]
+                flux_ = face_area * flux[v]
                 if !is_ghost_cell(element_large, mesh)
                     du[v, element_large] -= flux_
                 end

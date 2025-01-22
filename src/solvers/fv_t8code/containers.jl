@@ -738,32 +738,45 @@ end
 struct T8codeReconstructionContainer{NDIMS, NFACES}
     midpoint::SVector{NDIMS, Cdouble}
     face_midpoints::NTuple{NFACES, SVector{NDIMS, Cdouble}}
+    face_areas::SVector{NFACES, Cdouble}
+    face_normals::NTuple{NFACES, SVector{NDIMS, Cdouble}}
 
-    function T8codeReconstructionContainer(midpoint, face_midpoints)
-        new{length(midpoint), length(face_midpoints)}(midpoint, face_midpoints)
+    function T8codeReconstructionContainer(midpoint, face_midpoints, face_areas, face_normals)
+        new{length(midpoint), length(face_midpoints)}(midpoint, face_midpoints, face_areas, face_normals)
     end
 end
 
 function exchange_domain_data!(communication_data, elements, mesh, equations, solver)
     (; domain_data) = communication_data
-    (; midpoint, face_midpoints, num_faces) = elements
+    (; midpoint, face_midpoints, face_areas, face_normals, num_faces) = elements
     for element in 1:ncells(mesh)
         face_midpoints_tuple = []
+        face_normals_tuple = []
+        face_areas_ = zeros(eltype(face_areas), mesh.max_number_faces)
         for face in 1:(num_faces[element])
             push!(face_midpoints_tuple,
                   get_node_coords(face_midpoints, equations, solver, face, element))
+            push!(face_normals_tuple,
+                  get_node_coords(face_normals, equations, solver, face, element))
+            face_areas_[face] = face_areas[face, element]
         end
-        for i in (num_faces[element] + 1):(mesh.max_number_faces)
+        for _ in (num_faces[element] + 1):(mesh.max_number_faces)
             push!(face_midpoints_tuple,
+                  SVector{ndims(equations)}(zeros(eltype(midpoint), ndims(equations))))
+            push!(face_normals_tuple,
                   SVector{ndims(equations)}(zeros(eltype(midpoint), ndims(equations))))
         end
         face_midpoints_tuple_ = NTuple{mesh.max_number_faces,
                                        eltype(face_midpoints_tuple)}(face_midpoints_tuple)
+        face_normals_tuple_ = NTuple{mesh.max_number_faces,
+                                       eltype(face_normals_tuple)}(face_normals_tuple)
         domain_data[element] = T8codeReconstructionContainer(get_node_coords(midpoint,
                                                                              equations,
                                                                              solver,
                                                                              element),
-                                                             face_midpoints_tuple_)
+                                                             face_midpoints_tuple_,
+                                                             face_areas_,
+                                                             face_normals_tuple_)
     end
     exchange_ghost_data(mesh, domain_data)
 
