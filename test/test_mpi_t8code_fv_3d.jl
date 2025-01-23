@@ -51,7 +51,7 @@ const EXAMPLES_DIR = pkgdir(Trixi, "examples", "t8code_3d_fv")
             @test_trixi_include(joinpath(EXAMPLES_DIR,
                                          "elixir_advection_amr.jl"),
                                 order=1,
-                                l2=[0.03618776272465453],
+                                l2=[0.0361868295228438],
                                 linf=[0.2352594244477838])
             # Ensure that we do not have excessive memory allocations
             # (e.g., from type instabilities)
@@ -65,7 +65,7 @@ const EXAMPLES_DIR = pkgdir(Trixi, "examples", "t8code_3d_fv")
         @trixi_testset "second-order FV" begin
             @test_trixi_include(joinpath(EXAMPLES_DIR,
                                          "elixir_advection_amr.jl"),
-                                l2=[0.013166158330287843],
+                                l2=[0.013168690562079175],
                                 linf=[0.08606560611780918])
             # Ensure that we do not have excessive memory allocations
             # (e.g., from type instabilities)

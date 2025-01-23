@@ -1772,7 +1772,6 @@ function fill_mesh_info_fv!(mesh::T8codeMesh, interfaces, boundaries, mortars,
                             boundary_names; mpi_mesh_info = nothing)
     @assert t8_forest_is_committed(mesh.forest) != 0
 
-    num_local_elements = t8_forest_get_local_num_elements(mesh.forest)
     num_local_trees = t8_forest_get_num_local_trees(mesh.forest)
 
     # Process-local index of the current element in the space-filling curve.
@@ -1782,10 +1781,6 @@ function fill_mesh_info_fv!(mesh::T8codeMesh, interfaces, boundaries, mortars,
     local_num_conform = 0
     local_num_mortars = 0
     local_num_boundary = 0
-
-    # Helper variables to compute unique global MPI interface/mortar ids.
-    max_level = t8_forest_get_maxlevel(mesh.forest) #UInt64
-    max_tree_num_elements = UInt64(2^ndims(mesh))^max_level
 
     # These two variables help to fill (partly MPI-) mortars properly.
     visited_mortars = Tuple{Int, Int}[]
@@ -1797,8 +1792,6 @@ function fill_mesh_info_fv!(mesh::T8codeMesh, interfaces, boundaries, mortars,
         eclass_scheme = t8_forest_get_eclass_scheme(mesh.forest, tree_class)
 
         num_elements_in_tree = t8_forest_get_tree_num_elements(mesh.forest, itree)
-
-        global_itree = t8_forest_global_tree_id(mesh.forest, itree)
 
         # Loop over all local elements of the current local tree.
         for ielement in 0:(num_elements_in_tree - 1)
@@ -1844,8 +1837,9 @@ function fill_mesh_info_fv!(mesh::T8codeMesh, interfaces, boundaries, mortars,
                 #       <fill interface info>
                 #     elseif `mortar from larger element point of view`:
                 #       <fill mortar info>
-                #     else: // `mortar from smaller elements point of view`
-                #       <skip> // We only count local mortars once.
+                #     elseif: `mortar from larger element point of view`:
+                #       if `large element is ghost element`:
+                #           <fill mortar info> // Add information of small elements step by step
                 #
                 #   // end
 

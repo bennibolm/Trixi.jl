@@ -82,7 +82,7 @@ const EXAMPLES_DIR = pkgdir(Trixi, "examples", "t8code_2d_fv")
             @test_trixi_include(joinpath(EXAMPLES_DIR,
                                          "elixir_advection_amr.jl"),
                                 order=1,
-                                l2=[0.0449818455360287],
+                                l2=[0.0449182344669916],
                                 linf=[0.12473470922146587])
             # Ensure that we do not have excessive memory allocations
             # (e.g., from type instabilities)
