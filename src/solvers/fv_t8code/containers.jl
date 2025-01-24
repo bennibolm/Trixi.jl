@@ -55,9 +55,9 @@ mutable struct T8codeFVElementContainer{NDIMS, RealT <: Real, uEltype <: Real}
     face_areas::Matrix{RealT}       # [face, element]
     face_normals::Array{RealT, 3}   # [dimension, face, element]
 
-    reconstruction_stencil::Vector{Vector{Int}}             # Reconstruction stencil vector with neighbors per [element]
-    reconstruction_distance::Vector{Vector{Vector{RealT}}}  # Reconstruction stencil vector with distances per [element]
-    reconstruction_corner_elements::Array{Vector{Int}, 2}   # Reconstruction stencil array with neighbor elements at corner per [corner, element]
+    reconstruction_stencil::Vector{Vector{Int}}                     # Reconstruction stencil vector with neighbors per [element]
+    reconstruction_distance::Vector{Vector{SVector{NDIMS, RealT}}}  # Reconstruction stencil vector with distances per [element]
+    reconstruction_corner_elements::Array{Vector{Int}, 2}           # Reconstruction stencil array with neighbor elements at corner per [corner, element]
     reconstruction_gradient::Array{RealT, 4}            # [dimension, variable, slope_stencils, element], slope_stencil: i = use all neighbors exclusive i, n_neighbors = use all neighbors
     reconstruction_gradient_limited::Array{RealT, 3}    # [dimension, variable, element]
 
@@ -171,7 +171,7 @@ function init_elements(mesh::T8codeMesh{NDIMS, RealT},
                                (NDIMS, max_number_faces, nelements))
 
     reconstruction_stencil = Vector{Vector{Int}}(undef, nelements)
-    reconstruction_distance = Vector{Vector{Array{RealT, NDIMS}}}(undef, nelements)
+    reconstruction_distance = Vector{Vector{SVector{NDIMS, RealT}}}(undef, nelements)
 
     _reconstruction_corner_elements = Vector{Vector{Int}}(undef,
                                                           max_number_faces * nelements)
@@ -299,10 +299,10 @@ end
 
     # Create empty vectors for every element
     for element in eachindex(volume)
-        reconstruction_stencil[element] = []
-        reconstruction_distance[element] = []
+        reconstruction_stencil[element] = Int[]
+        reconstruction_distance[element] = SVector{eltype(reconstruction_distance)}[]
         for corner in 1:num_faces[element]
-            reconstruction_corner_elements[corner, element] = []
+            reconstruction_corner_elements[corner, element] = Int[]
         end
     end
 
@@ -370,7 +370,7 @@ end
 function init_reconstruction_stencil!(elements, interfaces, boundaries, mortars,
                                       communication_data,
                                       mesh, equations, solver::FV)
-    if solver.order != 2
+    if solver.order != 2 # type instability?
         return nothing
     end
     (; reconstruction_stencil, reconstruction_distance) = elements
@@ -378,8 +378,8 @@ function init_reconstruction_stencil!(elements, interfaces, boundaries, mortars,
 
     # Create empty vectors for every element
     for element in eachindex(reconstruction_stencil)
-        reconstruction_stencil[element] = []
-        reconstruction_distance[element] = []
+        reconstruction_stencil[element] = Int[]
+        reconstruction_distance[element] = SVector{eltype(reconstruction_distance)}[]
     end
 
     (; neighbor_ids, faces) = interfaces
@@ -759,8 +759,10 @@ function exchange_domain_data!(communication_data, elements, mesh, equations, so
     face_areas_ = zeros(eltype(face_areas), mesh.max_number_faces)
     for element in 1:ncells(mesh)
         for face in 1:num_faces[element]
-            face_midpoints_[face] = get_node_coords(face_midpoints, equations, solver, face, element)
-            face_normals_[face] = get_node_coords(face_normals, equations, solver, face, element)
+            face_midpoints_[face] = get_node_coords(face_midpoints, equations, solver,
+                                                    face, element)
+            face_normals_[face] = get_node_coords(face_normals, equations, solver,
+                                                  face, element)
             face_areas_[face] = face_areas[face, element]
         end
         domain_data[element] = T8codeReconstructionContainer(get_node_coords(midpoint,
