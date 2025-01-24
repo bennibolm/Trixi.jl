@@ -67,3 +67,5 @@ sol = solve(ode, CarpenterKennedy2N54(williamson_condition = false),
             save_everystep = false, callback = callbacks);
 
 summary_callback() # print the timer summary
+
+GC.enable(true)
