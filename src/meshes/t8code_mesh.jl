@@ -1925,6 +1925,7 @@ function fill_mesh_info_fv!(mesh::T8codeMesh, interfaces, boundaries, mortars,
                     end
                 end
 
+                t8_element_destroy(neighbor_scheme, num_neighbors, neighbor_leaves)
                 t8_free(dual_faces_ref[])
                 t8_free(pneighbor_leaves_ref[])
                 t8_free(pelement_indices_ref[])
