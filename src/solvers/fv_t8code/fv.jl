@@ -899,8 +899,8 @@ function calc_mortar_flux!(du, mesh::T8codeMesh, nonconservative_terms::False,
             element_small = mortars.neighbor_ids[position, mortar]
             face_small = mortars.faces[position, mortar]
 
-            u_large = view(mortars.u, 2, :, position, mortar)
-            u_small = view(mortars.u, 1, :, position, mortar)
+            u_small, u_large = get_surface_node_vars(mortars.u, equations, solver,
+                                                     position, mortar)
             flux = surface_flux(u_large, u_small, normal, equations)
             for v in eachvariable(equations)
                 face_area = domain_data[element_small].face_areas[face_small]
