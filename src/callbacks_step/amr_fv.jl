@@ -97,4 +97,83 @@ function rebalance_solver!(u_ode::AbstractVector,
         end
     end # GC.@preserve old_u_ode
 end
+
+# Coarsen and refine elements in the FV solver based on a difference list.
+function adapt!(u_ode::AbstractVector, adaptor, mesh::T8codeMesh, equations,
+                solver::FV, cache, difference)
+
+    # Return early if there is nothing to do.
+    if !any(difference .!= 0)
+        if mpi_isparallel()
+            # MPICache init uses all-to-all communication -> reinitialize even if there is nothing to do
+            # locally (there still might be other MPI ranks that have refined elements)
+            reinitialize_containers!(mesh, equations, solver, cache)
+        end
+        return
+    end
+
+    # Number of (local) cells/elements.
+    old_nelems = nelements(solver, cache)
+    new_nelems = ncells(mesh)
+
+    # Local element indices.
+    old_index = 1
+    new_index = 1
+
+    # Note: This is true for `quads`.
+    T8_CHILDREN = 2^ndims(equations)
+
+    # Retain current solution data.
+    old_u_ode = copy(u_ode)
+
+    GC.@preserve old_u_ode begin
+        old_u = wrap_array(old_u_ode, mesh, equations, solver, cache)
+
+        reinitialize_containers!(mesh, equations, solver, cache)
+
+        resize!(u_ode, nvariables(equations) * nelements(solver, cache))
+        u = wrap_array(u_ode, mesh, equations, solver, cache)
+
+        while old_index <= old_nelems && new_index <= new_nelems
+            if difference[old_index] > 0 # Refine.
+                # Refine element and store solution directly in new data structure.
+                refine_element!(u, new_index, old_u, old_index, adaptor,
+                                equations, solver)
+
+                # Increment `old_index` on the original mesh and the `new_index`
+                # on the refined mesh with the number of children, i.e., T8_CHILDREN = 4
+                old_index += 1
+                new_index += T8_CHILDREN
+
+            elseif difference[old_index] < 0 # Coarsen.
+                # If an element is to be removed, sanity check if the following elements
+                # are also marked - otherwise there would be an error in the way the
+                # cells/elements are sorted.
+                @assert all(difference[old_index:(old_index + T8_CHILDREN - 1)] .< 0) "bad cell/element order"
+
+                # Coarsen elements and store solution directly in new data structure.
+                coarsen_elements!(u, new_index, old_u, old_index, adaptor, equations,
+                                  solver)
+
+                # Increment `old_index` on the original mesh with the number of children
+                # (T8_CHILDREN = 4 in 2D) and the `new_index` by one for the single
+                # coarsened element
+                old_index += T8_CHILDREN
+                new_index += 1
+
+            else # No changes.
+
+                # Copy old element data to new element container.
+                @views u[:, new_index] .= old_u[:, old_index]
+
+                # No refinement / coarsening occurred, so increment element index
+                # on each mesh by one
+                old_index += 1
+                new_index += 1
+            end
+        end # while
+    end # GC.@preserve old_u_ode
+
+    return nothing
+end
 end # @muladd

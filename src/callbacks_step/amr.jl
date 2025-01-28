@@ -972,7 +972,7 @@ end
 #       But that would remove the simplest possibility to write that stuff to a file...
 #       We could of course implement some additional logic and workarounds, but is it worth the effort?
 function (controller::ControllerThreeLevel)(u::AbstractArray{<:Any},
-                                            mesh, equations, dg::DG, cache;
+                                            mesh, equations, dg::Union{DG, FV}, cache;
                                             kwargs...)
     @unpack controller_value = controller.cache
     resize!(controller_value, nelements(dg, cache))
@@ -981,46 +981,6 @@ function (controller::ControllerThreeLevel)(u::AbstractArray{<:Any},
     current_levels = current_element_levels(mesh, dg, cache)
 
     @threaded for element in eachelement(dg, cache)
-        current_level = current_levels[element]
-
-        # set target level
-        target_level = current_level
-        if alpha[element] > controller.max_threshold
-            target_level = controller.max_level
-        elseif alpha[element] > controller.med_threshold
-            if controller.med_level > 0
-                target_level = controller.med_level
-                # otherwise, target_level = current_level
-                # set med_level = -1 to implicitly use med_level = current_level
-            end
-        else
-            target_level = controller.base_level
-        end
-
-        # compare target level with actual level to set controller
-        if current_level < target_level
-            controller_value[element] = 1 # refine!
-        elseif current_level > target_level
-            controller_value[element] = -1 # coarsen!
-        else
-            controller_value[element] = 0 # we're good
-        end
-    end
-
-    return controller_value
-end
-
-function (controller::ControllerThreeLevel)(u::AbstractArray{<:Any},
-                                            mesh, equations, solver::FV, cache;
-                                            kwargs...)
-    @unpack controller_value = controller.cache
-    # The parameter mesh is different to the DG version.
-    resize!(controller_value, nelements(solver, cache))
-
-    alpha = controller.indicator(u, mesh, equations, solver, cache; kwargs...)
-    current_levels = current_element_levels(mesh, solver, cache)
-
-    @threaded for element in eachelement(solver, cache)
         current_level = current_levels[element]
 
         # set target level
