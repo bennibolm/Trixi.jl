@@ -9,7 +9,7 @@
 function create_cache(::Type{ControllerThreeLevel},
                       mesh::T8codeMesh, equations,
                       solver::FV, cache)
-    controller_value = Vector{Int}(undef, nelements(mesh, solver, cache))
+    controller_value = Vector{Int}(undef, nelements(solver, cache))
     return (; controller_value)
 end
 
@@ -34,7 +34,7 @@ function rebalance_solver!(u_ode::AbstractVector,
         return
     end
     # Retain current solution data
-    old_n_elements = nelements(mesh, solver, cache)
+    old_n_elements = nelements(solver, cache)
     old_u_ode = copy(u_ode)
     GC.@preserve old_u_ode begin # OBS! If we don't GC.@preserve old_u_ode, it might be GC'ed
         # Use `wrap_array_native` instead of `wrap_array` since MPI might not interact
@@ -45,7 +45,7 @@ function rebalance_solver!(u_ode::AbstractVector,
             reinitialize_containers!(mesh, equations, solver, cache)
         end
 
-        resize!(u_ode, nvariables(equations) * nelements(mesh, solver, cache))
+        resize!(u_ode, nvariables(equations) * nelements(solver, cache))
         u = wrap_array_native(u_ode, mesh, equations, solver, cache)
 
         @trixi_timeit timer() "exchange data" begin
@@ -70,7 +70,7 @@ function rebalance_solver!(u_ode::AbstractVector,
 
             # Loop over all elements in new container and either copy them from old container
             # or receive them with MPI
-            for element in eachelement(mesh, solver, cache)
+            for element in eachelement(solver, cache)
                 # Get global quad ID of element; local quad id is element id - 1
                 global_quad_id = global_first_quadrant[mpi_rank() + 1] + element - 1
                 if old_global_first_quadrant[mpi_rank() + 1] <= global_quad_id <

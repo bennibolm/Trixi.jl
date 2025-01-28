@@ -1015,13 +1015,12 @@ function (controller::ControllerThreeLevel)(u::AbstractArray{<:Any},
                                             kwargs...)
     @unpack controller_value = controller.cache
     # The parameter mesh is different to the DG version.
-    resize!(controller_value, nelements(mesh, solver, cache))
+    resize!(controller_value, nelements(solver, cache))
 
     alpha = controller.indicator(u, mesh, equations, solver, cache; kwargs...)
     current_levels = current_element_levels(mesh, solver, cache)
 
-    # The parameter mesh is different to the DG version.
-    @threaded for element in eachelement(mesh, solver, cache)
+    @threaded for element in eachelement(solver, cache)
         current_level = current_levels[element]
 
         # set target level

@@ -217,7 +217,7 @@ function max_dt(u, t, mesh,
                 constant_speed::False, equations, solver::FV, cache)
     dt = typemax(eltype(u))
 
-    for element in eachelement(mesh, solver, cache)
+    for element in eachelement(solver, cache)
         u_node = get_node_vars(u, equations, solver, element)
         lambda1, lambda2 = max_abs_speeds(u_node, equations)
         dx = cache.elements.dx[element]
@@ -236,7 +236,7 @@ function max_dt(u, t, mesh,
     dx_min = typemax(eltype(u))
 
     max_lambda1, max_lambda2 = max_abs_speeds(equations)
-    for element in eachelement(mesh, solver, cache)
+    for element in eachelement(solver, cache)
         dx = cache.elements.dx[element]
         dx_min = min(dx_min, dx)
     end

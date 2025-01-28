@@ -105,7 +105,7 @@ function adapt!(u_ode::AbstractVector, adaptor, mesh::T8codeMesh{2}, equations,
     end
 
     # Number of (local) cells/elements.
-    old_nelems = nelements(mesh, solver, cache)
+    old_nelems = nelements(solver, cache)
     new_nelems = ncells(mesh)
 
     # Local element indices.
@@ -113,7 +113,7 @@ function adapt!(u_ode::AbstractVector, adaptor, mesh::T8codeMesh{2}, equations,
     new_index = 1
 
     # Note: This is true for `quads`.
-    T8_CHILDREN = 4
+    T8_CHILDREN = 2^ndims(equations)
 
     # Retain current solution data.
     old_u_ode = copy(u_ode)
@@ -123,8 +123,7 @@ function adapt!(u_ode::AbstractVector, adaptor, mesh::T8codeMesh{2}, equations,
 
         reinitialize_containers!(mesh, equations, solver, cache)
 
-        resize!(u_ode,
-                nvariables(equations) * nelements(mesh, solver, cache))
+        resize!(u_ode, nvariables(equations) * nelements(solver, cache))
         u = wrap_array(u_ode, mesh, equations, solver, cache)
 
         while old_index <= old_nelems && new_index <= new_nelems

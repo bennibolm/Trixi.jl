@@ -190,7 +190,7 @@ function calc_error_norms(func, u, t, analyzer,
     total_volume = zero(real(mesh))
 
     # Iterate over all elements for error calculations
-    for element in eachelement(mesh, solver, cache)
+    for element in eachelement(solver, cache)
         midpoint = get_node_coords(cache.elements.midpoint, equations, solver, element)
         volume = cache.elements.volume[element]
 
@@ -320,7 +320,7 @@ function integrate_via_indices(func::Func, u,
     total_volume = zero(real(mesh))
 
     # Use quadrature to numerically integrate over entire domain
-    for element in eachelement(mesh, solver, cache)
+    for element in eachelement(solver, cache)
         volume = cache.elements.volume[element]
         integral += volume * func(u, element, equations, solver, args...)
         total_volume += volume

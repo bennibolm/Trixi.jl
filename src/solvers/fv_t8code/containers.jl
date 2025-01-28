@@ -699,7 +699,7 @@ end
 
 function exchange_solution_data!(u, mesh, equations, solver, cache)
     (; solution_data) = cache.communication_data
-    for element in eachelement(mesh, solver, cache)
+    for element in eachelement(solver, cache)
         solution_data[element] = T8codeSolutionContainer(Tuple(get_node_vars(u,
                                                                              equations,
                                                                              solver,
@@ -722,7 +722,7 @@ end
 function exchange_gradient_data!(reconstruction_gradient_limited,
                                  mesh, equations, solver, cache)
     (; gradient_data) = cache.communication_data
-    for element in eachelement(mesh, solver, cache)
+    for element in eachelement(solver, cache)
         gradient_data[element] = T8codeGradientContainer(ntuple(v -> get_node_coords(reconstruction_gradient_limited,
                                                                                      equations,
                                                                                      solver,

@@ -43,7 +43,8 @@ Base.summary(io::IO, solver::FV) = print(io, "FV(order=$(solver.order))")
 
 @inline Base.real(solver::FV{RealT}) where {RealT} = RealT
 
-@inline ndofs(mesh, solver::FV, cache) = nelements(mesh, solver, cache)
+@inline ndofs(mesh, solver::FV, cache) = ndofs(solver, cache)
+@inline ndofs(solver::FV, cache) = nelements(solver, cache)
 
 @inline nelements(mesh::T8codeMesh, solver::FV, cache) = nelements(solver, cache)
 @inline nelements(solver::FV, cache) = nelements(cache.elements)
@@ -51,8 +52,8 @@ Base.summary(io::IO, solver::FV) = print(io, "FV(order=$(solver.order))")
     nelementsglobal(mesh, solver, cache)
 end
 
-@inline function eachelement(mesh, solver::FV, cache)
-    Base.OneTo(nelements(mesh, solver, cache))
+@inline function eachelement(solver::FV, cache)
+    Base.OneTo(nelements(solver, cache))
 end
 
 @inline eachinterface(solver::FV, cache) = Base.OneTo(ninterfaces(solver, cache))
@@ -63,7 +64,7 @@ end
     if mpi_isparallel()
         Int(t8_forest_get_global_num_elements(mesh.forest))
     else
-        nelements(mesh, solver, cache)
+        nelements(solver, cache)
     end
 end
 
@@ -101,7 +102,7 @@ function allocate_coefficients(mesh::T8codeMesh, equations, solver::FV, cache)
     # We must allocate a `Vector` in order to be able to `resize!` it (AMR).
     # cf. wrap_array
     zeros(eltype(cache.elements),
-          nvariables(equations) * nelements(mesh, solver, cache))
+          nvariables(equations) * nelements(solver, cache))
 end
 
 # General fallback
@@ -117,15 +118,15 @@ end
                                    solver::FV, cache)
     @boundscheck begin
         @assert length(u_ode) ==
-                nvariables(equations) * nelements(mesh, solver, cache)
+                nvariables(equations) * nelements(solver, cache)
     end
     unsafe_wrap(Array{eltype(u_ode), 2}, pointer(u_ode),
-                (nvariables(equations), nelements(mesh, solver, cache)))
+                (nvariables(equations), nelements(solver, cache)))
 end
 
 function compute_coefficients!(u, func, t, mesh::T8codeMesh,
                                equations, solver::FV, cache)
-    for element in eachelement(mesh, solver, cache)
+    for element in eachelement(solver, cache)
         x_node = get_node_coords(cache.elements.midpoint, equations, solver, element)
         u_node = func(x_node, t, equations)
         set_node_vars!(u, u_node, equations, solver, element)
@@ -214,7 +215,7 @@ function rhs!(du, u, t, mesh::T8codeMesh, equations,
     end
 
     @trixi_timeit timer() "volume" begin
-        for element in eachelement(mesh, solver, cache)
+        for element in eachelement(solver, cache)
             volume = cache.elements.volume[element]
             for v in eachvariable(equations)
                 du[v, element] = (1 / volume) * du[v, element]
@@ -261,7 +262,7 @@ function calc_gradient_reconstruction!(u, mesh::T8codeMesh{2}, equations, solver
     r = 4
     epsilon = 1.0e-13
 
-    for element in eachelement(mesh, solver, cache)
+    for element in eachelement(solver, cache)
         # The actual number of used stencils is `n_stencil_neighbors + 1`, since the full stencil is additionally used once.
         if solver.extended_reconstruction_stencil
             # Number of faces = Number of corners
@@ -448,7 +449,7 @@ function calc_gradient_reconstruction!(u, mesh::T8codeMesh{3}, equations, solver
     r = 4
     epsilon = 1.0e-13
 
-    for element in eachelement(mesh, solver, cache)
+    for element in eachelement(solver, cache)
         # The actual number of used stencils is `n_stencil_neighbors + 1`, since the full stencil is additionally used once.
         if solver.extended_reconstruction_stencil
             # Number of faces = Number of corners
@@ -925,7 +926,7 @@ end
 
 function calc_sources!(du, u, t, source_terms, mesh::T8codeMesh,
                        equations::AbstractEquations, solver::FV, cache)
-    @threaded for element in eachelement(mesh, solver, cache)
+    @threaded for element in eachelement(solver, cache)
         u_local = get_node_vars(u, equations, solver, element)
         x_local = get_node_coords(cache.elements.midpoint, equations, solver, element)
         du_local = source_terms(u_local, x_local, t, equations)

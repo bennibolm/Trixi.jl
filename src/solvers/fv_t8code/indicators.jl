@@ -18,10 +18,10 @@ end
 function (indicator_max::IndicatorMax)(u, mesh, equations, solver::FV, cache;
                                        kwargs...)
     @unpack alpha, indicator_threaded = indicator_max.cache
-    resize!(alpha, nelements(mesh, solver, cache))
+    resize!(alpha, nelements(solver, cache))
     indicator_variable = indicator_max.variable
 
-    @threaded for element in eachelement(mesh, solver, cache)
+    @threaded for element in eachelement(solver, cache)
         indicator = indicator_threaded[Threads.threadid()]
 
         u_local = get_node_vars(u, equations, solver, element)
