@@ -850,7 +850,8 @@ function prolong2mortars!(cache, mesh::T8codeMesh, equations, solver::FV)
             end
         elseif solver.order == 2
             face_element_large = mortars.faces[end, mortar]
-            # TODO das hier macht so keinen sinn!
+            # TODO: Using this face midpoint for the reconstruction doesn't make sense.
+            # The alternative to use the small element's face midpoint isn't possible for periodic meshes.
             face_midpoint_element_large = domain_data[element_large].face_midpoints[face_element_large]
             midpoint_element_large = domain_data[element_large].midpoint
 
@@ -952,8 +953,8 @@ end
 function SolutionAnalyzer(solver::FV; kwargs...)
 end
 
-# TODO
-AdaptorAMR(mesh, solver::FV) = nothing # AdaptorL2(LobattoLegendreBasis(0))
+# For FV, there is no projection needed.
+AdaptorAMR(mesh, solver::FV) = nothing
 
 function create_cache_analysis(analyzer, mesh,
                                equations, solver::FV, cache,
