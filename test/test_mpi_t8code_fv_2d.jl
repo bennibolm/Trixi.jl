@@ -41,6 +41,24 @@ const EXAMPLES_DIR = pkgdir(Trixi, "examples", "t8code_2d_fv")
                 @test (@allocated Trixi.rhs!(du_ode, u_ode, semi, t)) < 1000
             end
         end
+        @trixi_testset "second-order FV, triangles" begin
+            @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_advection_basic.jl"),
+                                element_class=:triangle,
+                                coordinates_min=(-1.0, -1.0),
+                                coordinates_max=(1.0, 1.0),
+                                # TODO: Check this. Somehow, the errors (especially for linf) are smaller from the serial runs.
+                                # Are the errors calculated correctly?
+                                l2=[0.0025755638799824436],
+                                linf=[0.03718084126103127])
+            # Ensure that we do not have excessive memory allocations
+            # (e.g., from type instabilities)
+            let
+                t = sol.t[end]
+                u_ode = sol.u[end]
+                du_ode = similar(u_ode)
+                @test (@allocated Trixi.rhs!(du_ode, u_ode, semi, t)) < 1000
+            end
+        end
         # The extended reconstruction stencil is currently not mpi parallel.
         # The current version runs through but an error occurs on some rank.
     end
