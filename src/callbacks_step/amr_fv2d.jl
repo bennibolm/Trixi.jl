@@ -8,8 +8,6 @@
 function refine_element!(u::AbstractArray{<:Any, 2}, element_id,
                          old_u, old_element_id,
                          adaptor::Nothing, equations, solver::FV)
-    # @unpack forward_upper, forward_lower = adaptor
-
     # Store new element ids
     lower_left_id = element_id
     lower_right_id = element_id + 1
@@ -24,23 +22,6 @@ function refine_element!(u::AbstractArray{<:Any, 2}, element_id,
         @assert size(u, 1) == nvariables(equations)
         @assert size(u, 2) >= element_id + 3
     end
-    # @info "" forward_lower forward_upper
-
-    # # Interpolate to lower left element
-    # acc = get_node_vars(old_u, equations, solver, old_element_id) * forward_lower[1, 1] * forward_lower[1, 1]
-    # set_node_vars!(u, acc, equations, solver, lower_left_id)
-
-    # # Interpolate to lower right element
-    # acc = get_node_vars(old_u, equations, solver, old_element_id) * forward_upper[1, 1] * forward_lower[1, 1]
-    # set_node_vars!(u, acc, equations, solver, lower_right_id)
-
-    # # Interpolate to upper left element
-    # acc = get_node_vars(old_u, equations, solver, old_element_id) * forward_lower[1, 1] * forward_upper[1, 1]
-    # set_node_vars!(u, acc, equations, solver, upper_left_id)
-
-    # # Interpolate to upper right element
-    # acc = get_node_vars(old_u, equations, solver, old_element_id) * forward_upper[1, 1] * forward_upper[1, 1]
-    # set_node_vars!(u, acc, equations, solver, upper_right_id)
 
     u_local = get_node_vars(old_u, equations, solver, old_element_id)
     set_node_vars!(u, u_local, equations, solver, lower_left_id)
@@ -55,8 +36,6 @@ function coarsen_elements!(u::AbstractArray{<:Any, 2}, element_id,
                            old_u, old_element_id,
                            adaptor::Nothing, equations::AbstractEquations{2},
                            solver::FV)
-    # @unpack reverse_upper, reverse_lower = adaptor
-
     # Store old element ids
     lower_left_id = old_element_id
     lower_right_id = old_element_id + 1
@@ -72,19 +51,17 @@ function coarsen_elements!(u::AbstractArray{<:Any, 2}, element_id,
         @assert size(u, 2) >= element_id
     end
 
-    acc = zero(get_node_vars(u, equations, solver, element_id))
-
     # Project from lower left element
-    acc += get_node_vars(old_u, equations, solver, lower_left_id) #* reverse_lower[1, 1] * reverse_lower[1, 1]
+    acc = get_node_vars(old_u, equations, solver, lower_left_id)
 
     # Project from lower right element
-    acc += get_node_vars(old_u, equations, solver, lower_right_id) #* reverse_upper[1, 1] * reverse_lower[1, 1]
+    acc += get_node_vars(old_u, equations, solver, lower_right_id)
 
     # Project from upper left element
-    acc += get_node_vars(old_u, equations, solver, upper_left_id) #* reverse_lower[1, 1] * reverse_upper[1, 1]
+    acc += get_node_vars(old_u, equations, solver, upper_left_id)
 
     # Project from upper right element
-    acc += get_node_vars(old_u, equations, solver, upper_right_id) #* reverse_upper[1, 1] * reverse_upper[1, 1]
+    acc += get_node_vars(old_u, equations, solver, upper_right_id)
 
     # Update value
     set_node_vars!(u, 1 / 4 * acc, equations, solver, element_id)
