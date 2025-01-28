@@ -9,7 +9,7 @@ function reinitialize_containers!(mesh::T8codeMesh, equations, solver::FV, cache
     # Re-initialize elements container.
     @unpack elements = cache
     resize!(elements, ncells(mesh))
-    init_elements!(elements, mesh, solver)
+    init_elements!(elements, mesh, equations, solver)
 
     count_required_surfaces!(mesh)
     # Resize interfaces container.
@@ -209,12 +209,12 @@ function init_elements(mesh::T8codeMesh{NDIMS, RealT},
                                                                _reconstruction_gradient,
                                                                _reconstruction_gradient_limited)
 
-    init_elements!(elements, mesh, solver)
+    init_elements!(elements, mesh, equations, solver)
 
     return elements
 end
 
-function init_elements!(elements, mesh::T8codeMesh, solver::FV)
+function init_elements!(elements, mesh::T8codeMesh, equations, solver::FV)
     (; forest) = mesh
 
     n_dims = ndims(mesh)
@@ -284,13 +284,14 @@ function init_elements!(elements, mesh::T8codeMesh, solver::FV)
 
     # Init stencil for reconstruction
     if solver.extended_reconstruction_stencil
-        init_extended_reconstruction_stencil!(corners, elements, solver)
+        init_extended_reconstruction_stencil!(corners, elements, equations, solver)
     end
 
     return nothing
 end
 
-@inline function init_extended_reconstruction_stencil!(corners, elements, solver::FV)
+@inline function init_extended_reconstruction_stencil!(corners, elements, equations,
+                                                       solver::FV)
     if solver.order != 2
         return nothing
     end
@@ -312,16 +313,20 @@ end
         for possible_stencil_neighbor in (element + 1):length(volume)
             # loop over all corners of `element`
             for corner in 1:num_faces[element]
-                corner_coords = view(corners, :, corner, element)
+                corner_coords = get_node_coords(corners, equations, solver, corner,
+                                                element)
                 # loop over all corners of `possible_stencil_neighbor`
                 for possible_corner in 1:num_faces[possible_stencil_neighbor]
-                    possible_corner_coords = view(corners, :, possible_corner,
-                                                  possible_stencil_neighbor)
+                    possible_corner_coords = get_node_coords(corners, equations, solver,
+                                                             possible_corner,
+                                                             possible_stencil_neighbor)
                     if corner_coords == possible_corner_coords
                         neighbor = possible_stencil_neighbor
 
-                        midpoint_element = view(elements.midpoint, :, element)
-                        midpoint_neighbor = view(elements.midpoint, :, neighbor)
+                        midpoint_element = get_node_coords(elements.midpoint, equations,
+                                                           solver, element)
+                        midpoint_neighbor = get_node_coords(elements.midpoint,
+                                                            equations, solver, neighbor)
 
                         distance = midpoint_neighbor .- midpoint_element
                         append!(reconstruction_stencil[element], neighbor)

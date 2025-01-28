@@ -5,8 +5,6 @@ using Trixi
 
 include("test_trixi.jl")
 
-# I added this temporary test file for constantly testing while developing.
-# The tests have to be adapted at the end.
 EXAMPLES_DIR = joinpath(examples_dir(), "t8code_3d_fv")
 
 # Start with a clean environment: remove Trixi.jl output directory if it exists
