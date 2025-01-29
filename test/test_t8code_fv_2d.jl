@@ -62,8 +62,9 @@ mkdir(outdir)
                             element_class=:triangle,
                             coordinates_min=(-1.0, -1.0),
                             coordinates_max=(1.0, 1.0),
-                            l2=[0.0028006731408955366],
-                            linf=[0.11650772088083539])
+                            cfl=0.8,
+                            l2=[0.0022204921385198077],
+                            linf=[0.006858797853704468])
         # Ensure that we do not have excessive memory allocations
         # (e.g., from type instabilities)
         let

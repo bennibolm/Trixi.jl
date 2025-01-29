@@ -46,10 +46,9 @@ const EXAMPLES_DIR = pkgdir(Trixi, "examples", "t8code_2d_fv")
                                 element_class=:triangle,
                                 coordinates_min=(-1.0, -1.0),
                                 coordinates_max=(1.0, 1.0),
-                                # TODO: Check this. Somehow, the errors (especially for linf) are smaller from the serial runs.
-                                # Are the errors calculated correctly?
-                                l2=[0.0025755638799824436],
-                                linf=[0.03718084126103127])
+                                cfl=0.8,
+                                l2=[0.0022204486774251666],
+                                linf=[0.006855900757220645])
             # Ensure that we do not have excessive memory allocations
             # (e.g., from type instabilities)
             let
