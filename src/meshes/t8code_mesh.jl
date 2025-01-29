@@ -540,37 +540,96 @@ function T8codeMesh(trees_per_dimension, element_class;
     do_partition = 0
     cmesh = t8_cmesh_new()
 
+    num_trees_for_hypercube = Dict(:quad => 1, :hex => 1, :triangle => 2)
+
+    @assert element_class in keys(num_trees_for_hypercube) "element_class has to be a Symbol out of $(keys(num_trees_for_hypercube))"
+
+    # TODO: For now: Same number of trees per dimension.
     @assert(allequal(trees_per_dimension),
             "Different trees per dimensions are not supported for quad mesh. `trees_per_dimension`: $trees_per_dimension")
-    num_trees = prod(trees_per_dimension) * 1 # 1 = number of trees for single hypercube with quads
+    num_trees = prod(trees_per_dimension) * num_trees_for_hypercube[element_class]
 
-    vertices_per_tree = 2^NDIMS # number of vertices (=corners) in one tree
-    vertices = Vector{Cdouble}(undef, 3 * vertices_per_tree * num_trees) # 3 (dimensions) * vertices_per_tree) * num_trees
+    # TODO: Allow tuple with different eclasses
+    # if element_class isa Symbol
+    #     element_class = ntuple(_ -> element_class, num_trees)
+    # end
+
+    # TODO: It isn't easily possible with t8code to create arbitrary hybrid meshes with arbitrarynumber of trees.
+    # Therefore, this routines are hardcoded to only quad/hex meshes with 1x1 (1x1x1) or 2x2 (2x2x2) trees.
+    vertices_per_eclass = Dict(((:quad, :hex) .=> 2^NDIMS)..., :triangle => 3)
+
+    # TODO: Allow tuple
+    # vertices_per_tree = getindex.(Ref(vertices_per_eclass), element_class)
+    vertices_per_tree = vertices_per_eclass[element_class]
+
+    vertices = Vector{Cdouble}(undef, 3 * vertices_per_tree * num_trees)
+
+    @assert element_class in [:quad, :hex, :triangle] &&
+            trees_per_dimension in [(1, 1), (2, 2), (1, 1, 1), (2, 2, 2)]
     if NDIMS == 2
         coordinates_tree_x = range(-1.0, 1.0, length = trees_per_dimension[1] + 1)
         coordinates_tree_y = range(-1.0, 1.0, length = trees_per_dimension[2] + 1)
 
         for itree_y in 1:trees_per_dimension[2], itree_x in 1:trees_per_dimension[1]
-            index = trees_per_dimension[1] * 3 * vertices_per_tree * (itree_y - 1) +
-                    3 * vertices_per_tree * (itree_x - 1) + 1
-            vertices[index] = coordinates_tree_x[itree_x]
-            vertices[index + 1] = coordinates_tree_y[itree_y]
-            vertices[index + 2] = 0.0
+            # itree = (itree_y - 1) * trees_per_dimension[2] + itree_x
+            # vertices_tree = vertices_per_tree[itree]
 
-            index += 3
-            vertices[index] = coordinates_tree_x[itree_x + 1]
-            vertices[index + 1] = coordinates_tree_y[itree_y]
-            vertices[index + 2] = 0.0
+            if element_class == :quad
+                index = trees_per_dimension[1] * 3 * vertices_per_tree * (itree_y - 1) +
+                        3 * vertices_per_tree * (itree_x - 1) + 1
+                vertices[index] = coordinates_tree_x[itree_x]
+                vertices[index + 1] = coordinates_tree_y[itree_y]
+                vertices[index + 2] = 0.0
 
-            index += 3
-            vertices[index] = coordinates_tree_x[itree_x]
-            vertices[index + 1] = coordinates_tree_y[itree_y + 1]
-            vertices[index + 2] = 0.0
+                index += 3
+                vertices[index] = coordinates_tree_x[itree_x + 1]
+                vertices[index + 1] = coordinates_tree_y[itree_y]
+                vertices[index + 2] = 0.0
 
-            index += 3
-            vertices[index] = coordinates_tree_x[itree_x + 1]
-            vertices[index + 1] = coordinates_tree_y[itree_y + 1]
-            vertices[index + 2] = 0.0
+                index += 3
+                vertices[index] = coordinates_tree_x[itree_x]
+                vertices[index + 1] = coordinates_tree_y[itree_y + 1]
+                vertices[index + 2] = 0.0
+
+                index += 3
+                vertices[index] = coordinates_tree_x[itree_x + 1]
+                vertices[index + 1] = coordinates_tree_y[itree_y + 1]
+                vertices[index + 2] = 0.0
+            elseif element_class == :triangle
+                # Add vertices of two trees
+                # First tree
+                index = trees_per_dimension[1] * 3 * 2 * vertices_per_tree * (itree_y - 1) +
+                        3 * 2 * vertices_per_tree * (itree_x - 1) + 1
+                vertices[index] = coordinates_tree_x[itree_x]
+                vertices[index + 1] = coordinates_tree_y[itree_y]
+                vertices[index + 2] = 0.0
+
+                index += 3
+                vertices[index] = coordinates_tree_x[itree_x + 1]
+                vertices[index + 1] = coordinates_tree_y[itree_y]
+                vertices[index + 2] = 0.0
+
+                index += 3
+                vertices[index] = coordinates_tree_x[itree_x + 1]
+                vertices[index + 1] = coordinates_tree_y[itree_y + 1]
+                vertices[index + 2] = 0.0
+
+                # Second tree
+                index += 3
+                vertices[index] = coordinates_tree_x[itree_x]
+                vertices[index + 1] = coordinates_tree_y[itree_y]
+                vertices[index + 2] = 0.0
+
+                index += 3
+                vertices[index] = coordinates_tree_x[itree_x + 1]
+                vertices[index + 1] = coordinates_tree_y[itree_y + 1]
+                vertices[index + 2] = 0.0
+
+                index += 3
+                vertices[index] = coordinates_tree_x[itree_x]
+                vertices[index + 1] = coordinates_tree_y[itree_y + 1]
+                vertices[index + 2] = 0.0
+            end
         end
     elseif NDIMS == 3
         coordinates_tree_x = range(-1.0, 1.0, length = trees_per_dimension[1] + 1)
@@ -628,7 +687,6 @@ function T8codeMesh(trees_per_dimension, element_class;
     end
 
     analytical = trixi_t8_mapping_c(mapping)
-    # analytical = mapping
     name = ""
     user_data = vertices
     # user_data = C_NULL
@@ -644,10 +702,12 @@ function T8codeMesh(trees_per_dimension, element_class;
 
     t8_cmesh_register_geometry(cmesh, geometry)
 
-    element_classes = Dict(:quad => T8_ECLASS_QUAD,
-                           :triangle => T8_ECLASS_TRIANGLE,
-                           :hex => T8_ECLASS_HEX)
-    element_class_t8 = element_classes[element_class]
+    element_classes_t8 = Dict(:quad => T8_ECLASS_QUAD,
+                              :triangle => T8_ECLASS_TRIANGLE,
+                              :hex => T8_ECLASS_HEX)
+    # TODO: Allow tuple
+    # element_class_t8 = getindex.(Ref(element_classes_t8), element_class)
+    element_class_t8 = element_classes_t8[element_class]
     for itree in 1:num_trees
         offset_vertices = 3 * vertices_per_tree * (itree - 1)
         t8_cmesh_set_tree_class(cmesh, itree - 1, element_class_t8)
@@ -656,33 +716,62 @@ function T8codeMesh(trees_per_dimension, element_class;
                                    vertices_per_tree)
     end
 
+    # Note and TODO:
+    # Only works for quads and hex and hardcoded to `trees_per_dimension = (1, 1) or (2, 2)`
     if NDIMS == 2
-        # Note and TODO:
-        # Only hardcoded to `trees_per_dimension = (1, 1) or (2, 2)`
-        if num_trees == 1
-            if periodicity[1]
-                t8_cmesh_set_join(cmesh, 0, 0, 0, 1, 0)
+        if trees_per_dimension == (1, 1)
+            if element_class == :quad
+                if periodicity[1]
+                    t8_cmesh_set_join(cmesh, 0, 0, 0, 1, 0)
+                end
+                if periodicity[2]
+                    t8_cmesh_set_join(cmesh, 0, 0, 2, 3, 0)
+                end
+            elseif element_class == :triangle
+                t8_cmesh_set_join(cmesh, 0, 1, 1, 2, 0)
+                if periodicity[1]
+                    t8_cmesh_set_join(cmesh, 0, 1, 0, 1, 0)
+                end
+                if periodicity[2]
+                    t8_cmesh_set_join(cmesh, 0, 1, 2, 0, 1)
+                end
             end
-            if periodicity[2]
-                t8_cmesh_set_join(cmesh, 0, 0, 2, 3, 0)
+        elseif trees_per_dimension == (2, 2)
+            if element_class == :quad
+                if periodicity[1]
+                    t8_cmesh_set_join(cmesh, 0, 1, 0, 1, 0)
+                    t8_cmesh_set_join(cmesh, 2, 3, 0, 1, 0)
+                end
+                if periodicity[2]
+                    t8_cmesh_set_join(cmesh, 0, 2, 2, 3, 0)
+                    t8_cmesh_set_join(cmesh, 1, 3, 2, 3, 0)
+                end
+                t8_cmesh_set_join_by_stash(cmesh, C_NULL, 0)
+            elseif element_class == :triangle
+                t8_cmesh_set_join(cmesh, 0, 1, 1, 2, 0)
+                t8_cmesh_set_join(cmesh, 0, 3, 0, 1, 0)
+                t8_cmesh_set_join(cmesh, 1, 4, 0, 2, 1)
+                t8_cmesh_set_join(cmesh, 2, 3, 1, 2, 0)
+                t8_cmesh_set_join(cmesh, 3, 6, 0, 2, 1)
+                t8_cmesh_set_join(cmesh, 4, 5, 1, 2, 0)
+                t8_cmesh_set_join(cmesh, 4, 7, 0, 1, 0)
+                t8_cmesh_set_join(cmesh, 6, 7, 1, 2, 0)
+                if periodicity[1]
+                    t8_cmesh_set_join(cmesh, 1, 2, 1, 0, 0)
+                    t8_cmesh_set_join(cmesh, 5, 6, 1, 0, 0)
+                end
+                if periodicity[2]
+                    t8_cmesh_set_join(cmesh, 0, 5, 2, 0, 1)
+                    t8_cmesh_set_join(cmesh, 2, 7, 2, 0, 1)
+                end
             end
-        elseif num_trees == 4
-            if periodicity[1]
-                t8_cmesh_set_join(cmesh, 0, 1, 0, 1, 0)
-                t8_cmesh_set_join(cmesh, 2, 3, 0, 1, 0)
-            end
-            if periodicity[2]
-                t8_cmesh_set_join(cmesh, 0, 2, 2, 3, 0)
-                t8_cmesh_set_join(cmesh, 1, 3, 2, 3, 0)
-            end
-            t8_cmesh_set_join_by_stash(cmesh, C_NULL, 0)
         else
             error("Not supported trees_per_dimension")
         end
     elseif NDIMS == 3
         # Note and TODO:
         # Only hardcoded to `trees_per_dimension = (1, 1, 1) or (2, 2, 2)`
-        if num_trees == 1
+        if trees_per_dimension == (1, 1, 1)
             if periodicity[1]
                 t8_cmesh_set_join(cmesh, 0, 0, 0, 1, 0)
             end
@@ -692,7 +781,7 @@ function T8codeMesh(trees_per_dimension, element_class;
             if periodicity[3]
                 t8_cmesh_set_join(cmesh, 0, 0, 4, 5, 0)
             end
-        elseif num_trees == 8
+        elseif trees_per_dimension == (2, 2, 2)
             if periodicity[1]
                 t8_cmesh_set_join(cmesh, 0, 1, 0, 1, 0)
                 t8_cmesh_set_join(cmesh, 2, 3, 0, 1, 0)
@@ -727,6 +816,7 @@ function T8codeMesh(trees_per_dimension, element_class;
     boundary_names = fill(Symbol("---"), 2 * NDIMS, prod(trees_per_dimension))
 
     for itree in 1:t8_forest_get_num_global_trees(forest)
+        # TODO: For triangles
         if !periodicity[1]
             boundary_names[1, itree] = :x_neg
             boundary_names[2, itree] = :x_pos
