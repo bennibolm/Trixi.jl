@@ -152,6 +152,11 @@ end
 function save_mesh(semi::AbstractSemidiscretization, output_directory, timestep = 0)
     mesh, _, _, _ = mesh_equations_solver_cache(semi)
 
+    # Note: Try simple to not save the mesh file since the windows and macOS error seems to occur within the making.
+    if semi.solver isa FV
+        return ""
+    end
+
     if mesh.unsaved_changes
         # We only append the time step number to the mesh file name if it has
         # changed during the simulation due to AMR. We do not append it for
