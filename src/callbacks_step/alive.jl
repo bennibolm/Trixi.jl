@@ -98,6 +98,7 @@ function (alive_callback::AliveCallback)(integrator)
 
     # avoid re-evaluating possible FSAL stages
     u_modified!(integrator, false)
+
     return nothing
 end
 end # @muladd

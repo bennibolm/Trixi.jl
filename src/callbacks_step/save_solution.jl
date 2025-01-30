@@ -152,6 +152,11 @@ end
 function save_mesh(semi::AbstractSemidiscretization, output_directory, timestep = 0)
     mesh, _, _, _ = mesh_equations_solver_cache(semi)
 
+    # Note: Try simple to not save the mesh file since the windows and macOS error seems to occur within the making.
+    if semi.solver isa FV
+        return ""
+    end
+
     if mesh.unsaved_changes
         # We only append the time step number to the mesh file name if it has
         # changed during the simulation due to AMR. We do not append it for
@@ -257,6 +262,7 @@ function save_solution_file(u, time, dt, timestep,
                             system = "")
     @unpack output_directory, solution_variables = solution_callback
 
+    println("Start of save_solution_file")
     # Filename based on current time step
     if isempty(system)
         filename = joinpath(output_directory, @sprintf("solution_%09d.h5", timestep))
@@ -269,6 +275,7 @@ function save_solution_file(u, time, dt, timestep,
     Trixi.output_data_to_vtu(mesh, equations, solver,
                              cache.communication_data.solution_data, filename,
                              solution_variables)
+    println("End of save_solution_file")
 
     return filename
 end

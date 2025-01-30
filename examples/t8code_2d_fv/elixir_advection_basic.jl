@@ -64,7 +64,7 @@ mesh = T8codeMesh(trees_per_dimension, element_class,
 
 semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, solver)
 
-tspan = (0.0, 1.0)
+tspan = (0.0, 0.0)
 ode = semidiscretize(semi, tspan);
 
 summary_callback = SummaryCallback()
@@ -84,10 +84,12 @@ callbacks = CallbackSet(summary_callback, analysis_callback, alive_callback,
 
 ###############################################################################
 # run the simulation
-
+println("Directly before solve")
 sol = solve(ode, CarpenterKennedy2N54(williamson_condition = false),
             dt = 1.0, # solve needs some value here but it will be overwritten by the stepsize_callback
-            save_everystep = false, callback = callbacks);
+            save_everystep = false, callback = callbacks, maxiters = 0);
+println("Directly after solve")
 summary_callback()
+println("Directly after summary_callback")
 
 GC.enable(true)
