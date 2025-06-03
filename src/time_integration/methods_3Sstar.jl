@@ -49,9 +49,9 @@ end
 """
     ParsaniKetchesonDeconinck3Sstar94()
 
-Parsani, Ketcheson, Deconinck (2013)
+- Parsani, Ketcheson, Deconinck (2013)
   Optimized explicit RK schemes for the spectral difference method applied to wave propagation problems
-[DOI: 10.1137/120885899](https://doi.org/10.1137/120885899)
+  [DOI: 10.1137/120885899](https://doi.org/10.1137/120885899)
 """
 struct ParsaniKetchesonDeconinck3Sstar94 <: SimpleAlgorithm3Sstar
     gamma1::SVector{9, Float64}
@@ -100,9 +100,9 @@ end
 """
     ParsaniKetchesonDeconinck3Sstar32()
 
-Parsani, Ketcheson, Deconinck (2013)
+- Parsani, Ketcheson, Deconinck (2013)
   Optimized explicit RK schemes for the spectral difference method applied to wave propagation problems
-[DOI: 10.1137/120885899](https://doi.org/10.1137/120885899)
+  [DOI: 10.1137/120885899](https://doi.org/10.1137/120885899)
 """
 struct ParsaniKetchesonDeconinck3Sstar32 <: SimpleAlgorithm3Sstar
     gamma1::SVector{3, Float64}
@@ -145,7 +145,8 @@ function SimpleIntegrator3SstarOptions(callback, tspan; maxiters = typemax(Int),
 end
 
 mutable struct SimpleIntegrator3Sstar{RealT <: Real, uType, Params, Sol, F, Alg,
-                                      SimpleIntegrator3SstarOptions}
+                                      SimpleIntegrator3SstarOptions} <:
+               AbstractTimeIntegrator
     u::uType #
     du::uType
     u_tmp1::uType
@@ -298,7 +299,7 @@ function set_proposed_dt!(integrator::SimpleIntegrator3Sstar, dt)
     integrator.dt = dt
 end
 
-# Required e.g. for `glm_speed_callback` 
+# Required e.g. for `glm_speed_callback`
 function get_proposed_dt(integrator::SimpleIntegrator3Sstar)
     return integrator.dt
 end
