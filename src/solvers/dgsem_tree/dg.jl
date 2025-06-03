@@ -20,6 +20,7 @@ end
 # Given blending factors `alpha` and the solver `dg`, fill
 # `element_ids_dg` with the IDs of elements using a pure DG scheme and
 # `element_ids_dgfv` with the IDs of elements using a blended DG-FV scheme.
+# TODO: Only used for subcell limiting. Remove in future.
 function pure_and_blended_element_ids!(element_ids_dg, element_ids_dgfv, alpha, dg::DG,
                                        cache)
     empty!(element_ids_dg)
