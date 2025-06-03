@@ -6,29 +6,29 @@
 #! format: noindent
 
 @doc raw"""
-    IdealGlmMhdMultiIonEquations2D(; gammas, charge_to_mass, 
+    IdealGlmMhdMultiIonEquations2D(; gammas, charge_to_mass,
                                    electron_pressure = electron_pressure_zero,
                                    initial_c_h = NaN)
 
-The ideal compressible multi-ion MHD equations in two space dimensions augmented with a 
+The ideal compressible multi-ion MHD equations in two space dimensions augmented with a
 generalized Langange multipliers (GLM) divergence-cleaning technique. This is a
 multi-species variant of the ideal GLM-MHD equations for calorically perfect plasmas
-with independent momentum and energy equations for each ion species. This implementation 
+with independent momentum and energy equations for each ion species. This implementation
 assumes that the equations are non-dimensionalized such, that the vacuum permeability is ``\mu_0 = 1``.
 
-In case of more than one ion species, the specific heat capacity ratios `gammas` and the charge-to-mass 
+In case of more than one ion species, the specific heat capacity ratios `gammas` and the charge-to-mass
 ratios `charge_to_mass` should be passed as tuples, e.g., `gammas=(1.4, 1.667)`.
 
 The argument `electron_pressure` can be used to pass a function that computes the electron
 pressure as a function of the state `u` with the signature `electron_pressure(u, equations::IdealGlmMhdMultiIonEquations2D)`.
 By default, the electron pressure is zero.
 
-The argument `initial_c_h` can be used to set the GLM divergence-cleaning speed. Note that 
+The argument `initial_c_h` can be used to set the GLM divergence-cleaning speed. Note that
 `initial_c_h = 0` deactivates the divergence cleaning. The callback [`GlmSpeedCallback`](@ref)
 can be used to adjust the GLM divergence-cleaning speed according to the time-step size.
 
 References:
-- G. Toth, A. Glocer, Y. Ma, D. Najib, Multi-Ion Magnetohydrodynamics 429 (2010). Numerical 
+- G. Toth, A. Glocer, Y. Ma, D. Najib, Multi-Ion Magnetohydrodynamics 429 (2010). Numerical
   Modeling of Space Plasma Flows, 213–218.
 - A. Rueda-Ramírez, A. Sikstel, G. Gassner, An Entropy-Stable Discontinuous Galerkin Discretization
   of the Ideal Multi-Ion Magnetohydrodynamics System (2024). Journal of Computational Physics.
@@ -43,8 +43,8 @@ mutable struct IdealGlmMhdMultiIonEquations2D{NVARS, NCOMP, RealT <: Real,
                AbstractIdealGlmMhdMultiIonEquations{2, NVARS, NCOMP}
     gammas::SVector{NCOMP, RealT} # Heat capacity ratios
     charge_to_mass::SVector{NCOMP, RealT} # Charge to mass ratios
-    electron_pressure::ElectronPressure       # Function to compute the electron pressure
-    c_h::RealT                 # GLM cleaning speed
+    electron_pressure::ElectronPressure # Function to compute the electron pressure
+    c_h::RealT # GLM cleaning speed
     function IdealGlmMhdMultiIonEquations2D{NVARS, NCOMP, RealT,
                                             ElectronPressure}(gammas
                                                               ::SVector{NCOMP, RealT},
@@ -100,8 +100,8 @@ end
     initial_condition_weak_blast_wave(x, t, equations::IdealGlmMhdMultiIonEquations2D)
 
 A weak blast wave (adapted to multi-ion MHD) from
-- Hennemann, S., Rueda-Ramírez, A. M., Hindenlang, F. J., & Gassner, G. J. (2021). A provably entropy 
-  stable subcell shock capturing approach for high order split form DG for the compressible Euler equations. 
+- Hennemann, S., Rueda-Ramírez, A. M., Hindenlang, F. J., & Gassner, G. J. (2021). A provably entropy
+  stable subcell shock capturing approach for high order split form DG for the compressible Euler equations.
   Journal of Computational Physics, 426, 109935. [arXiv: 2008.12044](https://arxiv.org/abs/2008.12044).
   [DOI: 10.1016/j.jcp.2020.109935](https://doi.org/10.1016/j.jcp.2020.109935)
 """
@@ -110,7 +110,7 @@ function initial_condition_weak_blast_wave(x, t,
     # Adapted MHD version of the weak blast wave from Hennemann & Gassner JCP paper 2020 (Sec. 6.3)
     # Same discontinuity in the velocities but with magnetic fields
     # Set up polar coordinates
-    RealT = real(equations)
+    RealT = eltype(x)
     inicenter = (0, 0)
     x_norm = x[1] - inicenter[1]
     y_norm = x[2] - inicenter[2]
@@ -214,7 +214,7 @@ end
                                            orientation::Integer,
                                            equations::IdealGlmMhdMultiIonEquations2D)
 
-Entropy-conserving non-conservative two-point "flux"" as described in 
+Entropy-conserving non-conservative two-point "flux"" as described in
 - A. Rueda-Ramírez, A. Sikstel, G. Gassner, An Entropy-Stable Discontinuous Galerkin Discretization
   of the Ideal Multi-Ion Magnetohydrodynamics System (2024). Journal of Computational Physics.
   [DOI: 10.1016/j.jcp.2024.113655](https://doi.org/10.1016/j.jcp.2024.113655).
@@ -222,8 +222,8 @@ Entropy-conserving non-conservative two-point "flux"" as described in
 !!! info "Usage and Scaling of Non-Conservative Fluxes in Trixi.jl"
     The non-conservative fluxes derived in the reference above are written as the product
     of local and symmetric parts and are meant to be used in the same way as the conservative
-    fluxes (i.e., flux + flux_noncons in both volume and surface integrals). In this routine, 
-    the fluxes are multiplied by 2 because the non-conservative fluxes are always multiplied 
+    fluxes (i.e., flux + flux_noncons in both volume and surface integrals). In this routine,
+    the fluxes are multiplied by 2 because the non-conservative fluxes are always multiplied
     by 0.5 whenever they are used in the Trixi code.
 
 The term is composed of four individual non-conservative terms:
@@ -277,7 +277,7 @@ The term is composed of four individual non-conservative terms:
     f = zero(MVector{nvariables(equations), eltype(u_ll)})
 
     if orientation == 1
-        # Entries of Godunov-Powell term for induction equation (multiply by 2 because the non-conservative flux is 
+        # Entries of Godunov-Powell term for induction equation (multiply by 2 because the non-conservative flux is
         # multiplied by 0.5 whenever it's used in the Trixi code)
         f[1] = 2 * v1_plus_ll * B1_avg
         f[2] = 2 * v2_plus_ll * B1_avg
@@ -313,17 +313,17 @@ The term is composed of four individual non-conservative terms:
             # Compute GLM term for the energy
             f5 += v1_plus_ll * psi_ll * psi_avg
 
-            # Add to the flux vector (multiply by 2 because the non-conservative flux is 
+            # Add to the flux vector (multiply by 2 because the non-conservative flux is
             # multiplied by 0.5 whenever it's used in the Trixi code)
             set_component!(f, k, 0, 2 * f2, 2 * f3, 2 * f4, 2 * f5,
                            equations)
         end
-        # Compute GLM term for psi (multiply by 2 because the non-conservative flux is 
+        # Compute GLM term for psi (multiply by 2 because the non-conservative flux is
         # multiplied by 0.5 whenever it's used in the Trixi code)
         f[end] = 2 * v1_plus_ll * psi_avg
 
     else #if orientation == 2
-        # Entries of Godunov-Powell term for induction equation (multiply by 2 because the non-conservative flux is 
+        # Entries of Godunov-Powell term for induction equation (multiply by 2 because the non-conservative flux is
         # multiplied by 0.5 whenever it's used in the Trixi code)
         f[1] = 2 * v1_plus_ll * B2_avg
         f[2] = 2 * v2_plus_ll * B2_avg
@@ -360,12 +360,12 @@ The term is composed of four individual non-conservative terms:
             # Compute GLM term for the energy
             f5 += v2_plus_ll * psi_ll * psi_avg
 
-            # Add to the flux vector (multiply by 2 because the non-conservative flux is 
+            # Add to the flux vector (multiply by 2 because the non-conservative flux is
             # multiplied by 0.5 whenever it's used in the Trixi code)
             set_component!(f, k, 0, 2 * f2, 2 * f3, 2 * f4, 2 * f5,
                            equations)
         end
-        # Compute GLM term for psi (multiply by 2 because the non-conservative flux is 
+        # Compute GLM term for psi (multiply by 2 because the non-conservative flux is
         # multiplied by 0.5 whenever it's used in the Trixi code)
         f[end] = 2 * v2_plus_ll * psi_avg
     end
@@ -378,7 +378,7 @@ end
                                  equations::IdealGlmMhdMultiIonEquations2D)
 
 Central non-conservative two-point "flux", where the symmetric parts are computed with standard averages.
-The use of this term together with [`flux_central`](@ref) 
+The use of this term together with [`flux_central`](@ref)
 with [`VolumeIntegralFluxDifferencing`](@ref) yields a "standard"
 (weak-form) DGSEM discretization of the multi-ion GLM-MHD system. This flux can also be used to construct a
 standard local Lax-Friedrichs flux using `surface_flux = (flux_lax_friedrichs, flux_nonconservative_central)`.
@@ -386,8 +386,8 @@ standard local Lax-Friedrichs flux using `surface_flux = (flux_lax_friedrichs, f
 !!! info "Usage and Scaling of Non-Conservative Fluxes in Trixi"
     The central non-conservative fluxes implemented in this function are written as the product
     of local and symmetric parts, where the symmetric part is a standard average. These fluxes
-    are meant to be used in the same way as the conservative fluxes (i.e., flux + flux_noncons 
-    in both volume and surface integrals). In this routine, the fluxes are multiplied by 2 because 
+    are meant to be used in the same way as the conservative fluxes (i.e., flux + flux_noncons
+    in both volume and surface integrals). In this routine, the fluxes are multiplied by 2 because
     the non-conservative fluxes are always multiplied by 0.5 whenever they are used in the Trixi code.
 
 The term is composed of four individual non-conservative terms:
@@ -411,7 +411,7 @@ The term is composed of four individual non-conservative terms:
     mag_norm_ll = B1_ll^2 + B2_ll^2 + B3_ll^2
     mag_norm_rr = B1_rr^2 + B2_rr^2 + B3_rr^2
 
-    # Electron pressure 
+    # Electron pressure
     pe_ll = equations.electron_pressure(u_ll, equations)
     pe_rr = equations.electron_pressure(u_rr, equations)
 
@@ -764,7 +764,7 @@ function flux_ruedaramirez_etal(u_ll, u_rr, orientation::Integer,
 end
 
 # Calculate maximum wave speed for local Lax-Friedrichs-type dissipation
-# This routine approximates the maximum wave speed as sum of the maximum ion velocity 
+# This routine approximates the maximum wave speed as sum of the maximum ion velocity
 # for all species and the maximum magnetosonic speed.
 @inline function max_abs_speed_naive(u_ll, u_rr, orientation::Integer,
                                      equations::IdealGlmMhdMultiIonEquations2D)
@@ -811,9 +811,9 @@ end
     return (abs(v1) + cf_x_direction, abs(v2) + cf_y_direction)
 end
 
-# Compute the fastest wave speed for ideal multi-ion GLM-MHD equations: c_f, the fast 
+# Compute the fastest wave speed for ideal multi-ion GLM-MHD equations: c_f, the fast
 # magnetoacoustic eigenvalue. This routine computes the fast magnetosonic speed for each ion
-# species using the single-fluid MHD expressions and approximates the multi-ion c_f as 
+# species using the single-fluid MHD expressions and approximates the multi-ion c_f as
 # the maximum of these individual magnetosonic speeds.
 @inline function calc_fast_wavespeed(cons, orientation::Integer,
                                      equations::IdealGlmMhdMultiIonEquations2D)
