@@ -35,6 +35,7 @@ function pure_and_blended_element_ids!(element_ids_dg, element_ids_dgfv, alpha, 
         if dg.volume_integral isa VolumeIntegralSubcellLimiting
             tol = dg.volume_integral.limiter.threshold_smoothness_indicator
         else
+            # TODO: atol isn't even used. Since this only used for subcell limiting now, I can delete atol and this tol.
             tol = 1e-12
         end
         dg_only = isapprox(alpha[element], 0, atol = tol)
