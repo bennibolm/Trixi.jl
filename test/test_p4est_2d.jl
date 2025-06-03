@@ -230,7 +230,6 @@ end
     end
 end
 
-
 @trixi_testset "elixir_euler_free_stream_sc_subcell.jl" begin
     @test_trixi_include(joinpath(EXAMPLES_DIR,
                                  "elixir_euler_free_stream_sc_subcell.jl"),

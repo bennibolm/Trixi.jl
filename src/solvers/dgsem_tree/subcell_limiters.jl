@@ -443,7 +443,8 @@ function Base.show(io::IO, ::MIME"text/plain", limiter::SubcellLimiterMCL)
     end
 end
 
-function get_node_variable(::Val{:limiting_coefficient_rho}, u, mesh, equations, dg, cache)
+function get_node_variable(::Val{:limiting_coefficient_rho}, u,
+                           mesh, equations, dg, cache)
     (; limiter) = dg.volume_integral
     if !limiter.Plotting
         error("Activate `limiter.Plotting` to allow saving of limiting coefficients for MCL.")
@@ -452,7 +453,8 @@ function get_node_variable(::Val{:limiting_coefficient_rho}, u, mesh, equations,
     return alpha[1, ntuple(_ -> :, size(alpha, 2) + 1)...]
 end
 
-function get_node_variable(::Val{:limiting_coefficient_rho_v1}, u, mesh, equations, dg, cache)
+function get_node_variable(::Val{:limiting_coefficient_rho_v1}, u,
+                           mesh, equations, dg, cache)
     (; limiter) = dg.volume_integral
     if !limiter.Plotting
         error("Activate `limiter.Plotting` to allow saving of limiting coefficients for MCL.")
@@ -461,7 +463,8 @@ function get_node_variable(::Val{:limiting_coefficient_rho_v1}, u, mesh, equatio
     return alpha[2, ntuple(_ -> :, size(alpha, 2) + 1)...]
 end
 
-function get_node_variable(::Val{:limiting_coefficient_rho_v2}, u, mesh, equations, dg, cache)
+function get_node_variable(::Val{:limiting_coefficient_rho_v2}, u,
+                           mesh, equations, dg, cache)
     (; limiter) = dg.volume_integral
     if !limiter.Plotting
         error("Activate `limiter.Plotting` to allow saving of limiting coefficients for MCL.")
@@ -470,7 +473,8 @@ function get_node_variable(::Val{:limiting_coefficient_rho_v2}, u, mesh, equatio
     return alpha[3, ntuple(_ -> :, size(alpha, 2) + 1)...]
 end
 
-function get_node_variable(::Val{:limiting_coefficient_rho_e}, u, mesh, equations, dg, cache)
+function get_node_variable(::Val{:limiting_coefficient_rho_e}, u,
+                           mesh, equations, dg, cache)
     (; limiter) = dg.volume_integral
     if !limiter.Plotting
         error("Activate `limiter.Plotting` to allow saving of limiting coefficients for MCL.")
@@ -479,7 +483,8 @@ function get_node_variable(::Val{:limiting_coefficient_rho_e}, u, mesh, equation
     return alpha[4, ntuple(_ -> :, size(alpha, 2) + 1)...]
 end
 
-function get_node_variable(::Val{:limiting_coefficient_pressure}, u, mesh, equations, dg, cache)
+function get_node_variable(::Val{:limiting_coefficient_pressure}, u,
+                           mesh, equations, dg, cache)
     (; limiter) = dg.volume_integral
     if !limiter.Plotting
         error("Activate `limiter.Plotting` to allow saving of limiting coefficients for MCL.")
@@ -488,7 +493,8 @@ function get_node_variable(::Val{:limiting_coefficient_pressure}, u, mesh, equat
     return alpha_pressure
 end
 
-function get_node_variable(::Val{:limiting_coefficient_entropy}, u, mesh, equations, dg, cache)
+function get_node_variable(::Val{:limiting_coefficient_entropy}, u,
+                           mesh, equations, dg, cache)
     (; limiter) = dg.volume_integral
     if !limiter.Plotting
         error("Activate `limiter.Plotting` to allow saving of limiting coefficients for MCL.")
@@ -497,7 +503,8 @@ function get_node_variable(::Val{:limiting_coefficient_entropy}, u, mesh, equati
     return alpha_entropy
 end
 
-function get_node_variable(::Val{:limiting_coefficient_mean_rho}, u, mesh, equations, dg, cache)
+function get_node_variable(::Val{:limiting_coefficient_mean_rho}, u,
+                           mesh, equations, dg, cache)
     (; limiter) = dg.volume_integral
     if !limiter.Plotting
         error("Activate `limiter.Plotting` to allow saving of limiting coefficients for MCL.")
@@ -506,7 +513,8 @@ function get_node_variable(::Val{:limiting_coefficient_mean_rho}, u, mesh, equat
     return alpha_mean[1, ntuple(_ -> :, size(alpha_mean, 2) + 1)...]
 end
 
-function get_node_variable(::Val{:limiting_coefficient_mean_rho_v1}, u, mesh, equations, dg, cache)
+function get_node_variable(::Val{:limiting_coefficient_mean_rho_v1}, u,
+                           mesh, equations, dg, cache)
     (; limiter) = dg.volume_integral
     if !limiter.Plotting
         error("Activate `limiter.Plotting` to allow saving of limiting coefficients for MCL.")
@@ -515,7 +523,8 @@ function get_node_variable(::Val{:limiting_coefficient_mean_rho_v1}, u, mesh, eq
     return alpha_mean[2, ntuple(_ -> :, size(alpha_mean, 2) + 1)...]
 end
 
-function get_node_variable(::Val{:limiting_coefficient_mean_rho_v2}, u, mesh, equations, dg, cache)
+function get_node_variable(::Val{:limiting_coefficient_mean_rho_v2}, u,
+                           mesh, equations, dg, cache)
     (; limiter) = dg.volume_integral
     if !limiter.Plotting
         error("Activate `limiter.Plotting` to allow saving of limiting coefficients for MCL.")
@@ -524,7 +533,8 @@ function get_node_variable(::Val{:limiting_coefficient_mean_rho_v2}, u, mesh, eq
     return alpha_mean[3, ntuple(_ -> :, size(alpha_mean, 2) + 1)...]
 end
 
-function get_node_variable(::Val{:limiting_coefficient_mean_rho_e}, u, mesh, equations, dg, cache)
+function get_node_variable(::Val{:limiting_coefficient_mean_rho_e}, u,
+                           mesh, equations, dg, cache)
     (; limiter) = dg.volume_integral
     if !limiter.Plotting
         error("Activate `limiter.Plotting` to allow saving of limiting coefficients for MCL.")
@@ -533,7 +543,8 @@ function get_node_variable(::Val{:limiting_coefficient_mean_rho_e}, u, mesh, equ
     return alpha_mean[4, ntuple(_ -> :, size(alpha_mean, 2) + 1)...]
 end
 
-function get_node_variable(::Val{:limiting_coefficient_mean_pressure}, u, mesh, equations, dg, cache)
+function get_node_variable(::Val{:limiting_coefficient_mean_pressure}, u,
+                           mesh, equations, dg, cache)
     (; limiter) = dg.volume_integral
     if !limiter.Plotting
         error("Activate `limiter.Plotting` to allow saving of limiting coefficients for MCL.")
@@ -542,7 +553,8 @@ function get_node_variable(::Val{:limiting_coefficient_mean_pressure}, u, mesh, 
     return alpha_mean_pressure
 end
 
-function get_node_variable(::Val{:limiting_coefficient_mean_entropy}, u, mesh, equations, dg, cache)
+function get_node_variable(::Val{:limiting_coefficient_mean_entropy}, u,
+                           mesh, equations, dg, cache)
     (; limiter) = dg.volume_integral
     if !limiter.Plotting
         error("Activate `limiter.Plotting` to allow saving of limiting coefficients for MCL.")
