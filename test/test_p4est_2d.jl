@@ -176,8 +176,8 @@ end
                             2.6117996654306808e-14,
                             4.246603069191224e-14,
                             5.861977570020827e-14
-                            ],
-                            atol=2.0e-12,)
+                        ],
+                        atol=2.0e-12,)
     # Ensure that we do not have excessive memory allocations
     # (e.g., from type instabilities)
     let

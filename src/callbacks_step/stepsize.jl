@@ -83,33 +83,6 @@ end
     return nothing
 end
 
-# General case for a single semidiscretization
-function calculate_dt(u_ode, t, cfl_number, semi::AbstractSemidiscretization)
-    mesh, equations, solver, cache = mesh_equations_solver_cache(semi)
-    u = wrap_array(u_ode, mesh, equations, solver, cache)
-
-    dt = cfl_number * max_dt(u, t, mesh,
-                have_constant_speed(equations), equations,
-                semi, solver, cache, solver.volume_integral)
-end
-
-function max_dt(u, t, mesh, constant_speed, equations, semi, solver, cache,
-                volume_integral::AbstractVolumeIntegral)
-    max_dt(u, t, mesh, constant_speed, equations, solver, cache)
-end
-
-@inline function max_dt(u, t, mesh,
-                        constant_speed, equations, semi, solver, cache,
-                        volume_integral::VolumeIntegralSubcellLimiting)
-    @unpack limiter = volume_integral
-    if limiter isa SubcellLimiterIDP && !limiter.bar_states
-        return max_dt(u, t, mesh, constant_speed, equations, solver, cache)
-    else
-        return max_dt(u, t, mesh, constant_speed, equations, semi, solver, cache,
-                      limiter)
-    end
-end
-
 # Time integration methods from the DiffEq ecosystem without adaptive time stepping on their own
 # such as `CarpenterKennedy2N54` require passing `dt=...` in `solve(ode, ...)`. Since we don't have
 # an integrator at this stage but only the ODE, this method will be used there. It's called in
@@ -134,8 +107,8 @@ function calculate_dt(u_ode, t, cfl_number::Real, semi::AbstractSemidiscretizati
     u = wrap_array(u_ode, mesh, equations, solver, cache)
 
     dt = cfl_number * max_dt(u, t, mesh,
-                have_constant_speed(equations), equations,
-                solver, cache)
+                have_constant_speed(equations), semi, equations, solver, cache,
+                solver.volume_integral)
 end
 # Case for `cfl_number` as a function of time `t`.
 function calculate_dt(u_ode, t, cfl_number, semi::AbstractSemidiscretization)
@@ -143,8 +116,25 @@ function calculate_dt(u_ode, t, cfl_number, semi::AbstractSemidiscretization)
     u = wrap_array(u_ode, mesh, equations, solver, cache)
 
     dt = cfl_number(t) * max_dt(u, t, mesh,
-                have_constant_speed(equations), equations,
-                solver, cache)
+                have_constant_speed(equations), semi, equations, solver, cache,
+                solver.volume_integral)
+end
+
+function max_dt(u, t, mesh, constant_speed, semi, equations, solver, cache,
+                volume_integral::AbstractVolumeIntegral)
+    max_dt(u, t, mesh, constant_speed, equations, solver, cache)
+end
+
+@inline function max_dt(u, t, mesh,
+                        constant_speed, semi, equations, solver, cache,
+                        volume_integral::VolumeIntegralSubcellLimiting)
+    @unpack limiter = volume_integral
+    if limiter isa SubcellLimiterIDP && !limiter.bar_states
+        return max_dt(u, t, mesh, constant_speed, equations, solver, cache)
+    else
+        return max_dt(u, t, mesh, constant_speed, equations, semi, solver, cache,
+                      limiter)
+    end
 end
 
 include("stepsize_dg1d.jl")
