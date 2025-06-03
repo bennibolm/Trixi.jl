@@ -476,16 +476,16 @@ end
 @trixi_testset "elixir_euler_blast_wave_MCL.jl" begin
     @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_euler_blast_wave_MCL.jl"),
                         l2=[
-                            0.32716628280821736,
-                            0.17711362716405113,
-                            0.17710881738119433,
-                            0.6192141753914343
+                            0.32191828214715934,
+                            0.17540955611730064,
+                            0.17540982074090405,
+                            0.6191091024164918
                         ],
                         linf=[
-                            1.3147680231795071,
-                            1.1313232952582144,
-                            1.1308868661560831,
-                            2.4962119219206
+                            1.3010117741448277,
+                            1.0530533455435074,
+                            1.0526813029834023,
+                            2.485477346322933
                         ],
                         tspan=(0.0, 0.5),
                         initial_refinement_level=4,
@@ -598,16 +598,16 @@ end
     rm(joinpath("out", "alphas_min.txt"), force = true)
     @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_euler_sedov_blast_wave_MCL.jl"),
                         l2=[
-                            0.4740321851943766,
-                            0.15889871334104985,
-                            0.15889871334104988,
-                            0.6190405536267991
+                            0.4619257469360084,
+                            0.1563821055318811,
+                            0.1563821055318811,
+                            0.618809378479182
                         ],
                         linf=[
-                            4.011954283668753,
-                            1.8527131099524292,
-                            1.8527131099524277,
-                            6.465833729130187
+                            3.1267851321399522,
+                            1.4799515484572896,
+                            1.4799515484572887,
+                            6.4634390748742785
                         ],
                         tspan=(0.0, 1.0),
                         initial_refinement_level=4,
@@ -636,8 +636,8 @@ end
         # Run with coverage takes 6 time steps.
         @test startswith(lines[end], "6, 0.014")
     else
-        # Run without coverage takes 349 time steps.
-        @test startswith(lines[end], "349, 1.0, 0.0002")
+        # Run without coverage takes 346 time steps.
+        @test startswith(lines[end], "346, 1.0, 0.002")
     end
     @test count(",", lines[end]) == 13
     @test !any(occursin.(r"NaN", lines))
