@@ -25,20 +25,10 @@ function pure_and_blended_element_ids!(element_ids_dg, element_ids_dgfv, alpha, 
                                        cache)
     empty!(element_ids_dg)
     empty!(element_ids_dgfv)
-    # For `Float64`, this gives 1.8189894035458565e-12
-    # For `Float32`, this gives 1.1920929f-5
-    # RealT = eltype(alpha)
-    # TODO: atol isn't even used. Since this only used for subcell limiting now, I can delete atol and this tol.
-    # atol = max(100 * eps(RealT), eps(RealT)^convert(RealT, 0.75f0))
 
     for element in eachelement(dg, cache)
         # Clip blending factor for values close to zero (-> pure DG)
-        # if dg.volume_integral isa VolumeIntegralSubcellLimiting
-            tol = dg.volume_integral.limiter.threshold_smoothness_indicator
-        # else
-        #     error()
-        #     tol = 1e-12
-        # end
+        tol = dg.volume_integral.limiter.threshold_smoothness_indicator
         dg_only = isapprox(alpha[element], 0, atol = tol)
         if dg_only
             push!(element_ids_dg, element)
