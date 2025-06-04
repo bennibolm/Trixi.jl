@@ -415,16 +415,7 @@ end
     lines = readlines(joinpath("out", "alphas.txt"))
     @test lines[1] ==
           "# iter, simu_time, alpha_max, alpha_avg"
-    cmd = string(Base.julia_cmd())
-    coverage = occursin("--code-coverage", cmd) &&
-               !occursin("--code-coverage=none", cmd)
-    if coverage
-        # Run with coverage takes 1 time step.
-        @test occursin(r"1, 0.00404[0-9]*, 1.0, 0.96795", lines[end])
-    else
-        # Run without coverage takes 85 time steps.
-        @test startswith(lines[end], "85, 0.3, 1.0, 0.57771")
-    end
+    @test startswith(lines[end], "85, 0.3, 1.0, 0.57771")
     @test count(",", lines[end]) == 3
     @test !any(occursin.(r"NaN", lines))
     # Ensure that we do not have excessive memory allocations
@@ -683,10 +674,10 @@ end
     @test_trixi_include(joinpath(EXAMPLES_DIR,
                                  "elixir_euler_supersonic_cylinder_sc_subcell.jl"),
                         l2=[
-                            0.11085870166618325,
-                            0.23309905989870722,
+                            0.11085869686488965,
+                            0.23309903629883755,
                             0.13505351590735631,
-                            0.7932047512585592
+                            0.7932047196189057
                         ],
                         linf=[
                             2.9808773737943564,
