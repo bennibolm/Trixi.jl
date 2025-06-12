@@ -258,7 +258,8 @@ end
         end
         println(f)
         if limiter.smoothness_indicator
-            println(f, "WARNING: Smoothness indicator is activated. Bound deviations are not computed correctly. (TODO)")
+            println(f,
+                    "WARNING: Smoothness indicator is activated. Bound deviations are not computed correctly. (TODO)")
         end
     end
     # Reset local maximum deviations
@@ -287,7 +288,8 @@ end
         end
         println(f)
         if limiter.smoothness_indicator
-            println(f, "WARNING: Smoothness indicator is activated. Bound deviations are not computed correctly. (TODO)")
+            println(f,
+                    "WARNING: Smoothness indicator is activated. Bound deviations are not computed correctly. (TODO)")
         end
     end
 
