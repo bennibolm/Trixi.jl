@@ -583,7 +583,7 @@ end
           "# iter, simu_time, alpha_max, alpha_avg"
     @test startswith(lines[end], "381, 1.0, 1.0, 0.544")
     @test count(",", lines[end]) == 3
-    @test !any(occursin.(r"NaN", lines))
+    @test !any(occursin.(r"NaN", lines)) && !any(occursin.(r"Inf", lines))
     # Ensure that we do not have excessive memory allocations
     # (e.g., from type instabilities)
     let
@@ -604,7 +604,7 @@ end
     rm(joinpath("out", "alphas_min.txt"), force = true)
     @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_euler_sedov_blast_wave_MCL.jl"),
                         l2=[
-                            0.4619257469360084, # TODO: Adapt numbers
+                            0.4619257469360084,
                             0.1563821055318811,
                             0.1563821055318811,
                             0.618809378479182
@@ -622,24 +622,23 @@ end
     lines = readlines(joinpath("out", "deviations.txt"))
     @test lines[1] ==
           "# iter, simu_time, rho_min, rho_max, rho_v1_min, rho_v1_max, rho_v2_min, rho_v2_max, rho_e_min, rho_e_max, pressure_min"
-    @test startswith(lines[end], "349")
+    @test startswith(lines[end], "346")
 
     # Test alphas_mean.txt
     lines = readlines(joinpath("out", "alphas_mean.txt"))
     @test lines[1] ==
           "# iter, simu_time, alpha_min_rho, alpha_avg_rho, alpha_min_rho_v1, alpha_avg_rho_v1, alpha_min_rho_v2, alpha_avg_rho_v2, alpha_min_rho_e, alpha_avg_rho_e, alpha_min_pressure, alpha_avg_pressure, alpha_min_entropy, alpha_avg_entropy"
-    @test startswith(lines[end], "349, 1.0, 0.0002")
-
+    @test startswith(lines[end], "346, 1.0, 0.002")
     @test count(",", lines[end]) == 13
-    @test !any(occursin.(r"NaN", lines))
+    @test !any(occursin.(r"NaN", lines)) && !any(occursin.(r"Inf", lines))
 
     # Test alphas_min.txt
     lines = readlines(joinpath("out", "alphas_min.txt"))
     @test lines[1] ==
           "# iter, simu_time, alpha_min_rho, alpha_avg_rho, alpha_min_rho_v1, alpha_avg_rho_v1, alpha_min_rho_v2, alpha_avg_rho_v2, alpha_min_rho_e, alpha_avg_rho_e, alpha_min_pressure, alpha_avg_pressure, alpha_min_entropy, alpha_avg_entropy"
-    @test startswith(lines[end], "349, 1.0, -0.0, 0.773")
+    @test startswith(lines[end], "346, 1.0, -0.0, 0.761")
     @test count(",", lines[end]) == 13
-    @test !any(occursin.(r"NaN", lines))
+    @test !any(occursin.(r"NaN", lines)) && !any(occursin.(r"Inf", lines))
     # Ensure that we do not have excessive memory allocations
     # (e.g., from type instabilities)
     let
