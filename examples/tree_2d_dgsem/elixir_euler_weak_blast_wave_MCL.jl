@@ -33,11 +33,20 @@ function initial_condition_blast_wave(x, t, equations::CompressibleEulerEquation
 end
 initial_condition = initial_condition_blast_wave
 
-# Numerical fluxes
-# This combination causes entropy production in the volume, but entropy_limiter_semidiscrete with
-# volume_flux_fv = flux_lax_friedrichs causes entropy dissipation
+# Test the semidiscrete entropy fix for MCL:
+# Two setups for numerical fluxes
+# 1. Ranocha surface flux and central volume flux
 surface_flux = flux_ranocha
 volume_flux = flux_central
+# This combination causes entropy production in the volume, but entropy_limiter_semidiscrete with
+# volume_flux_fv = flux_lax_friedrichs causes entropy dissipation
+
+# 2. Ranocha surface flux and Lax-Friedrichs volume flux
+# surface_flux = flux_ranocha
+# volume_flux = flux_ranocha
+# This combination is EC for the high-order solver, but entropy_limiter_semidiscrete with
+# volume_flux_fv = flux_lax_friedrichs adds extra dissipation because it enforces a low-order Tadmor condition
+
 basis = LobattoLegendreBasis(3)
 limiter_mcl = SubcellLimiterMCL(equations, basis;
                                 density_limiter = false,
@@ -64,7 +73,7 @@ ode = semidiscretize(semi, tspan)
 
 summary_callback = SummaryCallback()
 
-analysis_interval = 1
+analysis_interval = 10
 analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
                                      save_analysis = true,
                                      output_directory = "out",
