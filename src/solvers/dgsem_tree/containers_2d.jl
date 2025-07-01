@@ -1603,7 +1603,6 @@ end
 
 nvariables(container::ContainerBarStates2D) = size(container.bar_states1, 1)
 nnodes(container::ContainerBarStates2D) = size(container.bar_states1, 3)
-ndims(container::ContainerBarStates2D) = size(container.normal_direction_xi, 1)
 
 # Only one-dimensional `Array`s are `resize!`able in Julia.
 # Hence, we use `Vector`s as internal storage and `resize!`
@@ -1613,7 +1612,7 @@ ndims(container::ContainerBarStates2D) = size(container.normal_direction_xi, 1)
 function Base.resize!(container::ContainerBarStates2D, capacity)
     n_variables = nvariables(container)
     n_nodes = nnodes(container)
-    n_dims = ndims(container)
+    n_dims = size(container.normal_direction_xi, 1)
 
     @unpack _bar_states1, _bar_states2 = container
     resize!(_bar_states1, n_variables * (n_nodes + 1) * n_nodes * capacity)
