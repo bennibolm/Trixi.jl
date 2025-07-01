@@ -345,7 +345,7 @@ function calc_normal_directions!(container_bar_states,
                                                                  contravariant_vectors,
                                                                  m, j, element)
                 end
-                for v in 1:(nvariables(equations) - 2)
+                for v in axes(normal_direction_xi, 1)
                     normal_direction_xi[v, i - 1, j, element] = normal_direction[v]
                 end
             end
@@ -360,7 +360,7 @@ function calc_normal_directions!(container_bar_states,
                                                                  contravariant_vectors,
                                                                  i, m, element)
                 end
-                for v in 1:(nvariables(equations) - 2)
+                for v in axes(normal_direction_eta, 1)
                     normal_direction_eta[v, i, j - 1, element] = normal_direction[v]
                 end
             end
