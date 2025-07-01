@@ -339,7 +339,7 @@ function calc_normal_directions!(container_bar_states,
             normal_direction = get_contravariant_vector(1, contravariant_vectors, 1, j,
                                                         element)
             for i in 2:nnodes(dg)
-                for m in 1:nnodes(dg)
+                for m in eachnode(dg)
                     normal_direction += weights[i - 1] * derivative_matrix[i - 1, m] *
                                         get_contravariant_vector(1,
                                                                  contravariant_vectors,
@@ -354,7 +354,7 @@ function calc_normal_directions!(container_bar_states,
             normal_direction = get_contravariant_vector(2, contravariant_vectors, i, 1,
                                                         element)
             for j in 2:nnodes(dg)
-                for m in 1:nnodes(dg)
+                for m in eachnode(dg)
                     normal_direction += weights[j - 1] * derivative_matrix[j - 1, m] *
                                         get_contravariant_vector(2,
                                                                  contravariant_vectors,
