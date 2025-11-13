@@ -569,7 +569,7 @@ end
                                                     mesh, i, j, k, element)
             var = u[variable, i, j, k, element]
             if var < 0
-                error("Safe low-order method produces negative value for conservative variable $variable. Try a smaller time step.")
+                throw(ArgumentError("Safe low-order method produces negative value for conservative variable $variable. Try a smaller time step."))
             end
 
             # Compute bound
