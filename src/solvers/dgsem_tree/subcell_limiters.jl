@@ -405,6 +405,10 @@ end
         if final_check(bound, goal, newton_abstol)
             break
         end
+
+        # if iter == limiter.max_iterations_newton
+        #     @warn "IDP limiter Newton-bisection: Maximum number of iterations reached without convergence."
+        # end
     end
 
     alpha[indices...] = 1 - beta # new alpha

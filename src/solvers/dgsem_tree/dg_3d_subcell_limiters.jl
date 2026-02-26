@@ -30,7 +30,8 @@ function calc_mortar_weights(equations::AbstractEquations{3},
     return mortar_weights, mortar_weights_sums
 end
 
-function calc_mortar_weights!(equations::AbstractEquations{3}, mortar_weights, n_nodes, RealT)
+function calc_mortar_weights!(equations::AbstractEquations{3}, mortar_weights, n_nodes,
+                              RealT)
     _, weights = gauss_lobatto_nodes_weights(n_nodes, RealT)
 
     # Local mortar weights are of the form: `w_(ij, kl) = int_S psi_(ij) phi_(kl) ds`,

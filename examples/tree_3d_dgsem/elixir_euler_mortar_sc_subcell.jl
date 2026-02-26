@@ -77,7 +77,8 @@ alive_callback = AliveCallback(analysis_interval = analysis_interval)
 save_solution = SaveSolutionCallback(interval = 50,
                                      save_initial_solution = true,
                                      save_final_solution = true,
-                                     solution_variables = cons2prim)
+                                     solution_variables = cons2prim,
+                                     extra_node_variables = (:limiting_coefficient,))
 
 amr_controller = ControllerThreeLevel(semi, IndicatorMax(semi, variable = first),
                                       base_level = 3,
@@ -92,8 +93,8 @@ stepsize_callback = StepsizeCallback(cfl = 0.8)
 
 callbacks = CallbackSet(summary_callback,
                         analysis_callback, alive_callback,
-                        # amr_callback,
                         save_solution,
+                        # amr_callback,
                         stepsize_callback);
 
 ###############################################################################
