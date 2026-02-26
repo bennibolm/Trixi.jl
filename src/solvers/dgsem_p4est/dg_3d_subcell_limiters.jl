@@ -60,7 +60,7 @@ end
 
 # Subcell limiting currently only implemented for certain mesh types
 @inline function volume_integral_kernel!(du, u, element,
-                                         mesh::P4estMesh{3},
+                                         mesh::Union{TreeMesh{3}, P4estMesh{3}},
                                          nonconservative_terms, equations,
                                          volume_integral::VolumeIntegralSubcellLimiting,
                                          dg::DGSEM, cache)
