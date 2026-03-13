@@ -350,7 +350,7 @@ end
 
 # Create boundaries container and initialize boundary data in `elements`.
 function init_boundaries(cell_ids, mesh::TreeMesh3D,
-                         elements::TreeElementContainer3D)
+                         elements::TreeElementContainer3D, basis)
     # Initialize container
     n_boundaries = count_required_boundaries(mesh, cell_ids)
     boundaries = TreeBoundaryContainer3D{real(elements), eltype(elements)}(n_boundaries,
@@ -358,7 +358,7 @@ function init_boundaries(cell_ids, mesh::TreeMesh3D,
                                                                            nnodes(elements))
 
     # Connect elements with boundaries
-    init_boundaries!(boundaries, elements, mesh)
+    init_boundaries!(boundaries, elements, mesh, basis)
     return boundaries
 end
 
@@ -388,7 +388,7 @@ function count_required_boundaries(mesh::TreeMesh3D, cell_ids)
 end
 
 # Initialize connectivity between elements and boundaries
-function init_boundaries!(boundaries, elements, mesh::TreeMesh3D)
+function init_boundaries!(boundaries, elements, mesh::TreeMesh3D, basis)
     # Reset boundaries count
     count = 0
 
@@ -1036,6 +1036,10 @@ function ContainerAntidiffusiveFlux3D{uEltype}(capacity::Integer, n_variables,
                                                  (n_variables, n_nodes, n_nodes, 2 * 3,
                                                   capacity))
 
+    reset_antidiffusive_fluxes!(antidiffusive_flux1_L, antidiffusive_flux1_R,
+                                antidiffusive_flux2_L, antidiffusive_flux2_R,
+                                antidiffusive_flux3_L, antidiffusive_flux3_R)
+
     return ContainerAntidiffusiveFlux3D{uEltype}(antidiffusive_flux1_L,
                                                  antidiffusive_flux1_R,
                                                  antidiffusive_flux2_L,
@@ -1108,22 +1112,28 @@ function Base.resize!(fluxes::ContainerAntidiffusiveFlux3D, capacity)
                                                         (n_variables, n_nodes, n_nodes,
                                                          2 * 3, capacity))
 
-    uEltype = eltype(fluxes.antidiffusive_flux1_L)
-    @threaded for element in axes(fluxes.antidiffusive_flux1_L, 5)
-        fluxes.antidiffusive_flux1_L[:, 1, :, :, element] .= zero(uEltype)
-        fluxes.antidiffusive_flux1_L[:, n_nodes + 1, :, :, element] .= zero(uEltype)
-        fluxes.antidiffusive_flux1_R[:, 1, :, :, element] .= zero(uEltype)
-        fluxes.antidiffusive_flux1_R[:, n_nodes + 1, :, :, element] .= zero(uEltype)
+    return nothing
+end
 
-        fluxes.antidiffusive_flux2_L[:, :, 1, :, element] .= zero(uEltype)
-        fluxes.antidiffusive_flux2_L[:, :, n_nodes + 1, :, element] .= zero(uEltype)
-        fluxes.antidiffusive_flux2_R[:, :, 1, :, element] .= zero(uEltype)
-        fluxes.antidiffusive_flux2_R[:, :, n_nodes + 1, :, element] .= zero(uEltype)
+function reset_antidiffusive_fluxes!(antidiffusive_flux1_L, antidiffusive_flux1_R,
+                                     antidiffusive_flux2_L, antidiffusive_flux2_R,
+                                     antidiffusive_flux3_L, antidiffusive_flux3_R)
+    uEltype = eltype(antidiffusive_flux1_L)
+    @threaded for element in axes(antidiffusive_flux1_L, 5)
+        antidiffusive_flux1_L[:, 1, :, :, element] .= zero(uEltype)
+        antidiffusive_flux1_L[:, end, :, :, element] .= zero(uEltype)
+        antidiffusive_flux1_R[:, 1, :, :, element] .= zero(uEltype)
+        antidiffusive_flux1_R[:, end, :, :, element] .= zero(uEltype)
 
-        fluxes.antidiffusive_flux3_L[:, :, :, 1, element] .= zero(uEltype)
-        fluxes.antidiffusive_flux3_L[:, :, :, n_nodes + 1, element] .= zero(uEltype)
-        fluxes.antidiffusive_flux3_R[:, :, :, 1, element] .= zero(uEltype)
-        fluxes.antidiffusive_flux3_R[:, :, :, n_nodes + 1, element] .= zero(uEltype)
+        antidiffusive_flux2_L[:, :, 1, :, element] .= zero(uEltype)
+        antidiffusive_flux2_L[:, :, end, :, element] .= zero(uEltype)
+        antidiffusive_flux2_R[:, :, 1, :, element] .= zero(uEltype)
+        antidiffusive_flux2_R[:, :, end, :, element] .= zero(uEltype)
+
+        antidiffusive_flux3_L[:, :, :, 1, element] .= zero(uEltype)
+        antidiffusive_flux3_L[:, :, :, end, element] .= zero(uEltype)
+        antidiffusive_flux3_R[:, :, :, 1, element] .= zero(uEltype)
+        antidiffusive_flux3_R[:, :, :, end, element] .= zero(uEltype)
     end
 
     return nothing
