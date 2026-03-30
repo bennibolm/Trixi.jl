@@ -65,7 +65,7 @@ end
 # Subcell limiting currently only implemented for certain mesh types
 function calc_volume_integral!(backend::Nothing, du, u,
                                mesh::Union{TreeMesh{2}, StructuredMesh{2},
-                                           P4estMesh{2}, P4estMesh{3}},
+                                           P4estMesh{2}, TreeMesh{3}, P4estMesh{3}},
                                have_nonconservative_terms, equations,
                                volume_integral::VolumeIntegralSubcellLimiting,
                                dg::DGSEM, cache, t, boundary_conditions)
@@ -102,7 +102,7 @@ function calc_volume_integral!(backend::Nothing, du, u,
         # Loop over pure DG elements
         @trixi_timeit timer() "pure DG" @threaded for idx_element in eachindex(element_ids_dg)
             element = element_ids_dg[idx_element]
-            flux_differencing_kernel!(du, u, element, mesh,
+            flux_differencing_kernel!(du, u, element, typeof(mesh),
                                       have_nonconservative_terms, equations,
                                       volume_integral.volume_flux_dg, dg, cache)
         end

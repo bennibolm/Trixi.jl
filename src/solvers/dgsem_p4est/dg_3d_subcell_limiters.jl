@@ -434,7 +434,7 @@ end
     return nothing
 end
 
-@inline function calc_lambdas_bar_states!(u, t, mesh::P4estMesh{3},
+@inline function calc_lambdas_bar_states!(u, t, mesh::Union{TreeMesh{3}, P4estMesh{3}},
                                           have_nonconservative_terms, equations,
                                           limiter, dg, cache, boundary_conditions;
                                           calc_bar_states = true)

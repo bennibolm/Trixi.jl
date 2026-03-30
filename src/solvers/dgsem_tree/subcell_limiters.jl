@@ -833,4 +833,20 @@ Should be used together with [`TreeMesh`](@ref) or [`StructuredMesh`](@ref).
 
     return u_outer
 end
+
+@inline function get_boundary_outer_state(u_inner, t,
+                                          boundary_condition::BoundaryConditionCharacteristic,
+                                          orientation_or_normal, direction,
+                                          mesh::Union{TreeMesh, StructuredMesh},
+                                          equations,
+                                          dg, cache, indices...)
+    (; node_coordinates) = cache.elements
+
+    x = get_node_coords(node_coordinates, equations, dg, indices...)
+    u_outer = boundary_condition.boundary_value_function(boundary_condition.outer_boundary_value_function,
+                                                         u_inner, orientation_or_normal,
+                                                         direction, x, t, equations)
+
+    return u_outer
+end
 end # @muladd
