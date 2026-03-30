@@ -817,6 +817,9 @@ time `t` and for node with spatial indices `indices` at the boundary with `orien
 and `direction`.
 
 Should be used together with [`TreeMesh`](@ref) or [`StructuredMesh`](@ref).
+
+!!! warning "Experimental implementation"
+    This is an experimental feature and may change in future releases.
 """
 @inline function get_boundary_outer_state(u_inner, t,
                                           boundary_condition::BoundaryConditionDirichlet,
