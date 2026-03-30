@@ -63,7 +63,7 @@ function create_cache(mesh::Union{TreeMesh{2}, StructuredMesh{2}, P4estMesh{2}},
 end
 
 # Subcell limiting currently only implemented for certain mesh types
-function calc_volume_integral!(du, u,
+function calc_volume_integral!(backend::Nothing, du, u,
                                mesh::Union{TreeMesh{2}, StructuredMesh{2},
                                            P4estMesh{2}, P4estMesh{3}},
                                have_nonconservative_terms, equations,
@@ -110,7 +110,7 @@ function calc_volume_integral!(du, u,
         # Loop over blended DG-FV elements
         @trixi_timeit timer() "subcell-wise blended DG-FV" @threaded for idx_element in eachindex(element_ids_dgfv)
             element = element_ids_dgfv[idx_element]
-            volume_integral_kernel!(du, u, element, mesh,
+            volume_integral_kernel!(du, u, element, typeof(mesh),
                                     have_nonconservative_terms, equations,
                                     volume_integral, limiter,
                                     dg, cache)
@@ -119,7 +119,7 @@ function calc_volume_integral!(du, u,
         # Loop over all elements
         @trixi_timeit timer() "subcell-wise blended DG-FV" @threaded for element in eachelement(dg,
                                                                                                 cache)
-            volume_integral_kernel!(du, u, element, mesh,
+            volume_integral_kernel!(du, u, element, typeof(mesh),
                                     have_nonconservative_terms, equations,
                                     volume_integral, limiter,
                                     dg, cache)
@@ -183,8 +183,9 @@ end
 end
 
 @inline function volume_integral_kernel!(du, u, element,
-                                         mesh::Union{TreeMesh{2}, StructuredMesh{2},
-                                                     P4estMesh{2}},
+                                         MeshT::Type{<:Union{TreeMesh{2},
+                                                             StructuredMesh{2},
+                                                             P4estMesh{2}}},
                                          nonconservative_terms::False, equations,
                                          volume_integral::VolumeIntegralSubcellLimiting,
                                          limiter::SubcellLimiterMCL,
@@ -198,7 +199,7 @@ end
     fhat1_R = fhat1_R_threaded[Threads.threadid()]
     fhat2_L = fhat2_L_threaded[Threads.threadid()]
     fhat2_R = fhat2_R_threaded[Threads.threadid()]
-    calcflux_fhat!(fhat1_L, fhat1_R, fhat2_L, fhat2_R, u, mesh,
+    calcflux_fhat!(fhat1_L, fhat1_R, fhat2_L, fhat2_R, u, MeshT,
                    nonconservative_terms, equations, volume_flux_dg, dg, element,
                    cache)
 
@@ -208,18 +209,18 @@ end
     fstar2_L = fstar2_L_threaded[Threads.threadid()]
     fstar1_R = fstar1_R_threaded[Threads.threadid()]
     fstar2_R = fstar2_R_threaded[Threads.threadid()]
-    calcflux_fv!(fstar1_L, fstar1_R, fstar2_L, fstar2_R, u, mesh,
+    calcflux_fv!(fstar1_L, fstar1_R, fstar2_L, fstar2_R, u, MeshT,
                  nonconservative_terms, equations, volume_flux_fv, dg, element,
                  cache)
 
     # antidiffusive flux
     calcflux_antidiffusive!(fhat1_L, fhat1_R, fhat2_L, fhat2_R,
                             fstar1_L, fstar1_R, fstar2_L, fstar2_R,
-                            u, mesh, nonconservative_terms, equations, limiter, dg,
+                            u, MeshT, nonconservative_terms, equations, limiter, dg,
                             element, cache)
 
     # limit antidiffusive flux
-    calcflux_antidiffusive_limited!(u, mesh, nonconservative_terms, equations,
+    calcflux_antidiffusive_limited!(u, MeshT, nonconservative_terms, equations,
                                     limiter, dg, element, cache,
                                     fstar1_L, fstar2_L)
 

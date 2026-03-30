@@ -711,26 +711,6 @@ function Base.show(io::IO, mime::MIME"text/plain",
     end
 end
 
-# Required to be able to run `SimpleSSPRK33` without `VolumeIntegralSubcellLimiting`
-Base.resize!(semi, volume_integral::AbstractVolumeIntegral, new_size) = nothing
-
-function Base.resize!(semi, volume_integral::VolumeIntegralSubcellLimiting, new_size)
-    # Resize container antidiffusive_fluxes
-    resize!(semi.cache.antidiffusive_fluxes, new_size)
-
-    # Resize container subcell_limiter_coefficients
-    @unpack limiter = volume_integral
-    resize!(limiter.cache.subcell_limiter_coefficients, new_size)
-
-    # Calc subcell normal directions before StepsizeCallback
-    if limiter isa SubcellLimiterMCL ||
-       (limiter isa SubcellLimiterIDP && limiter.bar_states)
-        resize!(limiter.cache.container_bar_states, new_size)
-    end
-
-    return nothing
-end
-
 function get_element_variables!(element_variables, u, mesh, equations,
                                 volume_integral::VolumeIntegralSubcellLimiting, dg,
                                 cache)
