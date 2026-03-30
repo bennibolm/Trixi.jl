@@ -180,11 +180,11 @@ function rhs!(du, u, t,
     return nothing
 end
 
-function calc_volume_integral!(du, u, mesh,
+function calc_volume_integral!(backend::Nothing, du, u, mesh,
                                nonconservative_terms, equations,
                                volume_integral::AbstractVolumeIntegral,
                                dg, cache, t, boundary_conditions)
-    calc_volume_integral!(du, u, mesh,
+    calc_volume_integral!(backend, du, u, mesh,
                           nonconservative_terms, equations,
                           volume_integral, dg, cache)
 
