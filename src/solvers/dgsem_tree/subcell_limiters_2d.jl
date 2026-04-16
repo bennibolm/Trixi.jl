@@ -13,7 +13,8 @@
 # Calculation of local bounds using low-order FV solution
 
 @inline function calc_bounds_twosided!(var_min, var_max, variable,
-                                       u::AbstractArray{<:Any, 4}, t, semi, equations)
+                                       u::AbstractArray{<:Any, 4}, t,
+                                       semi, equations)
     mesh, _, dg, cache = mesh_equations_solver_cache(semi)
     # Calc bounds inside elements
     @threaded for element in eachelement(dg, cache)
@@ -47,18 +48,25 @@
         end
     end
 
-    # Values at element boundary
-    calc_bounds_twosided_interface!(var_min, var_max, variable,
-                                    u, t, semi, mesh, equations)
+    # Calc bounds at element interfaces and periodic boundaries
+    calc_bounds_twosided_interface!(var_min, var_max, variable, u,
+                                    semi, mesh, equations)
+
+    # Calc bounds at mortars
+    calc_bounds_twosided_mortar!(var_min, var_max, variable, u, semi, mesh)
+
+    # Calc bounds at physical boundaries
+    (; boundary_conditions) = semi
+    calc_bounds_twosided_boundary!(var_min, var_max, variable, u, t,
+                                   boundary_conditions,
+                                   mesh, equations, dg, cache)
     return nothing
 end
 
-@inline function calc_bounds_twosided_interface!(var_min, var_max, variable,
-                                                 u, t, semi, mesh::TreeMesh2D,
-                                                 equations)
+@inline function calc_bounds_twosided_interface!(var_min, var_max, variable, u,
+                                                 semi, mesh::TreeMesh2D, equations)
     _, _, dg, cache = mesh_equations_solver_cache(semi)
 
-    # Calc bounds at interfaces and periodic boundaries
     for interface in eachinterface(dg, cache)
         # Get neighboring element ids
         left_element = cache.interfaces.neighbor_ids[1, interface]
@@ -92,7 +100,13 @@ end
         end
     end
 
-    # Calc bounds at mortars
+    return nothing
+end
+
+@inline function calc_bounds_twosided_mortar!(var_min, var_max, variable, u,
+                                              semi, mesh::TreeMesh2D)
+    _, _, dg, cache = mesh_equations_solver_cache(semi)
+
     # TODO: How to include values at mortar interfaces?
     # - For LobattoLegendreMortarIDP: include only values of nodes with nonnegative local weights
     # - For LobattoLegendreMortarL2: include all neighboring values (TODO?)
@@ -189,12 +203,6 @@ end
         end
     end
 
-    # Calc bounds at physical boundaries
-    (; boundary_conditions) = semi
-    calc_bounds_twosided_boundary!(var_min, var_max, variable, u, t,
-                                   boundary_conditions,
-                                   mesh, equations, dg, cache)
-
     return nothing
 end
 
@@ -238,7 +246,8 @@ end
 end
 
 @inline function calc_bounds_onesided!(var_minmax, min_or_max, variable,
-                                       u::AbstractArray{<:Any, 4}, t, semi)
+                                       u::AbstractArray{<:Any, 4}, t,
+                                       semi)
     mesh, equations, dg, cache = mesh_equations_solver_cache(semi)
 
     # The approach used in `calc_bounds_twosided!` is not used here because it requires more
@@ -279,17 +288,26 @@ end
         end
     end
 
-    # Values at element boundary
-    calc_bounds_onesided_interface!(var_minmax, min_or_max, variable, u, t, semi, mesh)
+    # Calc bounds at element interfaces and periodic boundaries
+    calc_bounds_onesided_interface!(var_minmax, min_or_max, variable, u,
+                                    semi, mesh)
+
+    # Calc bounds at mortars
+    calc_bounds_onesided_mortar!(var_minmax, min_or_max, variable, u, semi, mesh)
+
+    # Calc bounds at physical boundaries
+    (; boundary_conditions) = semi
+    calc_bounds_onesided_boundary!(var_minmax, min_or_max, variable, u, t,
+                                   boundary_conditions,
+                                   mesh, equations, dg, cache)
 
     return nothing
 end
 
-@inline function calc_bounds_onesided_interface!(var_minmax, min_or_max, variable, u, t,
+@inline function calc_bounds_onesided_interface!(var_minmax, min_or_max, variable, u,
                                                  semi, mesh::TreeMesh2D)
     _, equations, dg, cache = mesh_equations_solver_cache(semi)
 
-    # Calc bounds at interfaces and periodic boundaries
     for interface in eachinterface(dg, cache)
         # Get neighboring element ids
         left_element = cache.interfaces.neighbor_ids[1, interface]
@@ -322,7 +340,13 @@ end
         end
     end
 
-    # Calc bounds at mortars
+    return nothing
+end
+
+@inline function calc_bounds_onesided_mortar!(var_minmax, min_or_max, variable, u,
+                                              semi, mesh::TreeMesh2D)
+    _, equations, dg, cache = mesh_equations_solver_cache(semi)
+
     # TODO: How to include values at mortar interfaces?
     # See comment above two-sided version
     l2_mortars = dg.mortar isa LobattoLegendreMortarL2
@@ -412,12 +436,6 @@ end
             end
         end
     end
-
-    # Calc bounds at physical boundaries
-    (; boundary_conditions) = semi
-    calc_bounds_onesided_boundary!(var_minmax, min_or_max, variable, u, t,
-                                   boundary_conditions,
-                                   mesh, equations, dg, cache)
 
     return nothing
 end
@@ -526,8 +544,8 @@ end
 ##############################################################################
 # Local minimum or maximum limiting of nonlinear variables
 
-@inline function idp_local_onesided!(alpha, limiter, u::AbstractArray{<:Real, 4}, t, dt,
-                                     semi, variable, min_or_max)
+@inline function idp_local_onesided!(alpha, limiter, u::AbstractArray{<:Real, 4},
+                                     t, dt, semi, variable, min_or_max)
     mesh, equations, dg, cache = mesh_equations_solver_cache(semi)
     (; variable_bounds) = limiter.cache.subcell_limiter_coefficients
     var_minmax = variable_bounds[Symbol(string(variable), "_", string(min_or_max))]
