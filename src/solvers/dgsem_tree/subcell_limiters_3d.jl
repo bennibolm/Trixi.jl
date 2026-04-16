@@ -76,12 +76,14 @@ end
                                                  semi, mesh::TreeMesh3D, equations)
     _, _, dg, cache = mesh_equations_solver_cache(semi)
 
+    (; neighbor_ids, orientations) = cache.interfaces
+
     for interface in eachinterface(dg, cache)
         # Get neighboring element ids
-        left_element = cache.interfaces.neighbor_ids[1, interface]
-        right_element = cache.interfaces.neighbor_ids[2, interface]
+        left_element = neighbor_ids[1, interface]
+        right_element = neighbor_ids[2, interface]
 
-        orientation = cache.interfaces.orientations[interface]
+        orientation = orientations[interface]
 
         for j in eachnode(dg), i in eachnode(dg)
             # Define node indices for left and right element based on the interface orientation
@@ -238,12 +240,14 @@ end
                                                  semi, mesh::TreeMesh{3})
     _, equations, dg, cache = mesh_equations_solver_cache(semi)
 
+    (; neighbor_ids, orientations) = cache.interfaces
+
     for interface in eachinterface(dg, cache)
         # Get neighboring element ids
-        left_element = cache.interfaces.neighbor_ids[1, interface]
-        right_element = cache.interfaces.neighbor_ids[2, interface]
+        left_element = neighbor_ids[1, interface]
+        right_element = neighbor_ids[2, interface]
 
-        orientation = cache.interfaces.orientations[interface]
+        orientation = orientations[interface]
 
         for j in eachnode(dg), i in eachnode(dg)
             # Define node indices for left and right element based on the interface orientation
