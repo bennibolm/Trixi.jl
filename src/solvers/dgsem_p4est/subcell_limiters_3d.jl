@@ -96,6 +96,210 @@ function calc_bounds_twosided_interface!(var_min, var_max, variable, u,
     return nothing
 end
 
+@inline function calc_bounds_twosided_mortar!(var_min, var_max, variable, u,
+                                              semi, mesh::P4estMesh{3})
+    _, _, dg, cache = mesh_equations_solver_cache(semi)
+
+    (; neighbor_ids, node_indices) = cache.mortars
+    index_range = eachnode(dg)
+
+    # TODO: How to include values at mortar interfaces?
+    # See comment above TreeMesh version
+    l2_mortars = dg.mortar isa LobattoLegendreMortarL2
+    for mortar in eachmortar(dg, cache)
+        large_element = neighbor_ids[5, mortar]
+
+        # Get index information on the small elements
+        small_indices = node_indices[1, mortar]
+        i_small_start, i_small_step_i, i_small_step_j = index_to_start_step_3d(small_indices[1],
+                                                                               index_range)
+        j_small_start, j_small_step_i, j_small_step_j = index_to_start_step_3d(small_indices[2],
+                                                                               index_range)
+        k_small_start, k_small_step_i, k_small_step_j = index_to_start_step_3d(small_indices[3],
+                                                                               index_range)
+
+        # Get index information on the large element
+        large_indices = node_indices[2, mortar]
+        i_large_start, i_large_step_i, i_large_step_j = index_to_start_step_3d(large_indices[1],
+                                                                               index_range)
+        j_large_start, j_large_step_i, j_large_step_j = index_to_start_step_3d(large_indices[2],
+                                                                               index_range)
+        k_large_start, k_large_step_i, k_large_step_j = index_to_start_step_3d(large_indices[3],
+                                                                               index_range)
+
+        i_small = i_small_start
+        j_small = j_small_start
+        k_small = k_small_start
+        i_large = i_large_start
+        j_large = j_large_start
+        k_large = k_large_start
+        for j in eachnode(dg)
+            for i in eachnode(dg)
+                if small_indices[1] === :i_forward || small_indices[1] === :i_backward
+                    i_mortar_s = i_small
+                elseif small_indices[2] === :i_forward ||
+                       small_indices[2] === :i_backward
+                    i_mortar_s = j_small
+                else
+                    i_mortar_s = k_small
+                end
+                if small_indices[1] === :j_forward || small_indices[1] === :j_backward
+                    j_mortar_s = i_small
+                elseif small_indices[2] === :j_forward ||
+                       small_indices[2] === :j_backward
+                    j_mortar_s = j_small
+                else
+                    j_mortar_s = k_small
+                end
+                if large_indices[1] === :i_forward || large_indices[1] === :i_backward
+                    i_mortar_l = i_large
+                elseif large_indices[2] === :i_forward ||
+                       large_indices[2] === :i_backward
+                    i_mortar_l = j_large
+                else
+                    i_mortar_l = k_large
+                end
+                if large_indices[1] === :j_forward || large_indices[1] === :j_backward
+                    j_mortar_l = i_large
+                elseif large_indices[2] === :j_forward ||
+                       large_indices[2] === :j_backward
+                    j_mortar_l = j_large
+                else
+                    j_mortar_l = k_large
+                end
+
+                var_small = (u[variable, i_small, j_small, k_small,
+                               neighbor_ids[1, mortar]],
+                             u[variable, i_small, j_small, k_small,
+                               neighbor_ids[2, mortar]],
+                             u[variable, i_small, j_small, k_small,
+                               neighbor_ids[3, mortar]],
+                             u[variable, i_small, j_small, k_small,
+                               neighbor_ids[4, mortar]])
+                var_large = u[variable, i_large, j_large, k_large, large_element]
+
+                i_small_inner = i_small_start
+                j_small_inner = j_small_start
+                k_small_inner = k_small_start
+                i_large_inner = i_large_start
+                j_large_inner = j_large_start
+                k_large_inner = k_large_start
+                for l in eachnode(dg)
+                    for k in eachnode(dg)
+                        if small_indices[1] === :i_forward ||
+                           small_indices[1] === :i_backward
+                            i_mortar_s_inner = i_small_inner
+                        elseif small_indices[2] === :i_forward ||
+                               small_indices[2] === :i_backward
+                            i_mortar_s_inner = j_small_inner
+                        else
+                            i_mortar_s_inner = k_small_inner
+                        end
+                        if small_indices[1] === :j_forward ||
+                           small_indices[1] === :j_backward
+                            j_mortar_s_inner = i_small_inner
+                        elseif small_indices[2] === :j_forward ||
+                               small_indices[2] === :j_backward
+                            j_mortar_s_inner = j_small_inner
+                        else
+                            j_mortar_s_inner = k_small_inner
+                        end
+                        if large_indices[1] === :i_forward ||
+                           large_indices[1] === :i_backward
+                            i_mortar_l_inner = i_large_inner
+                        elseif large_indices[2] === :i_forward ||
+                               large_indices[2] === :i_backward
+                            i_mortar_l_inner = j_large_inner
+                        else
+                            i_mortar_l_inner = k_large_inner
+                        end
+                        if large_indices[1] === :j_forward ||
+                           large_indices[1] === :j_backward
+                            j_mortar_l_inner = i_large_inner
+                        elseif large_indices[2] === :j_forward ||
+                               large_indices[2] === :j_backward
+                            j_mortar_l_inner = j_large_inner
+                        else
+                            j_mortar_l_inner = k_large_inner
+                        end
+
+                        for small_element_index in 1:4
+                            small_element = neighbor_ids[small_element_index,
+                                                         mortar]
+                            # from large to small element
+                            if l2_mortars ||
+                               dg.mortar.mortar_weights[i_mortar_l, j_mortar_l,
+                                                        i_mortar_s_inner,
+                                                        j_mortar_s_inner,
+                                                        small_element_index] > 0
+                                var_min[i_small_inner, j_small_inner, k_small_inner,
+                                small_element] = min(var_min[i_small_inner,
+                                                             j_small_inner,
+                                                             k_small_inner,
+                                                             small_element],
+                                                     var_large)
+                                var_max[i_small_inner, j_small_inner, k_small_inner,
+                                small_element] = max(var_max[i_small_inner,
+                                                             j_small_inner,
+                                                             k_small_inner,
+                                                             small_element],
+                                                     var_large)
+                            end
+                            # from small to large element
+                            if l2_mortars ||
+                               dg.mortar.mortar_weights[i_mortar_l_inner,
+                                                        j_mortar_l_inner,
+                                                        i_mortar_s, j_mortar_s,
+                                                        small_element_index] > 0
+                                var_min[i_large_inner, j_large_inner, k_large_inner,
+                                large_element] = min(var_min[i_large_inner,
+                                                             j_large_inner,
+                                                             k_large_inner,
+                                                             large_element],
+                                                     var_small[small_element_index])
+                                var_max[i_large_inner, j_large_inner, k_large_inner,
+                                large_element] = max(var_max[i_large_inner,
+                                                             j_large_inner,
+                                                             k_large_inner,
+                                                             large_element],
+                                                     var_small[small_element_index])
+                            end
+                        end
+
+                        i_small_inner += i_small_step_i
+                        j_small_inner += j_small_step_i
+                        k_small_inner += k_small_step_i
+                        i_large_inner += i_large_step_i
+                        j_large_inner += j_large_step_i
+                        k_large_inner += k_large_step_i
+                    end
+                    i_small_inner += i_small_step_j
+                    j_small_inner += j_small_step_j
+                    k_small_inner += k_small_step_j
+                    i_large_inner += i_large_step_j
+                    j_large_inner += j_large_step_j
+                    k_large_inner += k_large_step_j
+                end
+
+                i_small += i_small_step_i
+                j_small += j_small_step_i
+                k_small += k_small_step_i
+                i_large += i_large_step_i
+                j_large += j_large_step_i
+                k_large += k_large_step_i
+            end
+            i_small += i_small_step_j
+            j_small += j_small_step_j
+            k_small += k_small_step_j
+            i_large += i_large_step_j
+            j_large += j_large_step_j
+            k_large += k_large_step_j
+        end
+    end
+
+    return nothing
+end
+
 @inline function calc_bounds_twosided_boundary!(var_min, var_max, variable, u, t,
                                                 boundary_conditions::BoundaryConditionPeriodic,
                                                 mesh::P4estMesh{3},
@@ -247,6 +451,203 @@ function calc_bounds_onesided_interface!(var_minmax, minmax, variable, u,
             i_secondary += i_secondary_step_j
             j_secondary += j_secondary_step_j
             k_secondary += k_secondary_step_j
+        end
+    end
+
+    return nothing
+end
+
+@inline function calc_bounds_onesided_mortar!(var_minmax, minmax, variable, u,
+                                              semi, mesh::P4estMesh{3})
+    _, equations, dg, cache = mesh_equations_solver_cache(semi)
+
+    (; neighbor_ids, node_indices) = cache.mortars
+    index_range = eachnode(dg)
+
+    # TODO: How to include values at mortar interfaces?
+    # See comment above TreeMesh version
+    l2_mortars = dg.mortar isa LobattoLegendreMortarL2
+    for mortar in eachmortar(dg, cache)
+        large_element = neighbor_ids[5, mortar]
+
+        # Get index information on the small elements
+        small_indices = node_indices[1, mortar]
+        i_small_start, i_small_step_i, i_small_step_j = index_to_start_step_3d(small_indices[1],
+                                                                               index_range)
+        j_small_start, j_small_step_i, j_small_step_j = index_to_start_step_3d(small_indices[2],
+                                                                               index_range)
+        k_small_start, k_small_step_i, k_small_step_j = index_to_start_step_3d(small_indices[3],
+                                                                               index_range)
+
+        # Get index information on the large element
+        large_indices = node_indices[2, mortar]
+        i_large_start, i_large_step_i, i_large_step_j = index_to_start_step_3d(large_indices[1],
+                                                                               index_range)
+        j_large_start, j_large_step_i, j_large_step_j = index_to_start_step_3d(large_indices[2],
+                                                                               index_range)
+        k_large_start, k_large_step_i, k_large_step_j = index_to_start_step_3d(large_indices[3],
+                                                                               index_range)
+
+        i_small = i_small_start
+        j_small = j_small_start
+        k_small = k_small_start
+        i_large = i_large_start
+        j_large = j_large_start
+        k_large = k_large_start
+        for j in eachnode(dg)
+            for i in eachnode(dg)
+                if small_indices[1] === :i_forward || small_indices[1] === :i_backward
+                    i_mortar_s = i_small
+                elseif small_indices[2] === :i_forward ||
+                       small_indices[2] === :i_backward
+                    i_mortar_s = j_small
+                else
+                    i_mortar_s = k_small
+                end
+                if small_indices[1] === :j_forward || small_indices[1] === :j_backward
+                    j_mortar_s = i_small
+                elseif small_indices[2] === :j_forward ||
+                       small_indices[2] === :j_backward
+                    j_mortar_s = j_small
+                else
+                    j_mortar_s = k_small
+                end
+                if large_indices[1] === :i_forward || large_indices[1] === :i_backward
+                    i_mortar_l = i_large
+                elseif large_indices[2] === :i_forward ||
+                       large_indices[2] === :i_backward
+                    i_mortar_l = j_large
+                else
+                    i_mortar_l = k_large
+                end
+                if large_indices[1] === :j_forward || large_indices[1] === :j_backward
+                    j_mortar_l = i_large
+                elseif large_indices[2] === :j_forward ||
+                       large_indices[2] === :j_backward
+                    j_mortar_l = j_large
+                else
+                    j_mortar_l = k_large
+                end
+
+                u_small = (get_node_vars(u, equations, dg, i_small, j_small, k_small,
+                                         neighbor_ids[1, mortar]),
+                           get_node_vars(u, equations, dg, i_small, j_small, k_small,
+                                         neighbor_ids[2, mortar]),
+                           get_node_vars(u, equations, dg, i_small, j_small, k_small,
+                                         neighbor_ids[3, mortar]),
+                           get_node_vars(u, equations, dg, i_small, j_small, k_small,
+                                         neighbor_ids[4, mortar]))
+                u_large = get_node_vars(u, equations, dg, i_large, j_large, k_large,
+                                        large_element)
+                var_small = (variable(u_small[1], equations),
+                             variable(u_small[2], equations),
+                             variable(u_small[3], equations),
+                             variable(u_small[4], equations))
+                var_large = variable(u_large, equations)
+
+                i_small_inner = i_small_start
+                j_small_inner = j_small_start
+                k_small_inner = k_small_start
+                i_large_inner = i_large_start
+                j_large_inner = j_large_start
+                k_large_inner = k_large_start
+                for l in eachnode(dg)
+                    for k in eachnode(dg)
+                        if small_indices[1] === :i_forward ||
+                           small_indices[1] === :i_backward
+                            i_mortar_s_inner = i_small_inner
+                        elseif small_indices[2] === :i_forward ||
+                               small_indices[2] === :i_backward
+                            i_mortar_s_inner = j_small_inner
+                        else
+                            i_mortar_s_inner = k_small_inner
+                        end
+                        if small_indices[1] === :j_forward ||
+                           small_indices[1] === :j_backward
+                            j_mortar_s_inner = i_small_inner
+                        elseif small_indices[2] === :j_forward ||
+                               small_indices[2] === :j_backward
+                            j_mortar_s_inner = j_small_inner
+                        else
+                            j_mortar_s_inner = k_small_inner
+                        end
+                        if large_indices[1] === :i_forward ||
+                           large_indices[1] === :i_backward
+                            i_mortar_l_inner = i_large_inner
+                        elseif large_indices[2] === :i_forward ||
+                               large_indices[2] === :i_backward
+                            i_mortar_l_inner = j_large_inner
+                        else
+                            i_mortar_l_inner = k_large_inner
+                        end
+                        if large_indices[1] === :j_forward ||
+                           large_indices[1] === :j_backward
+                            j_mortar_l_inner = i_large_inner
+                        elseif large_indices[2] === :j_forward ||
+                               large_indices[2] === :j_backward
+                            j_mortar_l_inner = j_large_inner
+                        else
+                            j_mortar_l_inner = k_large_inner
+                        end
+
+                        for small_element_index in 1:4
+                            small_element = neighbor_ids[small_element_index, mortar]
+                            # values of large element to small elements
+                            if l2_mortars ||
+                               dg.mortar.mortar_weights[i_mortar_l, j_mortar_l,
+                                                        i_mortar_s_inner,
+                                                        j_mortar_s_inner,
+                                                        small_element_index] > 0
+                                var_minmax[i_small_inner, j_small_inner, k_small_inner,
+                                small_element] = minmax(var_minmax[i_small_inner,
+                                                                   j_small_inner,
+                                                                   k_small_inner,
+                                                                   small_element],
+                                                        var_large)
+                            end
+                            # values of small elements to large element
+                            if l2_mortars ||
+                               dg.mortar.mortar_weights[i_mortar_l_inner,
+                                                        j_mortar_l_inner,
+                                                        i_mortar_s, j_mortar_s,
+                                                        small_element_index] > 0
+                                var_minmax[i_large_inner, j_large_inner, k_large_inner,
+                                large_element] = minmax(var_minmax[i_large_inner,
+                                                                   j_large_inner,
+                                                                   k_large_inner,
+                                                                   large_element],
+                                                        var_small[small_element_index])
+                            end
+                        end
+
+                        i_small_inner += i_small_step_i
+                        j_small_inner += j_small_step_i
+                        k_small_inner += k_small_step_i
+                        i_large_inner += i_large_step_i
+                        j_large_inner += j_large_step_i
+                        k_large_inner += k_large_step_i
+                    end
+                    i_small_inner += i_small_step_j
+                    j_small_inner += j_small_step_j
+                    k_small_inner += k_small_step_j
+                    i_large_inner += i_large_step_j
+                    j_large_inner += j_large_step_j
+                    k_large_inner += k_large_step_j
+                end
+
+                i_small += i_small_step_i
+                j_small += j_small_step_i
+                k_small += k_small_step_i
+                i_large += i_large_step_i
+                j_large += j_large_step_i
+                k_large += k_large_step_i
+            end
+            i_small += i_small_step_j
+            j_small += j_small_step_j
+            k_small += k_small_step_j
+            i_large += i_large_step_j
+            j_large += j_large_step_j
+            k_large += k_large_step_j
         end
     end
 
