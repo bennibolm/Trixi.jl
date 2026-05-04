@@ -18,9 +18,7 @@ function pure_and_blended_element_ids!(element_ids_dg, element_ids_dgfv, alpha, 
 
     for element in eachelement(dg, cache)
         # Clip blending factor for values close to zero (-> pure DG)
-        if dg.volume_integral isa VolumeIntegralSubcellLimiting
-            tol = dg.volume_integral.limiter.threshold_smoothness_indicator
-        elseif dg.volume_integral isa VolumeIntegralAdaptive
+        if dg.volume_integral isa VolumeIntegralAdaptive
             tol = max(100 * eps(Float64), eps(Float64)^convert(Float64, 0.75f0))
         end
         dg_only = isapprox(alpha[element], 0, atol = tol)
