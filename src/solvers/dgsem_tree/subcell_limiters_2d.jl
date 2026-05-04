@@ -236,6 +236,7 @@ end
         end
 
         orientation = cache.interfaces.orientations[interface]
+
         for i in eachnode(dg)
             # Define node indices for left and right element based on the interface orientation
             if orientation == 1
