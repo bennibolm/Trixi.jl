@@ -869,60 +869,6 @@ end
         small_element_4 = cache.mortars.neighbor_ids[4, mortar]
         large_element = cache.mortars.neighbor_ids[5, mortar]
 
-        # Compute minimal bound
-        var_min_small_1 = typemax(eltype(surface_flux_values))
-        var_min_small_2 = typemax(eltype(surface_flux_values))
-        var_min_small_3 = typemax(eltype(surface_flux_values))
-        var_min_small_4 = typemax(eltype(surface_flux_values))
-        var_min_large = typemax(eltype(surface_flux_values))
-        for j in eachnode(dg), i in eachnode(dg)
-            if cache.mortars.large_sides[mortar] == 1 # -> small elements on right side
-                if orientations[mortar] == 1
-                    # L2 mortars in x-direction
-                    indices_small = (1, i, j)
-                    indices_large = (nnodes(dg), i, j)
-                elseif orientations[mortar] == 2
-                    # L2 mortars in y-direction
-                    indices_small = (i, 1, j)
-                    indices_large = (i, nnodes(dg), j)
-                else # orientations[mortar] == 3
-                    # L2 mortars in z-direction
-                    indices_small = (i, j, 1)
-                    indices_large = (i, j, nnodes(dg))
-                end
-            else # large_sides[mortar] == 2 -> small elements on left side
-                if orientations[mortar] == 1
-                    # L2 mortars in x-direction
-                    indices_small = (nnodes(dg), i, j)
-                    indices_large = (1, i, j)
-                elseif orientations[mortar] == 2
-                    # L2 mortars in y-direction
-                    indices_small = (i, nnodes(dg), j)
-                    indices_large = (i, 1, j)
-                else # orientations[mortar] == 3
-                    # L2 mortars in z-direction
-                    indices_small = (i, j, nnodes(dg))
-                    indices_large = (i, j, 1)
-                end
-            end
-            var_small_1 = u[var_index, indices_small..., small_element_1]
-            var_small_2 = u[var_index, indices_small..., small_element_2]
-            var_small_3 = u[var_index, indices_small..., small_element_3]
-            var_small_4 = u[var_index, indices_small..., small_element_4]
-            var_large = u[var_index, indices_large..., large_element]
-            var_min_small_1 = min(var_min_small_1, var_small_1)
-            var_min_small_2 = min(var_min_small_2, var_small_2)
-            var_min_small_3 = min(var_min_small_3, var_small_3)
-            var_min_small_4 = min(var_min_small_4, var_small_4)
-            var_min_large = min(var_min_large, var_large)
-        end
-        var_min_small_1 = positivity_correction_factor * var_min_small_1
-        var_min_small_1 = positivity_correction_factor * var_min_small_1
-        var_min_small_2 = positivity_correction_factor * var_min_small_2
-        var_min_small_3 = positivity_correction_factor * var_min_small_3
-        var_min_small_4 = positivity_correction_factor * var_min_small_4
-        var_min_large = positivity_correction_factor * var_min_large
-
         # Set up correct direction and factors
         if cache.mortars.large_sides[mortar] == 1 # -> small elements on right side
             if orientations[mortar] == 1
@@ -1002,6 +948,13 @@ end
             if min(var_small_1, var_small_2, var_small_3, var_small_4, var_large) < 0
                 error("Safe low-order method produces negative value for conservative variable rho. Try a smaller time step.")
             end
+
+            # Compute minimal bound
+            var_min_small_1 = positivity_correction_factor * var_small_1
+            var_min_small_2 = positivity_correction_factor * var_small_2
+            var_min_small_3 = positivity_correction_factor * var_small_3
+            var_min_small_4 = positivity_correction_factor * var_small_4
+            var_min_large = positivity_correction_factor * var_large
 
             # Compute flux differences
             flux_small_1_high_order = surface_flux_values_high_order[var_index, i, j,
@@ -1134,7 +1087,7 @@ end
     factor = inverse_weights[1] # For LGL basis: Identical to weighted boundary interpolation at x = ±1
 
     (; limiter) = dg.volume_integral
-    (; positivity_correction_factor) = limiter
+    (; positivity_correction_factor, gamma_constant_newton) = limiter
 
     for mortar in eachmortar(dg, cache)
         small_element_1 = neighbor_ids[1, mortar]
@@ -1235,6 +1188,7 @@ end
                 error("Safe low-order method produces negative value for variable $variable. Try a smaller time step.")
             end
 
+            # Compute minimal bound
             var_min_small_1 = positivity_correction_factor * var_small_1
             var_min_small_2 = positivity_correction_factor * var_small_2
             var_min_small_3 = positivity_correction_factor * var_small_3
@@ -1262,11 +1216,11 @@ end
                 # Use pure low-order fluxes if high-order fluxes are not finite.
                 if !(all(isfinite.(flux_small_high_order)))
                     limiting_factor[mortar] = 1
-                    break # TODO: Actually, I need a double break here
+                    break
                 end
-                flux_difference_small = factor_small *
-                                        (flux_small_high_order .- flux_small_low_order)
-                antidiffusive_flux_small = inverse_jacobian_small *
+                flux_difference_small = flux_small_high_order .- flux_small_low_order
+                antidiffusive_flux_small = gamma_constant_newton * factor_small *
+                                           inverse_jacobian_small *
                                            flux_difference_small
 
                 u_small = get_node_vars(u, equations, dg, indices_small...,
@@ -1276,6 +1230,9 @@ end
                              initial_check_nonnegative_newton_idp,
                              final_check_nonnegative_newton_idp,
                              equations, dt, limiter, antidiffusive_flux_small)
+            end
+            if limiting_factor[mortar] == 1
+                break
             end
 
             # large element
@@ -1288,9 +1245,15 @@ end
                                                   i, j, direction_large, large_element)
             flux_large_low_order = get_node_vars(surface_flux_values, equations, dg,
                                                  i, j, direction_large, large_element)
-            flux_difference_large = factor_large *
-                                    (flux_large_high_order .- flux_large_low_order)
-            antidiffusive_flux_large = inverse_jacobian_large * flux_difference_large
+            # Use pure low-order fluxes if high-order fluxes are not finite.
+            if !(all(isfinite.(flux_large_high_order)))
+                limiting_factor[mortar] = 1
+                break
+            end
+            flux_difference_large = flux_large_high_order .- flux_large_low_order
+            antidiffusive_flux_large = gamma_constant_newton * factor_large *
+                                       inverse_jacobian_large *
+                                       flux_difference_large
 
             newton_loop!(limiting_factor, var_min_large, u_large, (mortar,), variable,
                          min, initial_check_nonnegative_newton_idp,
