@@ -11,11 +11,6 @@ function create_cache_subcell_limiting(mesh::Union{TreeMesh{2}, StructuredMesh{2
                                        volume_integral::VolumeIntegralSubcellLimiting,
                                        dg::DG, cache_containers, uEltype)
     cache = NamedTuple()
-    if dg.volume_integral isa VolumeIntegralAdaptive
-        element_ids_dg = Int[]
-        element_ids_dgfv = Int[]
-        cache = (; cache..., element_ids_dg, element_ids_dgfv)
-    end
 
     fhat1_L_threaded, fhat1_R_threaded,
     fhat2_L_threaded, fhat2_R_threaded = create_f_threaded(mesh, equations, dg,
