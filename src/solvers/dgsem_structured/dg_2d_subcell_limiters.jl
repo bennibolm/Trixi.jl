@@ -655,9 +655,15 @@ end
         end
     end
 
+    # Calc lambdas and bar states at element interfaces and periodic boundaries
     calc_lambdas_bar_states_interface!(u, t, limiter, boundary_conditions, mesh,
                                        equations,
                                        dg, cache; calc_bar_states = calc_bar_states)
+
+    # Calc lambdas and bar states at physical boundaries
+    calc_lambdas_bar_states_boundary!(u, t, limiter, boundary_conditions,
+                                      mesh, equations, dg, cache;
+                                      calc_bar_states = calc_bar_states)
 
     return nothing
 end
@@ -668,7 +674,6 @@ end
     (; contravariant_vectors) = cache.elements
     (; lambda1, lambda2, bar_states1, bar_states2) = limiter.cache.container_bar_states
 
-    # Calc lambdas and bar states at interfaces and periodic boundaries
     @threaded for element in eachelement(dg, cache)
         # Get neighboring element ids
         left = cache.elements.left_neighbors[1, element]
@@ -730,10 +735,19 @@ end
         end
     end
 
-    # Calc lambdas and bar states at physical boundaries
+    return nothing
+end
+
+@inline function calc_lambdas_bar_states_boundary!(u, t, limiter, boundary_conditions,
+                                                   mesh::StructuredMesh{2}, equations,
+                                                   dg,
+                                                   cache; calc_bar_states = true)
     if isperiodic(mesh)
         return nothing
     end
+    (; lambda1, lambda2, bar_states1, bar_states2) = limiter.cache.container_bar_states
+    (; contravariant_vectors) = cache.elements
+
     linear_indices = LinearIndices(size(mesh))
     if !isperiodic(mesh, 1)
         # - xi direction

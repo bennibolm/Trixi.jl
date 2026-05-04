@@ -896,7 +896,25 @@ end
         end
     end
 
-    # Calc lambdas and bar states at interfaces and periodic boundaries
+    # Calc lambdas and bar states at element interfaces and periodic boundaries
+    calc_lambdas_bar_states_interface!(u, t, limiter, boundary_conditions, mesh,
+                                       equations,
+                                       dg, cache; calc_bar_states = calc_bar_states)
+
+    # Calc lambdas and bar states at physical boundaries
+    calc_lambdas_bar_states_boundary!(u, t, limiter, boundary_conditions,
+                                      mesh, equations, dg, cache;
+                                      calc_bar_states = calc_bar_states)
+
+
+    return nothing
+end
+
+@inline function calc_lambdas_bar_states_interface!(u, t, limiter, boundary_conditions,
+                                                    mesh::TreeMesh{2}, equations,
+                                                    dg, cache; calc_bar_states = true)
+    (; lambda1, lambda2, bar_states1, bar_states2) = limiter.cache.container_bar_states
+
     @threaded for interface in eachinterface(dg, cache)
         # Get neighboring element ids
         left_element = cache.interfaces.neighbor_ids[1, interface]
@@ -955,7 +973,14 @@ end
         end
     end
 
-    # Calc lambdas and bar states at physical boundaries
+    return nothing
+end
+
+@inline function calc_lambdas_bar_states_boundary!(u, t, limiter, boundary_conditions,
+                                                   mesh::TreeMesh{2}, equations, dg,
+                                                   cache; calc_bar_states = true)
+    (; lambda1, lambda2, bar_states1, bar_states2) = limiter.cache.container_bar_states
+
     @threaded for boundary in eachboundary(dg, cache)
         element = cache.boundaries.neighbor_ids[boundary]
 

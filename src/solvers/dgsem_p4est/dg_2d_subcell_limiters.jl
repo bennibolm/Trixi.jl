@@ -14,7 +14,6 @@
     (; neighbor_ids, node_indices) = cache.interfaces
     index_range = eachnode(dg)
 
-    # Calc lambdas and bar states at interfaces and periodic boundaries
     for interface in eachinterface(dg, cache)
         # Get element and side index information on the primary element
         primary_element = neighbor_ids[1, interface]
@@ -125,10 +124,6 @@
         end
     end
 
-    calc_lambdas_bar_states_boundary!(u, t, limiter, boundary_conditions,
-                                      mesh, equations, dg, cache;
-                                      calc_bar_states = calc_bar_states)
-
     return nothing
 end
 
@@ -139,7 +134,6 @@ end
     return nothing
 end
 
-# Calc lambdas and bar states at physical boundaries
 @inline function calc_lambdas_bar_states_boundary!(u, t, limiter, boundary_conditions,
                                                    mesh::P4estMesh{2}, equations, dg,
                                                    cache; calc_bar_states = true)
