@@ -606,6 +606,10 @@ end
 
     # Calc lambdas and bar states inside elements
     @threaded for element in eachelement(dg, cache)
+
+        # detect if subcell limiting is necessary
+        perform_subcell_limiting(dg.volume_integral, element) || continue
+
         for j in eachnode(dg), i in 2:nnodes(dg)
             u_node = get_node_vars(u, equations, dg, i, j, element)
             u_node_im1 = get_node_vars(u, equations, dg, i - 1, j, element)
@@ -670,6 +674,14 @@ end
         left = cache.elements.left_neighbors[1, element]
         lower = cache.elements.left_neighbors[2, element]
 
+        if perform_subcell_limiting(dg.volume_integral, left) ||
+           perform_subcell_limiting(dg.volume_integral, lower)
+            # Subcell limiting is necessary for at least one of the elements => Calculate bounds at this interface
+        else
+            # Subcell limiting is not necessary for both elements => Skip this interface
+            continue
+        end
+
         if left != 0
             for i in eachnode(dg)
                 u_left = get_node_vars(u, equations, dg, nnodes(dg), i, left)
@@ -727,6 +739,9 @@ end
         # - xi direction
         for cell_y in axes(mesh, 2)
             element = linear_indices[begin, cell_y]
+
+            # detect if subcell limiting is necessary
+            perform_subcell_limiting(dg.volume_integral, element) || continue
             for j in eachnode(dg)
                 Ja1 = get_contravariant_vector(1, contravariant_vectors, 1, j, element)
                 u_inner = get_node_vars(u, equations, dg, 1, j, element)
@@ -752,6 +767,9 @@ end
         # + xi direction
         for cell_y in axes(mesh, 2)
             element = linear_indices[end, cell_y]
+
+            # detect if subcell limiting is necessary
+            perform_subcell_limiting(dg.volume_integral, element) || continue
             for j in eachnode(dg)
                 Ja1 = get_contravariant_vector(1, contravariant_vectors, nnodes(dg), j,
                                                element)
@@ -784,6 +802,9 @@ end
         # - eta direction
         for cell_x in axes(mesh, 1)
             element = linear_indices[cell_x, begin]
+
+            # detect if subcell limiting is necessary
+            perform_subcell_limiting(dg.volume_integral, element) || continue
             for i in eachnode(dg)
                 Ja2 = get_contravariant_vector(2, contravariant_vectors, i, 1, element)
                 u_inner = get_node_vars(u, equations, dg, i, 1, element)
@@ -809,6 +830,9 @@ end
         # + eta direction
         for cell_x in axes(mesh, 1)
             element = linear_indices[cell_x, end]
+
+            # detect if subcell limiting is necessary
+            perform_subcell_limiting(dg.volume_integral, element) || continue
             for i in eachnode(dg)
                 Ja2 = get_contravariant_vector(2, contravariant_vectors, i, nnodes(dg),
                                                element)
