@@ -223,7 +223,8 @@ end
                                                                                   have_nonconservative_terms,
                                                                                   equations,
                                                                                   limiter,
-                                                                                  dg, cache,
+                                                                                  dg,
+                                                                                  cache,
                                                                                   boundary_conditions)
         # Calculate boundaries
         @trixi_timeit timer() "calc_variable_bounds!" calc_variable_bounds!(u, mesh,
