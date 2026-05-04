@@ -179,16 +179,16 @@ end
                                  "elixir_euler_density_wave_nonconforming_idp_mortars.jl"),
                         initial_refinement_level=2,
                         l2=[
-                            0.06729971024754092,
-                            0.006729971024754253,
-                            0.013459942049508037,
-                            0.0016824927561872513
+                            0.07008600118063499,
+                            0.007008600118063528,
+                            0.014017200236126716,
+                            0.001752150029511529
                         ],
                         linf=[
-                            0.24865855103478962,
-                            0.02486585510348506,
-                            0.04973171020696385,
-                            0.006216463775885472
+                            0.293738757717684,
+                            0.02937387577177094,
+                            0.0587477515435388,
+                            0.007343468942970333
                         ],
                         tspan=(0.0, 0.5))
     # Ensure that we do not have excessive memory allocations
@@ -664,6 +664,38 @@ end
     @test lines[1] ==
           "# iter, simu_time, rho_min, rho_max, entropy_guermond_etal_min, pressure_min"
     @test startswith(lines[end], "138")
+    # Ensure that we do not have excessive memory allocations
+    # (e.g., from type instabilities)
+    # Larger values for allowed allocations due to usage of custom
+    # integrator which are not *recorded* for the methods from
+    # OrdinaryDiffEq.jl
+    # Corresponding issue: https://github.com/trixi-framework/Trixi.jl/issues/1877
+    @test_allocations(Trixi.rhs!, semi, sol, 15000)
+end
+
+@trixi_testset "elixir_euler_sedov_adaptive_sc_subcell.jl" begin
+    rm(joinpath("out", "deviations.txt"), force = true)
+    @test_trixi_include(joinpath(EXAMPLES_DIR,
+                                 "elixir_euler_sedov_adaptive_sc_subcell.jl"),
+                        l2=[
+                            0.4456769501001288,
+                            0.15182934074195198,
+                            0.15182934074202267,
+                            0.6163380678495841
+                        ],
+                        linf=[
+                            1.6991300568875336,
+                            0.9017734777842971,
+                            0.9017734776841926,
+                            6.455103686573007
+                        ],
+                        tspan=(0.0, 1.0),
+                        initial_refinement_level=4,
+                        save_errors=true)
+    lines = readlines(joinpath("out", "deviations.txt"))
+    @test lines[1] ==
+          "# iter, simu_time, rho_min, rho_max, entropy_guermond_etal_min, pressure_min"
+    @test startswith(lines[end], "140")
     # Ensure that we do not have excessive memory allocations
     # (e.g., from type instabilities)
     # Larger values for allowed allocations due to usage of custom
