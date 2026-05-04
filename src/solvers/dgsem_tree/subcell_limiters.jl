@@ -12,12 +12,6 @@ function create_cache(typ::Type{LimiterType},
     return create_cache(typ, mesh_equations_solver_cache(semi)...)
 end
 
-function get_element_variables!(element_variables, limiter::AbstractSubcellLimiter,
-                                ::VolumeIntegralSubcellLimiting)
-    element_variables[:smooth_indicator_elementwise] = limiter.IndicatorHG.cache.alpha
-    return nothing
-end
-
 """
     SubcellLimiterIDP(equations::AbstractEquations, basis;
                       local_twosided_variables_cons = String[],
