@@ -324,6 +324,7 @@ end
         calc_bounds_twosided!(var_min, var_max, variable, u, t, semi, equations)
     end
 
+    # TODO
     @threaded for element in elements
 
         # detect if subcell limiting is necessary
@@ -387,6 +388,7 @@ end
         calc_bounds_onesided!(var_minmax, min_or_max, variable, u, t, semi)
     end
 
+    # TODO
     # Perform Newton's bisection method to find new alpha
     @threaded for element in elements
 
@@ -421,6 +423,7 @@ end
     (; variable_bounds) = limiter.cache.subcell_limiter_coefficients
     var_min = variable_bounds[Symbol(string(variable), "_min")]
 
+    # TODO
     @threaded for element in elements
 
         # detect if subcell limiting is necessary
@@ -489,6 +492,7 @@ end
     (; variable_bounds) = limiter.cache.subcell_limiter_coefficients
     var_min = variable_bounds[Symbol(string(variable), "_min")]
 
+    # TODO
     @threaded for element in elements
 
         # detect if subcell limiting is necessary

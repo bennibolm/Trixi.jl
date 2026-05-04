@@ -85,13 +85,25 @@ end
     @unpack lambda1, lambda2 = limiter.cache.container_bar_states
 
     maxdt = typemax(eltype(u))
-    if limiter.smoothness_indicator
+    if dg.volume_integral isa VolumeIntegralSubcellLimiting &&
+       limiter.smoothness_indicator
         @unpack element_ids_dg, element_ids_dgfv = cache
         alpha_element = @trixi_timeit timer() "element-wise blending factors" limiter.IndicatorHG(u,
                                                                                                   mesh,
                                                                                                   equations,
                                                                                                   dg,
                                                                                                   cache)
+        pure_and_blended_element_ids!(element_ids_dg, element_ids_dgfv, alpha_element,
+                                      dg, cache)
+        # @info "" length(element_ids_dg) length(element_ids_dgfv)
+    elseif dg.volume_integral isa VolumeIntegralAdaptive
+        @unpack element_ids_dg, element_ids_dgfv = cache
+        alpha_element = @trixi_timeit timer() "element-wise blending factors" dg.volume_integral.indicator(u,
+                                                                                                           mesh,
+                                                                                                           equations,
+                                                                                                           dg,
+                                                                                                           cache)
+
         pure_and_blended_element_ids!(element_ids_dg, element_ids_dgfv, alpha_element,
                                       dg, cache)
     else
@@ -115,7 +127,9 @@ end
         end
     end
 
-    if limiter.smoothness_indicator && !isempty(element_ids_dg)
+    if (dg.volume_integral isa VolumeIntegralAdaptive ||
+        (dg.volume_integral isa VolumeIntegralSubcellLimiting &&
+         limiter.smoothness_indicator)) && !isempty(element_ids_dg)
         maxdt = min(maxdt,
                     max_dt_RK(u, t, mesh, constant_speed, equations, dg, cache,
                               limiter, element_ids_dg))

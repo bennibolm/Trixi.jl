@@ -11,7 +11,7 @@ function create_cache_subcell_limiting(mesh::Union{TreeMesh{2}, StructuredMesh{2
                                        volume_integral::VolumeIntegralSubcellLimiting,
                                        dg::DG, cache_containers, uEltype)
     cache = NamedTuple()
-    if volume_integral.limiter.smoothness_indicator
+    if dg.volume_integral isa VolumeIntegralAdaptive || volume_integral.limiter.smoothness_indicator
         element_ids_dg = Int[]
         element_ids_dgfv = Int[]
         cache = (; cache..., element_ids_dg, element_ids_dgfv)
