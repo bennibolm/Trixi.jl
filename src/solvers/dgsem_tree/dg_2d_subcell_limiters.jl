@@ -906,7 +906,6 @@ end
                                       mesh, equations, dg, cache;
                                       calc_bar_states = calc_bar_states)
 
-
     return nothing
 end
 
