@@ -138,12 +138,12 @@ function (cb::DiscreteCallback{Condition, Affect!})(ode::ODEProblem) where {Cond
                                                                             StepsizeCallback
                                                                             }
     stepsize_callback = cb.affect!
-    @unpack cfl_hyperbolic, cfl_parabolic = stepsize_callback
+    @unpack cfl_hyperbolic, cfl_parabolic, bar_states = stepsize_callback
     u_ode = ode.u0
     t = first(ode.tspan)
     semi = ode.p
 
-    return calculate_dt(u_ode, t, cfl_hyperbolic, cfl_parabolic, semi)
+    return calculate_dt(u_ode, t, cfl_hyperbolic, cfl_parabolic, semi, bar_states)
 end
 
 # General case for an abstract single (i.e., non-coupled) semidiscretization
