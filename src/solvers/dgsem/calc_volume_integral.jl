@@ -201,8 +201,8 @@ end
                                                         dg, cache)
 
     if volume_integral_stabilized isa VolumeIntegralSubcellLimiting &&
-         volume_integral_stabilized.limiter isa SubcellLimiterIDP &&
-         volume_integral_stabilized.limiter.bar_states
+       volume_integral_stabilized.limiter isa SubcellLimiterIDP &&
+       volume_integral_stabilized.limiter.bar_states
         error("`bar_states=true` is currently not supported in combination with the adaptive volume integral.")
     end
 
