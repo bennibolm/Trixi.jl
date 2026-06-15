@@ -590,6 +590,36 @@ end
         @test_allocations(Trixi.rhs!, semi, sol, 15000)
     end
 
+    @trixi_testset "local limiting with bar states" begin
+        @test_trixi_include(joinpath(EXAMPLES_DIR,
+                                     "elixir_euler_blast_wave_nonconforming_sc_subcell.jl"),
+                            local_twosided_variables_cons=["rho"],
+                            local_onesided_variables_nonlinear=[(entropy_math,
+                                                                 max)],
+                            bar_states=true,
+                            cfl=0.9,
+                            l2=[
+                                0.5717192059208559,
+                                0.23595907610024972,
+                                0.23621777193091487,
+                                0.7047759251741209
+                            ],
+                            linf=[
+                                2.3105126256259987,
+                                1.2243260764378798,
+                                1.22829478518527,
+                                2.972709823009244
+                            ],
+                            tspan=(0.0, 1.0))
+        # Ensure that we do not have excessive memory allocations
+        # (e.g., from type instabilities)
+        # Larger values for allowed allocations due to usage of custom
+        # integrator which are not *recorded* for the methods from
+        # OrdinaryDiffEq.jl
+        # Corresponding issue: https://github.com/trixi-framework/Trixi.jl/issues/1877
+        @test_allocations(Trixi.rhs!, semi, sol, 15000)
+    end
+
     @trixi_testset "conservation" begin
         @test_trixi_include(joinpath(EXAMPLES_DIR,
                                      "elixir_euler_blast_wave_nonconforming_sc_subcell.jl"),
