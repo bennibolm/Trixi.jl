@@ -569,16 +569,16 @@ end
                             local_onesided_variables_nonlinear=[(entropy_math,
                                                                  max)],
                             l2=[
-                                0.5717192059208559,
-                                0.23595907610024972,
-                                0.23621777193091487,
-                                0.7047759251741209
+                                0.5717196039375327,
+                                0.23595903512759547,
+                                0.2362183347230602,
+                                0.7047760052352289
                             ],
                             linf=[
-                                2.3105126256259987,
-                                1.2243260764378798,
-                                1.22829478518527,
-                                2.972709823009244
+                                2.3105119843669453,
+                                1.224327541967734,
+                                1.2282995367780682,
+                                2.9728147340304227
                             ],
                             tspan=(0.0, 1.0))
         # Ensure that we do not have excessive memory allocations
@@ -729,6 +729,9 @@ end
                             0.9025036660419865,
                             6.467780546540997
                         ],
+                        # Large absolute tolerance due to nondeterministic behavior in CI runs
+                        # Corresponding issue: https://github.com/trixi-framework/Trixi.jl/issues/3060.
+                        atol=1e-3,
                         tspan=(0.0, 1.0),
                         initial_refinement_level=4,
                         save_errors=true)
