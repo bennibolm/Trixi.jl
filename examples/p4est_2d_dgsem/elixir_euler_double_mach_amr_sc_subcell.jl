@@ -328,7 +328,7 @@ callbacks = CallbackSet(summary_callback,
 ###############################################################################
 
 stage_callbacks = (SubcellLimiterIDPCorrection(),
-                   BoundsCheckCallback(save_errors = false, output_directory = out_dir))
+                   BoundsCheckCallback(save_errors = false))
 
 sol = Trixi.solve(ode, Trixi.SimpleSSPRK33(stage_callbacks = stage_callbacks);
                   dt = 1, # solve needs some value here but it will be overwritten by the stepsize_callback
