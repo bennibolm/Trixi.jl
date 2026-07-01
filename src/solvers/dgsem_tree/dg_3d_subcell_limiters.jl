@@ -1287,4 +1287,17 @@ function calc_mortar_flux_low_order!(surface_flux_values,
 
     return nothing
 end
+
+@inline function calc_lambdas_bar_states!(u, t, mesh::Union{TreeMesh{3}, P4estMesh{3}},
+                                          have_nonconservative_terms, equations,
+                                          limiter, dg, cache, boundary_conditions;
+                                          calc_bar_states = true)
+    if limiter.bar_states == false
+        return nothing
+    end
+
+    error("Bar states are only implemented for 2D problems.")
+
+    return nothing
+end
 end # @muladd
