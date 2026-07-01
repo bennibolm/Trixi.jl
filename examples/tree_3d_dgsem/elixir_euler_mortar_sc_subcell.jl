@@ -35,9 +35,7 @@ limiter_idp = SubcellLimiterIDP(equations, basis;
 volume_integral = VolumeIntegralSubcellLimiting(limiter_idp;
                                                 volume_flux_dg = volume_flux,
                                                 volume_flux_fv = surface_flux)
-mortar = MortarIDP(equations, basis;
-                   positivity_variables_cons = ["rho"],
-                   positivity_variables_nonlinear = [pressure],
+mortar = MortarIDP(equations, basis, limiter_idp;
                    pure_low_order = false)
 solver = DGSEM(basis, surface_flux, volume_integral, mortar)
 
@@ -103,5 +101,5 @@ callbacks = CallbackSet(summary_callback,
 stage_callbacks = (SubcellLimiterIDPCorrection(), BoundsCheckCallback())
 
 sol = Trixi.solve(ode, Trixi.SimpleSSPRK33(stage_callbacks = stage_callbacks);
-                  dt = 1.0, # solve needs some value here but it will be overwritten by the stepsize_callback
+                  dt = 1, # solve needs some value here but it will be overwritten by the stepsize_callback
                   callback = callbacks);

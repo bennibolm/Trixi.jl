@@ -157,33 +157,44 @@ boundary_conditions = (x_neg = BoundaryConditionCharacteristic(initial_condition
                        y_neg = boundary_condition_periodic,
                        y_pos = boundary_condition_periodic)
 
-surface_flux = flux_lax_friedrichs # HLLC needs more shock capturing (alpha_max)
+# The calculation of the time step with bar states uses `max_abs_speed_naive`. Therefore, use it as the surface flux here.
+surface_flux = FluxLaxFriedrichs(max_abs_speed_naive)
 volume_flux = flux_chandrashekar # works with Chandrashekar flux as well
 polydeg = 3
 basis = LobattoLegendreBasis(polydeg)
 
 # shock capturing necessary for this tough example
 limiter_idp = SubcellLimiterIDP(equations, basis;
-                                # local_twosided_variables_cons = ["rho"],
-                                # local_onesided_variables_nonlinear = [(entropy_guermond_etal,
-                                #                                        min)],
                                 positivity_variables_cons = ["rho"],
                                 positivity_variables_nonlinear = [pressure],
                                 positivity_correction_factor = 0.1,
-                                max_iterations_newton = 200)
+                                # local_twosided_variables_cons = ["rho"],
+                                # local_onesided_variables_nonlinear = [(entropy_guermond_etal,
+                                #                                        min)],
+                                max_iterations_newton = 500)
 volume_integral = VolumeIntegralSubcellLimiting(limiter_idp;
                                                 volume_flux_dg = volume_flux,
                                                 volume_flux_fv = surface_flux)
-mortar = MortarIDP(equations, basis;
-                   positivity_variables_cons = ["rho"],
-                   positivity_variables_nonlinear = [pressure])
+mortar = MortarIDP(equations, basis, limiter_idp)
+
 solver = DGSEM(basis, surface_flux, volume_integral, mortar)
 
 coordinates_min = (-0.5, -0.5)
 coordinates_max = (0.5, 0.5)
 
+refinement_level = 7
+
+# refine the jet region in the initial mesh
+initial_refinement_level = 4
+dx = 1.0 / 2^initial_refinement_level
+if dx < 0.05
+    error("Jet width cannot by covered by two elements.")
+end
+box = (type = "box", coordinates_min = (-0.5, -dx), coordinates_max = (-0.5 + dx, dx))
+refinement_patches = ntuple(_ -> box, Val(refinement_level - initial_refinement_level))
 mesh = TreeMesh(coordinates_min, coordinates_max,
-                initial_refinement_level = 8,
+                initial_refinement_level = initial_refinement_level,
+                refinement_patches = refinement_patches,
                 periodicity = (false, true),
                 n_cells_max = 500_000)
 semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, solver,
@@ -197,18 +208,18 @@ ode = semidiscretize(semi, tspan)
 
 summary_callback = SummaryCallback()
 
-analysis_interval = 100
+analysis_interval = 500
 analysis_callback = AnalysisCallback(semi, interval = analysis_interval)
 
 alive_callback = AliveCallback(analysis_interval = analysis_interval)
 
-save_solution = SaveSolutionCallback(interval = 50,
+save_solution = SaveSolutionCallback(interval = 500,
                                      save_initial_solution = true,
                                      save_final_solution = true,
                                      solution_variables = cons2prim,
                                      extra_node_variables = (:limiting_coefficient,))
 
-restart_interval = 21800
+restart_interval = 10000
 save_restart = SaveRestartCallback(interval = restart_interval,
                                    save_final_restart = true)
 
@@ -225,7 +236,7 @@ amr_indicator = IndicatorHennemannGassner(semi,
 amr_controller = ControllerThreeLevel(semi, amr_indicator,
                                       base_level = 2,
                                       med_level = 0, med_threshold = 0.0003, # med_level = current level
-                                      max_level = 8, max_threshold = 0.003)
+                                      max_level = refinement_level, max_threshold = 0.003)
 
 amr_callback = AMRCallback(semi, amr_controller,
                            interval = 1,
@@ -233,26 +244,29 @@ amr_callback = AMRCallback(semi, amr_controller,
                            adapt_initial_condition_only_refine = true,
                            limiter! = positivity_limiter)
 
-function cfl_amr(t)
-    if t < 4.5e-7
-        return 0.001
-    else
-        return 0.5
-    end
-end
-stepsize_callback = StepsizeCallback(cfl = cfl_amr)
+# old cfl number
+# function cfl(t)
+#     if t < 4.5e-7
+#         return 0.001
+#     else
+#         return 0.5
+#     end
+# end
+cfl(t) = t == 0.0 ? 0.001 : 0.5
+stepsize_callback = StepsizeCallback(cfl = cfl)
 
 callbacks = CallbackSet(summary_callback,
                         analysis_callback, alive_callback,
                         save_restart, save_solution,
+                        LimitingAnalysisCallback(interval = 100),
                         amr_callback,
                         stepsize_callback)
 
 stage_callbacks = (SubcellLimiterIDPCorrection(),
-                   BoundsCheckCallback(save_errors = false, interval = 1))
+                   BoundsCheckCallback(save_errors = false, interval = 100))
 
 ###############################################################################
 # run the simulation
 sol = Trixi.solve(ode, Trixi.SimpleSSPRK33(stage_callbacks = stage_callbacks);
-                  dt = 1.0, # solve needs some value here but it will be overwritten by the stepsize_callback
+                  dt = 1, # solve needs some value here but it will be overwritten by the stepsize_callback
                   maxiters = 1_000_000, callback = callbacks);

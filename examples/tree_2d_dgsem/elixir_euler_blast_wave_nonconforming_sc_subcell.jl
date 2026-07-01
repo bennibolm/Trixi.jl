@@ -29,7 +29,6 @@ function initial_condition_blast_wave(x, t, equations::CompressibleEulerEquation
     v1 = r > 0.5f0 ? zero(RealT) : RealT(0.1882) * cos_phi
     v2 = r > 0.5f0 ? zero(RealT) : RealT(0.1882) * sin_phi
     p = r > 0.5f0 ? RealT(1.0E-3) : RealT(1.245)
-    # p = r > 0.5f0 ? RealT(1.0E-1) : RealT(1.245)
 
     return prim2cons(SVector(rho, v1, v2, p), equations)
 end
@@ -40,19 +39,17 @@ volume_flux = flux_ranocha
 basis = LobattoLegendreBasis(3)
 limiter_idp = SubcellLimiterIDP(equations, basis;
                                 positivity_variables_cons = ["rho"],
-                                positivity_correction_factor = 0.5,
                                 positivity_variables_nonlinear = [pressure],
-                                local_twosided_variables_cons = ["rho"],
-                                local_onesided_variables_nonlinear = [(entropy_math,
-                                                                       max)],
+                                positivity_correction_factor = 0.1,
+                                local_twosided_variables_cons = [],
+                                local_onesided_variables_nonlinear = [],
+                                bar_states = false,
                                 max_iterations_newton = 70)
 volume_integral = VolumeIntegralSubcellLimiting(limiter_idp;
                                                 volume_flux_dg = volume_flux,
                                                 volume_flux_fv = surface_flux)
-mortar = MortarIDP(equations, basis;
-                   positivity_variables_cons = ["rho"],
-                   positivity_variables_nonlinear = [pressure],
-                   pure_low_order = true)
+mortar = MortarIDP(equations, basis, limiter_idp;
+                   pure_low_order = false)
 solver = DGSEM(basis, surface_flux, volume_integral, mortar)
 
 coordinates_min = (-2.0, -2.0)
@@ -100,12 +97,13 @@ save_solution = SaveSolutionCallback(interval = 100,
 #                            adapt_initial_condition = true,
 #                            adapt_initial_condition_only_refine = false)
 
-stepsize_callback = StepsizeCallback(cfl = 0.5)
+stepsize_callback = StepsizeCallback(cfl = 0.5, bar_states = false)
 
 callbacks = CallbackSet(summary_callback,
                         analysis_callback, alive_callback,
                         save_solution,
                         # amr_callback,
+                        LimitingAnalysisCallback(),
                         stepsize_callback)
 
 ###############################################################################
@@ -115,5 +113,5 @@ stage_callbacks = (SubcellLimiterIDPCorrection(), BoundsCheckCallback(save_error
 
 sol = Trixi.solve(ode,
                   Trixi.SimpleSSPRK33(stage_callbacks = stage_callbacks);
-                  dt = 1.0, # solve needs some value here but it will be overwritten by the stepsize_callback
+                  dt = 1, # solve needs some value here but it will be overwritten by the stepsize_callback
                   callback = callbacks);

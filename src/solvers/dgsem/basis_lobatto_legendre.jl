@@ -230,10 +230,8 @@ end
 @inline polydeg(mortar::LobattoLegendreMortarL2) = nnodes(mortar) - 1
 
 struct LobattoLegendreMortarIDP{RealT <: Real, NNODES, NDIMS, LENGTH,
-                                LimitingVariablesNonlinear, Mortar} <:
-       AbstractMortar{RealT}
-    positivity_variables_cons::Vector{Int}
-    positivity_variables_nonlinear::LimitingVariablesNonlinear
+                                Limiter, Mortar} <: AbstractMortar{RealT}
+    limiter::Limiter
     pure_low_order::Bool
     mortar_l2::Mortar
     # LENGTH = `2 * (NDIMS - 1) + 1`
@@ -242,11 +240,10 @@ struct LobattoLegendreMortarIDP{RealT <: Real, NNODES, NDIMS, LENGTH,
     output_directory::String
 end
 
-function MortarIDP(equations, basis::LobattoLegendreBasis;
-                   positivity_variables_cons = String[],
-                   positivity_variables_nonlinear = [],
+function MortarIDP(equations, basis::LobattoLegendreBasis, limiter;
                    pure_low_order = false,
                    output_directory = "out")
+    @assert limiter isa SubcellLimiterIDP
     RealT = real(basis)
     n_dims = ndims(equations)
     nnodes_ = nnodes(basis)
@@ -255,14 +252,10 @@ function MortarIDP(equations, basis::LobattoLegendreBasis;
 
     mortar_weights, mortar_weights_sums = calc_mortar_weights(equations, basis, RealT)
 
-    positivity_variables_cons_ = get_variable_index.(positivity_variables_cons,
-                                                     equations)
-
     LobattoLegendreMortarIDP{RealT, nnodes_, n_dims,
                              2 * (n_dims - 1) + 1,
-                             typeof(positivity_variables_nonlinear),
-                             typeof(mortar_l2)}(positivity_variables_cons_,
-                                                positivity_variables_nonlinear,
+                             typeof(limiter),
+                             typeof(mortar_l2)}(limiter,
                                                 pure_low_order,
                                                 mortar_l2,
                                                 mortar_weights,
@@ -273,19 +266,19 @@ end
 function Base.show(io::IO, mortar::LobattoLegendreMortarIDP)
     @nospecialize mortar # reduce precompilation time
 
-    print(io, "LobattoLegendreMortarIDP(polydeg=", polydeg(mortar), ", positivity for ",
-          mortar.positivity_variables_cons, " and ",
-          mortar.positivity_variables_nonlinear, ")")
+    print(io, "LobattoLegendreMortarIDP{", real(mortar), "}(polydeg=", polydeg(mortar),
+          "limiter=", mortar.limiter, ", pure_low_order=", mortar.pure_low_order, ")")
 end
 function Base.show(io::IO, ::MIME"text/plain", mortar::LobattoLegendreMortarIDP)
     @nospecialize mortar # reduce precompilation time
 
-    print(io, "LobattoLegendreMortarIDP{", real(mortar),
-          "} with polynomials of degree ",
-          polydeg(mortar),
-          " and positivity limiting for conservative variables ",
-          mortar.positivity_variables_cons, " and ",
-          mortar.positivity_variables_nonlinear)
+    setup = ["limiter" => string(mortar.limiter)]
+    if mortar.pure_low_order
+        push!(setup, "" => "pure low-order mortars")
+    end
+    summary_box(io,
+                "LobattoLegendreMortarIDP{$(real(mortar)), polydeg=$(polydeg(mortar))}",
+                setup)
 end
 
 @inline Base.real(mortar::LobattoLegendreMortarIDP{RealT}) where {RealT} = RealT

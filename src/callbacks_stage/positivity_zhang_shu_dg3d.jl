@@ -24,6 +24,13 @@ function limiter_zhang_shu!(u, threshold::Real, variable,
         # Jensen's inequality holds (e.g. pressure for compressible Euler equations).
         value_mean = variable(u_mean, equations)
         theta = (value_mean - threshold) / (value_mean - value_min)
+
+        # This avoids the issue when `value_mean` is slightly smaller than `threshold`
+        # (e.g., due to finite precision effects in PositivityPreservingLimiterLiuZhang),
+        # which results in invalid theta values smaller than 0. Note that min(1, theta)
+        # is not necessary since we are only enforcing lower bounds. 
+        theta = max(0, theta)
+
         for k in eachnode(dg), j in eachnode(dg), i in eachnode(dg)
             u_node = get_node_vars(u, equations, dg, i, j, k, element)
             set_node_vars!(u, theta * u_node + (1 - theta) * u_mean,
@@ -92,8 +99,8 @@ function limiter_zhang_shu!(u, threshold::Real, variable, mesh::AbstractMesh{3},
         end
     end
     # thread_sum_total = sum(theta_sum)
-    # mkpath("out")
-    # open("out/shifting_alphas_refined_elements.txt", "a") do f
+    # (; output_directory) = dg.mortar
+    # open(joinpath(output_directory, "shifting_alphas_refined_elements.txt"), "a") do f
     #     println(f,
     #             "variable: $variable, n_refined elements: $(length(element_ids_new) * 8), avg: $(thread_sum_total / length(element_ids_new)), ")
     # end
@@ -143,7 +150,8 @@ function limiter_zhang_shu!(u, threshold::Real, variable,
         end
     end
     # thread_sum_total = sum(theta_sum)
-    # open("out/shifting_alphas_coarsened_elements.txt", "a") do f
+    # (; output_directory) = dg.mortar
+    # open(joinpath(output_directory, "shifting_alphas_coarsened_elements.txt"), "a") do f
     #     println(f,
     #             "variable: $variable, n_coarsened elements: $(length(element_ids_new)), avg: $(thread_sum_total / length(element_ids_new)), ")
     # end

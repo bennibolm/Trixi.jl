@@ -449,7 +449,7 @@ an entropy-conservative volume integral (i.e., [`VolumeIntegralFluxDifferencing`
 for stability, but not everywhere in the domain.
 In such cases, the `volume_integral_default` can be a cheaper volume integral such as [`VolumeIntegralWeakForm`](@ref).
 
-For reference, see 
+For reference, see
 - Doehring, Chan, Ranocha, Schlottke-Lakemper, Torrilhon, Gassner (2026)
   Volume Term Adaptivity for Discontinuous Galerkin Schemes
   [DOI: 10.48550/arXiv.2603.24189](https://doi.org/10.48550/arXiv.2603.24189)
@@ -747,7 +747,7 @@ function resize_volume_integral_cache!(cache, mesh,
                                        volume_integral::VolumeIntegralSubcellLimiting,
                                        new_size)
     resize!(cache.antidiffusive_fluxes, new_size)
-    resize!(volume_integral.limiter.cache.subcell_limiter_coefficients, new_size)
+    resize_subcell_limiter_cache!(volume_integral.limiter, new_size)
 
     resize_normal_vectors!(cache, mesh, new_size)
 
@@ -762,7 +762,7 @@ function reinit_volume_integral_cache!(cache, mesh, dg,
 
     return nothing
 end
-  
+
 # Check if subcell limiting should be performed for a given element.
 # Always true for pure `VolumeIntegralSubcellLimiting`,
 # but not necessarily for `VolumeIntegralAdaptive` with an a-priori indicator.
@@ -1149,6 +1149,13 @@ include("dgsem/dgsem.jl")
 # functionality implemented for DGSEM.
 include("fdsbp_tree/fdsbp.jl")
 include("fdsbp_unstructured/fdsbp.jl")
+
+# Block-structured finite volume methods
+include("blockfv/blockfv.jl")
+include("blockfv/containers_1d.jl")
+include("blockfv/containers_2d.jl")
+include("blockfv/blockfv_1d.jl")
+include("blockfv/blockfv_2d.jl")
 
 function allocate_coefficients(mesh::AbstractMesh, equations, dg::DG, cache)
     # We must allocate a `Vector` in order to be able to `resize!` it (AMR).

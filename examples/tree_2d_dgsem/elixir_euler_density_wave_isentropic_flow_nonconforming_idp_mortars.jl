@@ -66,14 +66,14 @@ basis = LobattoLegendreBasis(polydeg)
 limiter_idp = SubcellLimiterIDP(equations, basis;
                                 positivity_variables_cons = ["rho"],
                                 positivity_variables_nonlinear = [pressure],
-                                max_iterations_newton = 50)
+                                # local_twosided_variables_cons = ["rho"],
+                                # local_onesided_variables_nonlinear = [(entropy_guermond_etal,
+                                #                                        min)],
+                                max_iterations_newton = 100)
 volume_integral = VolumeIntegralSubcellLimiting(limiter_idp;
                                                 volume_flux_dg = volume_flux,
                                                 volume_flux_fv = surface_flux)
-mortar = MortarIDP(equations, basis;
-                   positivity_variables_cons = ["rho"],
-                   positivity_variables_nonlinear = [pressure],
-                   pure_low_order = false)
+mortar = MortarIDP(equations, basis, limiter_idp)
 solver = DGSEM(basis, surface_flux, volume_integral, mortar)
 
 # 1d problem in literature uses x in [-1,1]
@@ -82,12 +82,12 @@ solver = DGSEM(basis, surface_flux, volume_integral, mortar)
 # why I expanded the domain to [-2/sqrt(2), 2/sqrt(2)]^2.
 coordinates_min = (-2 / sqrt(2), -2 / sqrt(2))
 coordinates_max = (2 / sqrt(2), 2 / sqrt(2))
-refinement_patches = ((type = "box", coordinates_min = (0.0, -0.5),
-                       coordinates_max = (0.5, 0.5)),)
+refinement_patches = ((type = "box", coordinates_min = (-1 / sqrt(2), -1 / sqrt(2)),
+                       coordinates_max = (0.0, 1 / sqrt(2))),)
 mesh = TreeMesh(coordinates_min, coordinates_max,
                 initial_refinement_level = 4,
                 refinement_patches = refinement_patches,
-                n_cells_max = 30_000,
+                n_cells_max = 100_000,
                 periodicity = true)
 
 semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, solver,
@@ -107,7 +107,7 @@ analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
 
 alive_callback = AliveCallback(analysis_interval = analysis_interval)
 
-save_solution = SaveSolutionCallback(interval = 5,
+save_solution = SaveSolutionCallback(interval = 100,
                                      save_initial_solution = true,
                                      save_final_solution = true,
                                      solution_variables = cons2prim,
@@ -115,9 +115,12 @@ save_solution = SaveSolutionCallback(interval = 5,
 
 stepsize_callback = StepsizeCallback(cfl = 0.5)
 
+limiting_analysis = LimitingAnalysisCallback(interval = 100)
+
 callbacks = CallbackSet(summary_callback,
                         analysis_callback, alive_callback,
                         save_solution,
+                        limiting_analysis,
                         stepsize_callback)
 
 ###############################################################################
@@ -127,5 +130,5 @@ stage_callbacks = (SubcellLimiterIDPCorrection(), BoundsCheckCallback())
 
 sol = Trixi.solve(ode,
                   Trixi.SimpleSSPRK33(stage_callbacks = stage_callbacks);
-                  dt = 1.0, # solve needs some value here but it will be overwritten by the stepsize_callback
+                  dt = 1, # solve needs some value here but it will be overwritten by the stepsize_callback
                   callback = callbacks);

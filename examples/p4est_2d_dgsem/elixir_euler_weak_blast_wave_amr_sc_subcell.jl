@@ -30,7 +30,8 @@ initial_condition = initial_condition_weak_blast_wave
 
 # Get the DG approximation space
 
-surface_flux = flux_lax_friedrichs
+# The calculation of the time step with bar states uses `max_abs_speed_naive`. Therefore, use it as the surface flux here.
+surface_flux = FluxLaxFriedrichs(max_abs_speed_naive)
 volume_flux = flux_ranocha
 polydeg = 4
 basis = LobattoLegendreBasis(polydeg)
@@ -43,9 +44,9 @@ limiter_idp = SubcellLimiterIDP(equations, basis;
 volume_integral = VolumeIntegralSubcellLimiting(limiter_idp;
                                                 volume_flux_dg = volume_flux,
                                                 volume_flux_fv = surface_flux)
-mortar = MortarIDP(equations, basis; pure_low_order = false,
-                   positivity_variables_cons = ["rho"],
-                   positivity_variables_nonlinear = [pressure])
+mortar = MortarIDP(equations, basis, limiter_idp;
+                   pure_low_order = false)
+
 solver = DGSEM(basis, surface_flux, volume_integral, mortar)
 
 ###############################################################################
@@ -117,5 +118,5 @@ callbacks = CallbackSet(summary_callback,
 stage_callbacks = (SubcellLimiterIDPCorrection(), BoundsCheckCallback())
 
 sol = Trixi.solve(ode, Trixi.SimpleSSPRK33(stage_callbacks = stage_callbacks);
-                  dt = 1.0, # solve needs some value here but it will be overwritten by the stepsize_callback
+                  dt = 1, # solve needs some value here but it will be overwritten by the stepsize_callback
                   callback = callbacks);

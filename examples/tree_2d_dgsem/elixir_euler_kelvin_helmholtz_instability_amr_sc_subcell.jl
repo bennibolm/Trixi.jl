@@ -30,7 +30,14 @@ function initial_condition_kelvin_helmholtz_instability(x, t,
 end
 initial_condition = initial_condition_kelvin_helmholtz_instability
 
-surface_flux = flux_lax_friedrichs
+# Up to version 0.13.0, `max_abs_speed_naive` was used as the default wave speed estimate of
+# `const flux_lax_friedrichs = FluxLaxFriedrichs(), i.e., `FluxLaxFriedrichs(max_abs_speed = max_abs_speed_naive)`.
+# In the `StepsizeCallback`, though, the less diffusive `max_abs_speeds` is employed which is consistent with `max_abs_speed`.
+# Thus, we exchanged in PR#2458 the default wave speed used in the LLF flux to `max_abs_speed`.
+# To ensure that every example still runs we specify explicitly `FluxLaxFriedrichs(max_abs_speed_naive)`.
+# We remark, however, that the now default `max_abs_speed` is in general recommended due to compliance with the
+# `StepsizeCallback` (CFL-Condition) and less diffusion.
+surface_flux = FluxLaxFriedrichs(max_abs_speed_naive)
 volume_flux = flux_ranocha
 polydeg = 3
 basis = LobattoLegendreBasis(polydeg)
@@ -38,14 +45,14 @@ basis = LobattoLegendreBasis(polydeg)
 limiter_idp = SubcellLimiterIDP(equations, basis;
                                 positivity_variables_cons = ["rho"],
                                 positivity_variables_nonlinear = [pressure],
-                                local_twosided_variables_cons = [], # required for testing
-                                max_iterations_newton = 30)
+                                local_twosided_variables_cons = [],
+                                local_onesided_variables_nonlinear = [],
+                                max_iterations_newton = 30,
+                                bar_states = false)
 volume_integral = VolumeIntegralSubcellLimiting(limiter_idp;
                                                 volume_flux_dg = volume_flux,
                                                 volume_flux_fv = surface_flux)
-mortar = MortarIDP(equations, basis;
-                   positivity_variables_cons = ["rho"],
-                   positivity_variables_nonlinear = [pressure],
+mortar = MortarIDP(equations, basis, limiter_idp;
                    pure_low_order = false)
 solver = DGSEM(basis, surface_flux, volume_integral, mortar)
 
@@ -76,7 +83,7 @@ save_solution = SaveSolutionCallback(interval = 100,
                                      solution_variables = cons2prim,
                                      extra_node_variables = (:limiting_coefficient,))
 
-save_restart = SaveRestartCallback(interval = 1000,
+save_restart = SaveRestartCallback(interval = 5000,
                                    save_final_restart = true)
 
 amr_indicator = IndicatorHennemannGassner(semi,
@@ -93,11 +100,12 @@ amr_callback = AMRCallback(semi, amr_controller,
                            adapt_initial_condition = true,
                            adapt_initial_condition_only_refine = true)
 
-stepsize_callback = StepsizeCallback(cfl = 0.3)
+stepsize_callback = StepsizeCallback(cfl = 0.3, bar_states = false)
 
 callbacks = CallbackSet(summary_callback,
                         analysis_callback, alive_callback,
                         save_solution, save_restart,
+                        LimitingAnalysisCallback(interval = 100),
                         amr_callback,
                         stepsize_callback)
 
@@ -109,5 +117,6 @@ stage_callbacks = (SubcellLimiterIDPCorrection(),
 # `interval` is used when calling this elixir in the tests with `save_errors=true`.
 
 sol = Trixi.solve(ode, Trixi.SimpleSSPRK33(stage_callbacks = stage_callbacks);
-                  dt = 1.0, # solve needs some value here but it will be overwritten by the stepsize_callback
+                  dt = 1, # solve needs some value here but it will be overwritten by the stepsize_callback
+                  ode_default_options()...,
                   callback = callbacks);

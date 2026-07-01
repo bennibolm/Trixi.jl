@@ -36,8 +36,8 @@ the [`AveragingCallback`](@ref).
 """
 mutable struct EulerAcousticsCouplingCallback{RealT <: Real, MeanValues,
                                               IntegratorEuler}
-    stepsize_callback_acoustics::StepsizeCallback{RealT, RealT}
-    stepsize_callback_euler::StepsizeCallback{RealT, RealT}
+    stepsize_callback_acoustics::StepsizeCallback{RealT, RealT, False}
+    stepsize_callback_euler::StepsizeCallback{RealT, RealT, False}
     mean_values::MeanValues
     integrator_euler::IntegratorEuler
 end
@@ -128,7 +128,7 @@ function EulerAcousticsCouplingCallback(ode_euler, mean_values, alg, cfl_acousti
                                         cfl_euler;
                                         kwargs...)
     # Set up ODE Integrator for Euler equations
-    integrator_euler = init(ode_euler, alg, save_everystep = false, dt = 1.0; kwargs...) # dt will be overwritten
+    integrator_euler = init(ode_euler, alg, save_everystep = false, dt = 1; kwargs...) # dt will be overwritten
 
     euler_acoustics_coupling = EulerAcousticsCouplingCallback{typeof(cfl_acoustics),
                                                               typeof(mean_values),
@@ -211,8 +211,8 @@ function (euler_acoustics_coupling::EulerAcousticsCouplingCallback)(integrator_a
     end
 
     # avoid re-evaluation possible FSAL stages
-    u_modified!(integrator_acoustics, false)
-    u_modified!(integrator_euler, false)
+    derivative_discontinuity!(integrator_acoustics, false)
+    derivative_discontinuity!(integrator_euler, false)
 
     return nothing
 end
