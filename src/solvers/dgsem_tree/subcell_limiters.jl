@@ -269,15 +269,23 @@ function create_cache(limiter::Type{SubcellLimiterIDP},
 end
 
 function create_cache(limiter::Type{SubcellLimiterIDP},
-                      equations::AbstractEquations{NDIMS},
+                      equations::AbstractEquations{2},
                       basis::LobattoLegendreBasis, bound_keys,
-                      ::True) where {NDIMS}
-    if NDIMS != 2
-        error("Bar states are only implemented for 2D problems.")
-    end
-
+                      ::True)
     cache = create_cache(limiter, equations, basis, bound_keys, False())
     container_bar_states = Trixi.ContainerBarStates2D{real(basis)}(0,
+                                                                   nvariables(equations),
+                                                                   nnodes(basis))
+
+    return (; container_bar_states, cache...)
+end
+
+function create_cache(limiter::Type{SubcellLimiterIDP},
+                      equations::AbstractEquations{3},
+                      basis::LobattoLegendreBasis, bound_keys,
+                      ::True)
+    cache = create_cache(limiter, equations, basis, bound_keys, False())
+    container_bar_states = Trixi.ContainerBarStates3D{real(basis)}(0,
                                                                    nvariables(equations),
                                                                    nnodes(basis))
 
