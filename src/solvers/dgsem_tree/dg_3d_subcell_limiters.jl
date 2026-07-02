@@ -1288,7 +1288,7 @@ function calc_mortar_flux_low_order!(surface_flux_values,
     return nothing
 end
 
-@inline function calc_lambdas_bar_states!(u, t, mesh::Union{TreeMesh{3}, P4estMesh{3}},
+@inline function calc_lambdas_bar_states!(u, t, mesh::TreeMesh{3},
                                           have_nonconservative_terms, equations,
                                           limiter, dg, cache, boundary_conditions;
                                           calc_bar_states = true)
@@ -1296,7 +1296,318 @@ end
         return nothing
     end
 
-    error("Bar states are only implemented for 2D problems.")
+    (; lambda1, lambda2, lambda3, bar_states1, bar_states2, bar_states3) = limiter.cache.container_bar_states
+
+    @threaded for element in eachelement(dg, cache)
+        for k in eachnode(dg), j in eachnode(dg), i in 2:nnodes(dg)
+            u_node = get_node_vars(u, equations, dg, i, j, k, element)
+            u_node_im1 = get_node_vars(u, equations, dg, i - 1, j, k, element)
+            lambda1[i, j, k, element] = max_abs_speed_naive(u_node_im1, u_node, 1,
+                                                            equations)
+
+            calc_bar_states || continue
+
+            flux1 = flux(u_node, 1, equations)
+            flux1_im1 = flux(u_node_im1, 1, equations)
+            for v in eachvariable(equations)
+                bar_states1[v, i, j, k, element] = 0.5 * (u_node[v] + u_node_im1[v]) -
+                                                   0.5 * (flux1[v] - flux1_im1[v]) /
+                                                   lambda1[i, j, k, element]
+            end
+        end
+
+        for k in eachnode(dg), j in 2:nnodes(dg), i in eachnode(dg)
+            u_node = get_node_vars(u, equations, dg, i, j, k, element)
+            u_node_jm1 = get_node_vars(u, equations, dg, i, j - 1, k, element)
+            lambda2[i, j, k, element] = max_abs_speed_naive(u_node_jm1, u_node, 2,
+                                                            equations)
+
+            calc_bar_states || continue
+
+            flux2 = flux(u_node, 2, equations)
+            flux2_jm1 = flux(u_node_jm1, 2, equations)
+            for v in eachvariable(equations)
+                bar_states2[v, i, j, k, element] = 0.5 * (u_node[v] + u_node_jm1[v]) -
+                                                   0.5 * (flux2[v] - flux2_jm1[v]) /
+                                                   lambda2[i, j, k, element]
+            end
+        end
+
+        for k in 2:nnodes(dg), j in eachnode(dg), i in eachnode(dg)
+            u_node = get_node_vars(u, equations, dg, i, j, k, element)
+            u_node_km1 = get_node_vars(u, equations, dg, i, j, k - 1, element)
+            lambda3[i, j, k, element] = max_abs_speed_naive(u_node_km1, u_node, 3,
+                                                            equations)
+
+            calc_bar_states || continue
+
+            flux3 = flux(u_node, 3, equations)
+            flux3_km1 = flux(u_node_km1, 3, equations)
+            for v in eachvariable(equations)
+                bar_states3[v, i, j, k, element] = 0.5 * (u_node[v] + u_node_km1[v]) -
+                                                   0.5 * (flux3[v] - flux3_km1[v]) /
+                                                   lambda3[i, j, k, element]
+            end
+        end
+    end
+
+    # Calc lambdas and bar states at element interfaces and periodic boundaries
+    calc_lambdas_bar_states_interface!(u, t, limiter, boundary_conditions, mesh,
+                                       equations, dg, cache;
+                                       calc_bar_states = calc_bar_states)
+
+    # Calc lambdas and bar states at physical boundaries
+    calc_lambdas_bar_states_boundary!(u, t, limiter, boundary_conditions, mesh,
+                                      equations, dg, cache;
+                                      calc_bar_states = calc_bar_states)
+
+    return nothing
+end
+
+@inline function calc_lambdas_bar_states_interface!(u, t, limiter, boundary_conditions,
+                                                    mesh::TreeMesh{3}, equations, dg,
+                                                    cache; calc_bar_states = true)
+    (; lambda1, lambda2, lambda3, bar_states1, bar_states2, bar_states3) = limiter.cache.container_bar_states
+
+    @threaded for interface in eachinterface(dg, cache)
+        # Get neighboring element ids
+        left_element = cache.interfaces.neighbor_ids[1, interface]
+        right_element = cache.interfaces.neighbor_ids[2, interface]
+
+        orientation = cache.interfaces.orientations[interface]
+
+        if orientation == 1
+            for k in eachnode(dg), j in eachnode(dg)
+                u_left = get_node_vars(u, equations, dg, nnodes(dg), j, k,
+                                       left_element)
+                u_right = get_node_vars(u, equations, dg, 1, j, k, right_element)
+                lambda = max_abs_speed_naive(u_left, u_right, orientation, equations)
+
+                lambda1[nnodes(dg) + 1, j, k, left_element] = lambda
+                lambda1[1, j, k, right_element] = lambda
+
+                calc_bar_states || continue
+
+                flux_left = flux(u_left, orientation, equations)
+                flux_right = flux(u_right, orientation, equations)
+                bar_state = 0.5 * (u_left + u_right) -
+                            0.5 * (flux_right - flux_left) / lambda
+                for v in eachvariable(equations)
+                    bar_states1[v, nnodes(dg) + 1, j, k, left_element] = bar_state[v]
+                    bar_states1[v, 1, j, k, right_element] = bar_state[v]
+                end
+            end
+        elseif orientation == 2
+            for k in eachnode(dg), i in eachnode(dg)
+                u_left = get_node_vars(u, equations, dg, i, nnodes(dg), k,
+                                       left_element)
+                u_right = get_node_vars(u, equations, dg, i, 1, k, right_element)
+                lambda = max_abs_speed_naive(u_left, u_right, orientation, equations)
+
+                lambda2[i, nnodes(dg) + 1, k, left_element] = lambda
+                lambda2[i, 1, k, right_element] = lambda
+
+                calc_bar_states || continue
+
+                flux_left = flux(u_left, orientation, equations)
+                flux_right = flux(u_right, orientation, equations)
+                bar_state = 0.5 * (u_left + u_right) -
+                            0.5 * (flux_right - flux_left) / lambda
+                for v in eachvariable(equations)
+                    bar_states2[v, i, nnodes(dg) + 1, k, left_element] = bar_state[v]
+                    bar_states2[v, i, 1, k, right_element] = bar_state[v]
+                end
+            end
+        else # orientation == 3
+            for j in eachnode(dg), i in eachnode(dg)
+                u_left = get_node_vars(u, equations, dg, i, j, nnodes(dg),
+                                       left_element)
+                u_right = get_node_vars(u, equations, dg, i, j, 1, right_element)
+                lambda = max_abs_speed_naive(u_left, u_right, orientation, equations)
+
+                lambda3[i, j, nnodes(dg) + 1, left_element] = lambda
+                lambda3[i, j, 1, right_element] = lambda
+
+                calc_bar_states || continue
+
+                flux_left = flux(u_left, orientation, equations)
+                flux_right = flux(u_right, orientation, equations)
+                bar_state = 0.5 * (u_left + u_right) -
+                            0.5 * (flux_right - flux_left) / lambda
+                for v in eachvariable(equations)
+                    bar_states3[v, i, j, nnodes(dg) + 1, left_element] = bar_state[v]
+                    bar_states3[v, i, j, 1, right_element] = bar_state[v]
+                end
+            end
+        end
+    end
+
+    return nothing
+end
+
+@inline function calc_lambdas_bar_states_boundary!(u, t, limiter, boundary_conditions,
+                                                   mesh::TreeMesh{3}, equations, dg,
+                                                   cache; calc_bar_states = true)
+    (; lambda1, lambda2, lambda3, bar_states1, bar_states2, bar_states3) = limiter.cache.container_bar_states
+
+    @threaded for boundary in eachboundary(dg, cache)
+        element = cache.boundaries.neighbor_ids[boundary]
+
+        orientation = cache.boundaries.orientations[boundary]
+        neighbor_side = cache.boundaries.neighbor_sides[boundary]
+
+        if orientation == 1
+            if neighbor_side == 2 # Element is on the right, boundary on the left
+                for k in eachnode(dg), j in eachnode(dg)
+                    u_inner = get_node_vars(u, equations, dg, 1, j, k, element)
+                    u_outer = get_boundary_outer_state(u_inner, t,
+                                                       boundary_conditions[1],
+                                                       orientation, 1,
+                                                       mesh, equations, dg, cache,
+                                                       1, j, k, element)
+                    lambda1[1, j, k, element] = max_abs_speed_naive(u_inner, u_outer,
+                                                                    orientation,
+                                                                    equations)
+
+                    calc_bar_states || continue
+
+                    flux_inner = flux(u_inner, orientation, equations)
+                    flux_outer = flux(u_outer, orientation, equations)
+                    bar_state = 0.5 * (u_inner + u_outer) -
+                                0.5 * (flux_inner - flux_outer) /
+                                lambda1[1, j, k, element]
+                    for v in eachvariable(equations)
+                        bar_states1[v, 1, j, k, element] = bar_state[v]
+                    end
+                end
+            else # Element is on the left, boundary on the right
+                for k in eachnode(dg), j in eachnode(dg)
+                    u_inner = get_node_vars(u, equations, dg, nnodes(dg), j, k,
+                                            element)
+                    u_outer = get_boundary_outer_state(u_inner, t,
+                                                       boundary_conditions[2],
+                                                       orientation, 2,
+                                                       mesh, equations, dg, cache,
+                                                       nnodes(dg), j, k, element)
+                    lambda1[nnodes(dg) + 1, j, k, element] = max_abs_speed_naive(u_inner,
+                                                                                 u_outer,
+                                                                                 orientation,
+                                                                                 equations)
+
+                    calc_bar_states || continue
+
+                    flux_inner = flux(u_inner, orientation, equations)
+                    flux_outer = flux(u_outer, orientation, equations)
+                    bar_state = 0.5 * (u_inner + u_outer) -
+                                0.5 * (flux_outer - flux_inner) /
+                                lambda1[nnodes(dg) + 1, j, k, element]
+                    for v in eachvariable(equations)
+                        bar_states1[v, nnodes(dg) + 1, j, k, element] = bar_state[v]
+                    end
+                end
+            end
+        elseif orientation == 2
+            if neighbor_side == 2 # Element is on the right, boundary on the left
+                for k in eachnode(dg), i in eachnode(dg)
+                    u_inner = get_node_vars(u, equations, dg, i, 1, k, element)
+                    u_outer = get_boundary_outer_state(u_inner, t,
+                                                       boundary_conditions[3],
+                                                       orientation, 3,
+                                                       mesh, equations, dg, cache,
+                                                       i, 1, k, element)
+                    lambda2[i, 1, k, element] = max_abs_speed_naive(u_inner, u_outer,
+                                                                    orientation,
+                                                                    equations)
+
+                    calc_bar_states || continue
+
+                    flux_inner = flux(u_inner, orientation, equations)
+                    flux_outer = flux(u_outer, orientation, equations)
+                    bar_state = 0.5 * (u_inner + u_outer) -
+                                0.5 * (flux_inner - flux_outer) /
+                                lambda2[i, 1, k, element]
+                    for v in eachvariable(equations)
+                        bar_states2[v, i, 1, k, element] = bar_state[v]
+                    end
+                end
+            else # Element is on the left, boundary on the right
+                for k in eachnode(dg), i in eachnode(dg)
+                    u_inner = get_node_vars(u, equations, dg, i, nnodes(dg), k,
+                                            element)
+                    u_outer = get_boundary_outer_state(u_inner, t,
+                                                       boundary_conditions[4],
+                                                       orientation, 4,
+                                                       mesh, equations, dg, cache,
+                                                       i, nnodes(dg), k, element)
+                    lambda2[i, nnodes(dg) + 1, k, element] = max_abs_speed_naive(u_inner,
+                                                                                 u_outer,
+                                                                                 orientation,
+                                                                                 equations)
+
+                    calc_bar_states || continue
+
+                    flux_inner = flux(u_inner, orientation, equations)
+                    flux_outer = flux(u_outer, orientation, equations)
+                    bar_state = 0.5 * (u_inner + u_outer) -
+                                0.5 * (flux_outer - flux_inner) /
+                                lambda2[i, nnodes(dg) + 1, k, element]
+                    for v in eachvariable(equations)
+                        bar_states2[v, i, nnodes(dg) + 1, k, element] = bar_state[v]
+                    end
+                end
+            end
+        else # orientation == 3
+            if neighbor_side == 2 # Element is on the right, boundary on the left
+                for j in eachnode(dg), i in eachnode(dg)
+                    u_inner = get_node_vars(u, equations, dg, i, j, 1, element)
+                    u_outer = get_boundary_outer_state(u_inner, t,
+                                                       boundary_conditions[5],
+                                                       orientation, 5,
+                                                       mesh, equations, dg, cache,
+                                                       i, j, 1, element)
+                    lambda3[i, j, 1, element] = max_abs_speed_naive(u_inner, u_outer,
+                                                                    orientation,
+                                                                    equations)
+
+                    calc_bar_states || continue
+
+                    flux_inner = flux(u_inner, orientation, equations)
+                    flux_outer = flux(u_outer, orientation, equations)
+                    bar_state = 0.5 * (u_inner + u_outer) -
+                                0.5 * (flux_inner - flux_outer) /
+                                lambda3[i, j, 1, element]
+                    for v in eachvariable(equations)
+                        bar_states3[v, i, j, 1, element] = bar_state[v]
+                    end
+                end
+            else # Element is on the left, boundary on the right
+                for j in eachnode(dg), i in eachnode(dg)
+                    u_inner = get_node_vars(u, equations, dg, i, j, nnodes(dg),
+                                            element)
+                    u_outer = get_boundary_outer_state(u_inner, t,
+                                                       boundary_conditions[6],
+                                                       orientation, 6,
+                                                       mesh, equations, dg, cache,
+                                                       i, j, nnodes(dg), element)
+                    lambda3[i, j, nnodes(dg) + 1, element] = max_abs_speed_naive(u_inner,
+                                                                                 u_outer,
+                                                                                 orientation,
+                                                                                 equations)
+
+                    calc_bar_states || continue
+
+                    flux_inner = flux(u_inner, orientation, equations)
+                    flux_outer = flux(u_outer, orientation, equations)
+                    bar_state = 0.5 * (u_inner + u_outer) -
+                                0.5 * (flux_outer - flux_inner) /
+                                lambda3[i, j, nnodes(dg) + 1, element]
+                    for v in eachvariable(equations)
+                        bar_states3[v, i, j, nnodes(dg) + 1, element] = bar_state[v]
+                    end
+                end
+            end
+        end
+    end
 
     return nothing
 end
@@ -1307,6 +1618,136 @@ end
         return nothing
     end
 
-    error("Bar states are only implemented for 2D problems.")
+    (; variable_bounds) = limiter.cache.subcell_limiter_coefficients
+    (; bar_states1, bar_states2, bar_states3) = limiter.cache.container_bar_states
+
+    (; small_stencil) = limiter
+    @assert small_stencil "small_stencil == false is not yet implemented for 3D subcell limiting"
+
+    # Local two-sided limiting for conservative variables
+    if limiter.local_twosided
+        for v in limiter.local_twosided_variables_cons
+            v_string = string(v)
+            var_min = variable_bounds[Symbol(v_string, "_min")]
+            var_max = variable_bounds[Symbol(v_string, "_max")]
+            @threaded for element in eachelement(dg, cache)
+                for k in eachnode(dg), j in eachnode(dg), i in eachnode(dg)
+                    var_min[i, j, k, element] = typemax(eltype(var_min))
+                    var_max[i, j, k, element] = typemin(eltype(var_max))
+                end
+
+                for k in eachnode(dg), j in eachnode(dg), i in eachnode(dg)
+                    var_min[i, j, k, element] = min(var_min[i, j, k, element],
+                                                    u[v, i, j, k, element],
+                                                    bar_states1[v, i, j, k,
+                                                                element],
+                                                    bar_states1[v, i + 1, j, k,
+                                                                element],
+                                                    bar_states2[v, i, j, k,
+                                                                element],
+                                                    bar_states2[v, i, j + 1, k,
+                                                                element],
+                                                    bar_states3[v, i, j, k,
+                                                                element],
+                                                    bar_states3[v, i, j, k + 1,
+                                                                element])
+                    var_max[i, j, k, element] = max(var_max[i, j, k, element],
+                                                    u[v, i, j, k, element],
+                                                    bar_states1[v, i, j, k,
+                                                                element],
+                                                    bar_states1[v, i + 1, j, k,
+                                                                element],
+                                                    bar_states2[v, i, j, k,
+                                                                element],
+                                                    bar_states2[v, i, j + 1, k,
+                                                                element],
+                                                    bar_states3[v, i, j, k,
+                                                                element],
+                                                    bar_states3[v, i, j, k + 1,
+                                                                element])
+                end
+            end
+        end
+    end
+
+    # Local one-sided limiting for nonlinear variables
+    if limiter.local_onesided
+        for (variable, min_or_max) in limiter.local_onesided_variables_nonlinear
+            var_minmax = variable_bounds[Symbol(string(variable), "_",
+                                                string(min_or_max))]
+            @threaded for element in eachelement(dg, cache)
+                for k in eachnode(dg), j in eachnode(dg), i in eachnode(dg)
+                    var = variable(get_node_vars(u, equations, dg, i, j, k, element),
+                                   equations)
+                    var_minmax[i, j, k, element] = var
+                end
+
+                for k in eachnode(dg), j in eachnode(dg),
+                    i in 1:(nnodes(dg) + 1)
+
+                    var = variable(get_node_vars(bar_states1, equations, dg, i,
+                                                 j, k, element), equations)
+                    if i < nnodes(dg) + 1
+                        var_minmax[i, j, k, element] = min_or_max(var_minmax[i,
+                                                                             j,
+                                                                             k,
+                                                                             element],
+                                                                  var)
+                    end
+                    if i > 1
+                        var_minmax[i - 1, j, k, element] = min_or_max(var_minmax[i - 1,
+                                                                                 j,
+                                                                                 k,
+                                                                                 element],
+                                                                      var)
+                    end
+                end
+
+                for k in eachnode(dg), j in 1:(nnodes(dg) + 1),
+                    i in eachnode(dg)
+
+                    var = variable(get_node_vars(bar_states2, equations, dg, i,
+                                                 j, k, element), equations)
+                    if j < nnodes(dg) + 1
+                        var_minmax[i, j, k, element] = min_or_max(var_minmax[i,
+                                                                             j,
+                                                                             k,
+                                                                             element],
+                                                                  var)
+                    end
+                    if j > 1
+                        var_minmax[i, j - 1, k, element] = min_or_max(var_minmax[i,
+                                                                                 j - 1,
+                                                                                 k,
+                                                                                 element],
+                                                                      var)
+                    end
+                end
+
+                for k in 1:(nnodes(dg) + 1), j in eachnode(dg),
+                    i in eachnode(dg)
+
+                    var = variable(get_node_vars(bar_states3, equations, dg, i,
+                                                 j, k, element), equations)
+                    if k < nnodes(dg) + 1
+                        var_minmax[i, j, k, element] = min_or_max(var_minmax[i,
+                                                                             j,
+                                                                             k,
+                                                                             element],
+                                                                  var)
+                    end
+                    if k > 1
+                        var_minmax[i, j, k - 1, element] = min_or_max(var_minmax[i,
+                                                                                 j,
+                                                                                 k - 1,
+                                                                                 element],
+                                                                      var)
+                    end
+                end
+            end
+        end
+    end
+
+    return nothing
 end
 end # @muladd

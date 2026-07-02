@@ -841,4 +841,15 @@ end
 
     return nothing
 end
+
+@inline function calc_lambdas_bar_states!(u, t, mesh::P4estMesh{3},
+                                          have_nonconservative_terms, equations,
+                                          limiter, dg, cache, boundary_conditions;
+                                          calc_bar_states = true)
+    if limiter.bar_states == false
+        return nothing
+    end
+
+    error("Not yet implemented for P4estMesh{3}")
+end
 end # @muladd
