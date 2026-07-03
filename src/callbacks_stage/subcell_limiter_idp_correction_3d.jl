@@ -118,7 +118,7 @@ function perform_idp_correction!(u, dt,
 end
 
 function perform_idp_mortar_correction(u, dt, mesh::TreeMesh{3}, equations, dg, cache)
-    (; orientations, limiting_factor) = cache.mortars
+    (; orientations, large_sides, limiting_factor, neighbor_ids) = cache.mortars
 
     (; surface_flux_values) = cache.elements
     (; surface_flux_values_high_order) = cache.antidiffusive_fluxes
@@ -131,32 +131,23 @@ function perform_idp_mortar_correction(u, dt, mesh::TreeMesh{3}, equations, dg, 
             continue
         end
 
-        if cache.mortars.large_sides[mortar] == 1 # -> small elements on right side
-            if orientations[mortar] == 1
-                direction_small = 1
-                direction_large = 2
-            elseif orientations[mortar] == 2
-                direction_small = 3
-                direction_large = 4
-            else # orientations[mortar] == 3
-                direction_small = 5
-                direction_large = 6
-            end
+        orientation = orientations[mortar]
+        if large_sides[mortar] == 1 # -> small elements on right side
+            direction_small = 2 * orientation - 1
+            direction_large = 2 * orientation
+            node_small = 1
+            node_large = nnodes(dg)
+
             # In `apply_jacobian`, `du` is multiplied with inverse jacobian and a negative sign.
             # This sign switch is directly applied to the boundary interpolation factors here.
             factor_small = factor
             factor_large = -factor
         else # large_sides[mortar] == 2 -> small elements on left side
-            if orientations[mortar] == 1
-                direction_small = 2
-                direction_large = 1
-            elseif orientations[mortar] == 2
-                direction_small = 4
-                direction_large = 3
-            else # orientations[mortar] == 3
-                direction_small = 6
-                direction_large = 5
-            end
+            direction_small = 2 * orientation
+            direction_large = 2 * orientation - 1
+            node_small = nnodes(dg)
+            node_large = 1
+
             # In `apply_jacobian`, `du` is multiplied with inverse jacobian and a negative sign.
             # This sign switch is directly applied to the boundary interpolation factors here.
             factor_large = factor
@@ -164,39 +155,23 @@ function perform_idp_mortar_correction(u, dt, mesh::TreeMesh{3}, equations, dg, 
         end
 
         for j in eachnode(dg), i in eachnode(dg)
-            if cache.mortars.large_sides[mortar] == 1 # -> small elements on right side
-                if orientations[mortar] == 1
-                    # L2 mortars in x-direction
-                    indices_small = (1, i, j)
-                    indices_large = (nnodes(dg), i, j)
-                elseif orientations[mortar] == 2
-                    # L2 mortars in y-direction
-                    indices_small = (i, 1, j)
-                    indices_large = (i, nnodes(dg), j)
-                else # orientations[mortar] == 3
-                    # L2 mortars in z-direction
-                    indices_small = (i, j, 1)
-                    indices_large = (i, j, nnodes(dg))
-                end
-            else # large_sides[mortar] == 2 -> small elements on left side
-                if orientations[mortar] == 1
-                    # L2 mortars in x-direction
-                    indices_small = (nnodes(dg), i, j)
-                    indices_large = (1, i, j)
-                elseif orientations[mortar] == 2
-                    # L2 mortars in y-direction
-                    indices_small = (i, nnodes(dg), j)
-                    indices_large = (i, 1, j)
-                else # orientations[mortar] == 3
-                    # L2 mortars in z-direction
-                    indices_small = (i, j, nnodes(dg))
-                    indices_large = (i, j, 1)
-                end
+            if orientation == 1
+                # L2 mortars in x-direction
+                indices_small = (node_small, i, j)
+                indices_large = (node_large, i, j)
+            elseif orientation == 2
+                # L2 mortars in y-direction
+                indices_small = (i, node_small, j)
+                indices_large = (i, node_large, j)
+            else # orientation == 3
+                # L2 mortars in z-direction
+                indices_small = (i, j, node_small)
+                indices_large = (i, j, node_large)
             end
 
             # small elements
             for small_element_index in 1:4
-                small_element = cache.mortars.neighbor_ids[small_element_index, mortar]
+                small_element = neighbor_ids[small_element_index, mortar]
                 inverse_jacobian_small = get_inverse_jacobian(cache.elements.inverse_jacobian,
                                                               mesh, indices_small...,
                                                               small_element)
@@ -219,7 +194,7 @@ function perform_idp_mortar_correction(u, dt, mesh::TreeMesh{3}, equations, dg, 
             end
 
             # large element
-            large_element = cache.mortars.neighbor_ids[5, mortar]
+            large_element = neighbor_ids[5, mortar]
             inverse_jacobian_large = get_inverse_jacobian(cache.elements.inverse_jacobian,
                                                           mesh, indices_large...,
                                                           large_element)
