@@ -1097,21 +1097,6 @@ end
     return nothing
 end
 
-@inline function add_mortar_lambdas!(lambda1, lambda2, orientation,
-                                     lambda_indices_large, large_element,
-                                     lambda_indices_small, small_element,
-                                     lambda_large, lambda_small)
-    if orientation == 1
-        lambda1[lambda_indices_large..., large_element] += lambda_large
-        lambda1[lambda_indices_small..., small_element] += lambda_small
-    else # orientation == 2
-        lambda2[lambda_indices_large..., large_element] += lambda_large
-        lambda2[lambda_indices_small..., small_element] += lambda_small
-    end
-
-    return nothing
-end
-
 @inline function add_mortar_bar_states!(bar_states1, bar_states2, orientation,
                                         equations, lambda_indices_large,
                                         large_element, lambda_indices_small,
@@ -1205,11 +1190,15 @@ end
                                                      equations)
                     end
 
-                    add_mortar_lambdas!(lambda1, lambda2, orientation,
-                                        lambda_indices_large, large_element,
-                                        lambda_indices_small, small_element,
-                                        weight * lambda / mortar_weights_sums[j, 2],
-                                        weight * lambda / mortar_weights_sums[k, 1])
+                    lambda_large = weight * lambda / mortar_weights_sums[j, 2]
+                    lambda_small = weight * lambda / mortar_weights_sums[k, 1]
+                    if orientation == 1
+                        lambda1[lambda_indices_large..., large_element] += lambda_large
+                        lambda1[lambda_indices_small..., small_element] += lambda_small
+                    else # orientation == 2
+                        lambda2[lambda_indices_large..., large_element] += lambda_large
+                        lambda2[lambda_indices_small..., small_element] += lambda_small
+                    end
 
                     calc_bar_states || continue
 
