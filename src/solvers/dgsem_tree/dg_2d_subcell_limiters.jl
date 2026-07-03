@@ -1097,45 +1097,6 @@ end
     return nothing
 end
 
-@inline function add_mortar_lambdas!(lambda1, lambda2, orientation,
-                                     lambda_indices_large, large_element,
-                                     lambda_indices_small, small_element,
-                                     lambda_large, lambda_small)
-    if orientation == 1
-        lambda1[lambda_indices_large..., large_element] += lambda_large
-        lambda1[lambda_indices_small..., small_element] += lambda_small
-    else # orientation == 2
-        lambda2[lambda_indices_large..., large_element] += lambda_large
-        lambda2[lambda_indices_small..., small_element] += lambda_small
-    end
-
-    return nothing
-end
-
-@inline function add_mortar_bar_states!(bar_states1, bar_states2, orientation,
-                                        equations, lambda_indices_large,
-                                        large_element, lambda_indices_small,
-                                        small_element, bar_state,
-                                        weight_large, weight_small)
-    if orientation == 1
-        for v in eachvariable(equations)
-            bar_states1[v, lambda_indices_large..., large_element] += weight_large *
-                                                                      bar_state[v]
-            bar_states1[v, lambda_indices_small..., small_element] += weight_small *
-                                                                      bar_state[v]
-        end
-    else # orientation == 2
-        for v in eachvariable(equations)
-            bar_states2[v, lambda_indices_large..., large_element] += weight_large *
-                                                                      bar_state[v]
-            bar_states2[v, lambda_indices_small..., small_element] += weight_small *
-                                                                      bar_state[v]
-        end
-    end
-
-    return nothing
-end
-
 @inline function calc_lambdas_bar_states_mortar!(u, t, limiter, boundary_conditions,
                                                  mesh::TreeMesh{2}, equations,
                                                  dg, cache; calc_bar_states = true)
@@ -1203,10 +1164,15 @@ end
 
                     weight_large = weight / mortar_weights_sums[j, 2]
                     weight_small = weight / mortar_weights_sums[k, 1]
-                    add_mortar_lambdas!(lambda1, lambda2, orientation,
-                                        lambda_indices_large, large_element,
-                                        lambda_indices_small, small_element,
-                                        weight_large * lambda, weight_small * lambda)
+                    lambda_large = weight_large * lambda
+                    lambda_small = weight_small * lambda
+                    if orientation == 1
+                        lambda1[lambda_indices_large..., large_element] += lambda_large
+                        lambda1[lambda_indices_small..., small_element] += lambda_small
+                    else # orientation == 2
+                        lambda2[lambda_indices_large..., large_element] += lambda_large
+                        lambda2[lambda_indices_small..., small_element] += lambda_small
+                    end
 
                     calc_bar_states || continue
 
@@ -1218,11 +1184,25 @@ end
                     end
                     central_part = u_small + u_large
                     bar_state = 0.5 * (central_part - flux_diff / lambda)
-                    add_mortar_bar_states!(bar_states1, bar_states2, orientation,
-                                           equations, lambda_indices_large,
-                                           large_element, lambda_indices_small,
-                                           small_element, bar_state,
-                                           weight_large, weight_small)
+                    if orientation == 1
+                        multiply_add_to_node_vars!(bar_states1, weight_large, bar_state,
+                                                   equations, dg,
+                                                   lambda_indices_large...,
+                                                   large_element)
+                        multiply_add_to_node_vars!(bar_states1, weight_small, bar_state,
+                                                   equations, dg,
+                                                   lambda_indices_small...,
+                                                   small_element)
+                    else # orientation == 2
+                        multiply_add_to_node_vars!(bar_states2, weight_large, bar_state,
+                                                   equations, dg,
+                                                   lambda_indices_large...,
+                                                   large_element)
+                        multiply_add_to_node_vars!(bar_states2, weight_small, bar_state,
+                                                   equations, dg,
+                                                   lambda_indices_small...,
+                                                   small_element)
+                    end
                 end
             end
         end
