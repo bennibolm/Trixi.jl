@@ -111,6 +111,10 @@ function SubcellLimiterIDP(equations::AbstractEquations, basis;
     positivity = (length(positivity_variables_cons) +
                   length(positivity_variables_nonlinear) > 0)
 
+    if indicator !== nothing && ndims(equations) == 3
+        error("The indicator is not yet implemented in 3D.")
+    end
+
     # When passing `min` or `max` in the elixir, the specific function of Base is used.
     # To speed up the simulation, we replace it with `Trixi.min` and `Trixi.max` respectively.
     local_onesided_variables_nonlinear_ = Tuple{Function, Function}[]
