@@ -1465,6 +1465,55 @@ end
     return nothing
 end
 
+@inline function add_mortar_lambdas!(lambda1, lambda2, lambda3, orientation,
+                                     lambda_indices_large, large_element,
+                                     lambda_indices_small, small_element,
+                                     lambda_large, lambda_small)
+    if orientation == 1
+        lambda1[lambda_indices_large..., large_element] += lambda_large
+        lambda1[lambda_indices_small..., small_element] += lambda_small
+    elseif orientation == 2
+        lambda2[lambda_indices_large..., large_element] += lambda_large
+        lambda2[lambda_indices_small..., small_element] += lambda_small
+    else # orientation == 3
+        lambda3[lambda_indices_large..., large_element] += lambda_large
+        lambda3[lambda_indices_small..., small_element] += lambda_small
+    end
+
+    return nothing
+end
+
+@inline function add_mortar_bar_states!(bar_states1, bar_states2, bar_states3,
+                                        orientation, equations,
+                                        lambda_indices_large, large_element,
+                                        lambda_indices_small, small_element,
+                                        bar_state, weight_large, weight_small)
+    if orientation == 1
+        for v in eachvariable(equations)
+            bar_states1[v, lambda_indices_large..., large_element] += weight_large *
+                                                                      bar_state[v]
+            bar_states1[v, lambda_indices_small..., small_element] += weight_small *
+                                                                      bar_state[v]
+        end
+    elseif orientation == 2
+        for v in eachvariable(equations)
+            bar_states2[v, lambda_indices_large..., large_element] += weight_large *
+                                                                      bar_state[v]
+            bar_states2[v, lambda_indices_small..., small_element] += weight_small *
+                                                                      bar_state[v]
+        end
+    else # orientation == 3
+        for v in eachvariable(equations)
+            bar_states3[v, lambda_indices_large..., large_element] += weight_large *
+                                                                      bar_state[v]
+            bar_states3[v, lambda_indices_small..., small_element] += weight_small *
+                                                                      bar_state[v]
+        end
+    end
+
+    return nothing
+end
+
 @inline function calc_lambdas_bar_states_mortar!(u, t, limiter, boundary_conditions,
                                                  mesh::TreeMesh{3}, equations,
                                                  dg, cache; calc_bar_states = true)
@@ -1479,30 +1528,28 @@ end
 
         orientation = cache.mortars.orientations[mortar]
         small_elements_on_right = cache.mortars.large_sides[mortar] == 1
+        if small_elements_on_right
+            large_node = nnodes(dg)
+            lambda_large_node = nnodes(dg) + 1
+            small_node = 1
+            lambda_small_node = 1
+        else
+            large_node = 1
+            lambda_large_node = 1
+            small_node = nnodes(dg)
+            lambda_small_node = nnodes(dg) + 1
+        end
 
         for j_large in eachnode(dg), i_large in eachnode(dg)
-            if small_elements_on_right
-                if orientation == 1
-                    indices_large = (nnodes(dg), i_large, j_large)
-                    lambda_indices_large = (nnodes(dg) + 1, i_large, j_large)
-                elseif orientation == 2
-                    indices_large = (i_large, nnodes(dg), j_large)
-                    lambda_indices_large = (i_large, nnodes(dg) + 1, j_large)
-                else # orientation == 3
-                    indices_large = (i_large, j_large, nnodes(dg))
-                    lambda_indices_large = (i_large, j_large, nnodes(dg) + 1)
-                end
-            else # small elements on left side
-                if orientation == 1
-                    indices_large = (1, i_large, j_large)
-                    lambda_indices_large = (1, i_large, j_large)
-                elseif orientation == 2
-                    indices_large = (i_large, 1, j_large)
-                    lambda_indices_large = (i_large, 1, j_large)
-                else # orientation == 3
-                    indices_large = (i_large, j_large, 1)
-                    lambda_indices_large = (i_large, j_large, 1)
-                end
+            if orientation == 1
+                indices_large = (large_node, i_large, j_large)
+                lambda_indices_large = (lambda_large_node, i_large, j_large)
+            elseif orientation == 2
+                indices_large = (i_large, large_node, j_large)
+                lambda_indices_large = (i_large, lambda_large_node, j_large)
+            else # orientation == 3
+                indices_large = (i_large, j_large, large_node)
+                lambda_indices_large = (i_large, j_large, lambda_large_node)
             end
             u_large = get_node_vars(u, equations, dg, indices_large..., large_element)
             flux_large = flux(u_large, orientation, equations)
@@ -1516,31 +1563,15 @@ end
                         continue
                     end
 
-                    if small_elements_on_right
-                        if orientation == 1
-                            indices_small = (1, i_small, j_small)
-                            lambda_indices_small = (1, i_small, j_small)
-                        elseif orientation == 2
-                            indices_small = (i_small, 1, j_small)
-                            lambda_indices_small = (i_small, 1, j_small)
-                        else # orientation == 3
-                            indices_small = (i_small, j_small, 1)
-                            lambda_indices_small = (i_small, j_small, 1)
-                        end
-                    else # small elements on left side
-                        if orientation == 1
-                            indices_small = (nnodes(dg), i_small, j_small)
-                            lambda_indices_small = (nnodes(dg) + 1, i_small,
-                                                    j_small)
-                        elseif orientation == 2
-                            indices_small = (i_small, nnodes(dg), j_small)
-                            lambda_indices_small = (i_small, nnodes(dg) + 1,
-                                                    j_small)
-                        else # orientation == 3
-                            indices_small = (i_small, j_small, nnodes(dg))
-                            lambda_indices_small = (i_small, j_small,
-                                                    nnodes(dg) + 1)
-                        end
+                    if orientation == 1
+                        indices_small = (small_node, i_small, j_small)
+                        lambda_indices_small = (lambda_small_node, i_small, j_small)
+                    elseif orientation == 2
+                        indices_small = (i_small, small_node, j_small)
+                        lambda_indices_small = (i_small, lambda_small_node, j_small)
+                    else # orientation == 3
+                        indices_small = (i_small, j_small, small_node)
+                        lambda_indices_small = (i_small, j_small, lambda_small_node)
                     end
                     u_small = get_node_vars(u, equations, dg, indices_small...,
                                             small_element)
@@ -1553,40 +1584,13 @@ end
                                                      equations)
                     end
 
-                    if orientation == 1
-                        lambda1[lambda_indices_large..., large_element] += weight *
-                                                                           lambda /
-                                                                           mortar_weights_sums[i_large,
-                                                                                               j_large,
-                                                                                               2]
-                        lambda1[lambda_indices_small..., small_element] += weight *
-                                                                           lambda /
-                                                                           mortar_weights_sums[i_small,
-                                                                                               j_small,
-                                                                                               1]
-                    elseif orientation == 2
-                        lambda2[lambda_indices_large..., large_element] += weight *
-                                                                           lambda /
-                                                                           mortar_weights_sums[i_large,
-                                                                                               j_large,
-                                                                                               2]
-                        lambda2[lambda_indices_small..., small_element] += weight *
-                                                                           lambda /
-                                                                           mortar_weights_sums[i_small,
-                                                                                               j_small,
-                                                                                               1]
-                    else # orientation == 3
-                        lambda3[lambda_indices_large..., large_element] += weight *
-                                                                           lambda /
-                                                                           mortar_weights_sums[i_large,
-                                                                                               j_large,
-                                                                                               2]
-                        lambda3[lambda_indices_small..., small_element] += weight *
-                                                                           lambda /
-                                                                           mortar_weights_sums[i_small,
-                                                                                               j_small,
-                                                                                               1]
-                    end
+                    add_mortar_lambdas!(lambda1, lambda2, lambda3, orientation,
+                                        lambda_indices_large, large_element,
+                                        lambda_indices_small, small_element,
+                                        weight * lambda /
+                                        mortar_weights_sums[i_large, j_large, 2],
+                                        weight * lambda /
+                                        mortar_weights_sums[i_small, j_small, 1])
 
                     calc_bar_states || continue
 
@@ -1598,46 +1602,15 @@ end
                     end
                     bar_state = 0.5 * (u_small + u_large - flux_diff / lambda)
 
-                    if orientation == 1
-                        for v in eachvariable(equations)
-                            bar_states1[v, lambda_indices_large..., large_element] += weight *
-                                                                                      bar_state[v] /
-                                                                                      mortar_weights_sums[i_large,
-                                                                                                          j_large,
-                                                                                                          2]
-                            bar_states1[v, lambda_indices_small..., small_element] += weight *
-                                                                                      bar_state[v] /
-                                                                                      mortar_weights_sums[i_small,
-                                                                                                          j_small,
-                                                                                                          1]
-                        end
-                    elseif orientation == 2
-                        for v in eachvariable(equations)
-                            bar_states2[v, lambda_indices_large..., large_element] += weight *
-                                                                                      bar_state[v] /
-                                                                                      mortar_weights_sums[i_large,
-                                                                                                          j_large,
-                                                                                                          2]
-                            bar_states2[v, lambda_indices_small..., small_element] += weight *
-                                                                                      bar_state[v] /
-                                                                                      mortar_weights_sums[i_small,
-                                                                                                          j_small,
-                                                                                                          1]
-                        end
-                    else # orientation == 3
-                        for v in eachvariable(equations)
-                            bar_states3[v, lambda_indices_large..., large_element] += weight *
-                                                                                      bar_state[v] /
-                                                                                      mortar_weights_sums[i_large,
-                                                                                                          j_large,
-                                                                                                          2]
-                            bar_states3[v, lambda_indices_small..., small_element] += weight *
-                                                                                      bar_state[v] /
-                                                                                      mortar_weights_sums[i_small,
-                                                                                                          j_small,
-                                                                                                          1]
-                        end
-                    end
+                    add_mortar_bar_states!(bar_states1, bar_states2, bar_states3,
+                                           orientation, equations,
+                                           lambda_indices_large, large_element,
+                                           lambda_indices_small, small_element,
+                                           bar_state,
+                                           weight /
+                                           mortar_weights_sums[i_large, j_large, 2],
+                                           weight /
+                                           mortar_weights_sums[i_small, j_small, 1])
                 end
             end
         end
