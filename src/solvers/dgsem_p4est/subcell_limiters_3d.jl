@@ -103,7 +103,6 @@ end
     (; neighbor_ids, node_indices) = cache.mortars
     index_range = eachnode(dg)
 
-    # TODO: How to include values at mortar interfaces?
     # See comment above TreeMesh version
     l2_mortars = dg.mortar isa LobattoLegendreMortarL2
     for mortar in eachmortar(dg, cache)
@@ -464,7 +463,6 @@ end
     (; neighbor_ids, node_indices) = cache.mortars
     index_range = eachnode(dg)
 
-    # TODO: How to include values at mortar interfaces?
     # See comment above TreeMesh version
     l2_mortars = dg.mortar isa LobattoLegendreMortarL2
     for mortar in eachmortar(dg, cache)
