@@ -90,9 +90,9 @@ end
     @test_allocations(Trixi.rhs!, semi, sol, 1000)
 end
 
-@trixi_testset "elixir_euler_convergence_amr_sc_subcell.jl" begin
+@trixi_testset "elixir_euler_convergence_mortar_sc_subcell.jl" begin
     @test_trixi_include(joinpath(EXAMPLES_DIR,
-                                 "elixir_euler_convergence_amr_sc_subcell.jl"),
+                                 "elixir_euler_convergence_mortar_sc_subcell.jl"),
                         l2=[
                             2.410500253406329e-6,
                             2.1540176628043107e-6,
@@ -599,16 +599,16 @@ end
                             bar_states=true,
                             cfl=0.9,
                             l2=[
-                                0.6364461416074191,
-                                0.26804557206405333,
-                                0.2672562767904788,
-                                0.7159364638066054
+                                0.6364461653305845,
+                                0.26804559966663105,
+                                0.26725628551370295,
+                                0.715936476519179
                             ],
                             linf=[
-                                3.801802893589546,
-                                1.9847561761565402,
-                                1.965677541576987,
-                                3.0097115924172613
+                                3.801801861328472,
+                                1.9847555417988514,
+                                1.9656768638005273,
+                                3.009711858772259
                             ],
                             tspan=(0.0, 1.0))
         # Ensure that we do not have excessive memory allocations
