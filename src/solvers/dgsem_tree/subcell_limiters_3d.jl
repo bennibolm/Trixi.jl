@@ -917,6 +917,56 @@ end
 # IDP mortar limiting
 ###############################################################################
 
+@inline function precompute_n_mortars_per_nodes!(volume_integral::VolumeIntegralSubcellLimiting,
+                                                 dg, cache, mesh::TreeMesh{3})
+    if !(dg.mortar isa LobattoLegendreMortarIDP)
+        return nothing
+    end
+
+    (; n_mortars_per_node) = volume_integral.limiter.cache.subcell_limiter_coefficients
+    (; neighbor_ids, orientations, large_sides) = cache.mortars
+
+    n_mortars_per_node .= zero(eltype(n_mortars_per_node))
+
+    for mortar in eachmortar(dg, cache)
+        small_element_1 = neighbor_ids[1, mortar]
+        small_element_2 = neighbor_ids[2, mortar]
+        small_element_3 = neighbor_ids[3, mortar]
+        small_element_4 = neighbor_ids[4, mortar]
+        large_element = neighbor_ids[5, mortar]
+
+        orientation = orientations[mortar]
+        if large_sides[mortar] == 1 # -> small elements on right side
+            node_small = 1
+            node_large = nnodes(dg)
+        else # large_sides[mortar] == 2 -> small elements on left side
+            node_small = nnodes(dg)
+            node_large = 1
+        end
+
+        for j in eachnode(dg), i in eachnode(dg)
+            if orientation == 1
+                indices_small = (node_small, i, j)
+                indices_large = (node_large, i, j)
+            elseif orientation == 2
+                indices_small = (i, node_small, j)
+                indices_large = (i, node_large, j)
+            else # orientation == 3
+                indices_small = (i, j, node_small)
+                indices_large = (i, j, node_large)
+            end
+
+            n_mortars_per_node[indices_small..., small_element_1] += 1
+            n_mortars_per_node[indices_small..., small_element_2] += 1
+            n_mortars_per_node[indices_small..., small_element_3] += 1
+            n_mortars_per_node[indices_small..., small_element_4] += 1
+            n_mortars_per_node[indices_large..., large_element] += 1
+        end
+    end
+
+    return nothing
+end
+
 ###############################################################################
 # Global positivity limiting of conservative variables
 @inline function limiting_positivity_conservative!(limiting_factor, u, dt, semi,

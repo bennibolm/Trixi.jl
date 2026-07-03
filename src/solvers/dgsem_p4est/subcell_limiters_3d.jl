@@ -720,4 +720,70 @@ end
 
     return nothing
 end
+
+###############################################################################
+# IDP mortar limiting
+###############################################################################
+
+@inline function precompute_n_mortars_per_nodes!(volume_integral::VolumeIntegralSubcellLimiting,
+                                                 dg, cache,
+                                                 mesh::P4estMesh{3})
+    if !(dg.mortar isa LobattoLegendreMortarIDP)
+        return nothing
+    end
+
+    (; n_mortars_per_node) = volume_integral.limiter.cache.subcell_limiter_coefficients
+    (; neighbor_ids, node_indices) = cache.mortars
+    index_range = eachnode(dg)
+
+    n_mortars_per_node .= zero(eltype(n_mortars_per_node))
+
+    for mortar in eachmortar(dg, cache)
+        small_element_1 = neighbor_ids[1, mortar]
+        small_element_2 = neighbor_ids[2, mortar]
+        small_element_3 = neighbor_ids[3, mortar]
+        small_element_4 = neighbor_ids[4, mortar]
+        large_element = neighbor_ids[5, mortar]
+
+        # Get index information on the small elements
+        small_indices = node_indices[1, mortar]
+        i_small_start, i_small_step = index_to_start_step_2d(small_indices[1],
+                                                             index_range)
+        j_small_start, j_small_step = index_to_start_step_2d(small_indices[2],
+                                                             index_range)
+        k_small_start, k_small_step = index_to_start_step_2d(small_indices[3],
+                                                             index_range)
+
+        large_indices = node_indices[2, mortar]
+        i_large_start, i_large_step = index_to_start_step_2d(large_indices[1],
+                                                             index_range)
+        j_large_start, j_large_step = index_to_start_step_2d(large_indices[2],
+                                                             index_range)
+        k_large_start, k_large_step = index_to_start_step_2d(large_indices[3],
+                                                             index_range)
+
+        i_small = i_small_start
+        j_small = j_small_start
+        k_small = k_small_start
+        i_large = i_large_start
+        j_large = j_large_start
+        k_large = k_large_start
+        for node in eachnode(dg)
+            n_mortars_per_node[i_small, j_small, k_small, small_element_1] += 1
+            n_mortars_per_node[i_small, j_small, k_small, small_element_2] += 1
+            n_mortars_per_node[i_small, j_small, k_small, small_element_3] += 1
+            n_mortars_per_node[i_small, j_small, k_small, small_element_4] += 1
+            n_mortars_per_node[i_large, j_large, k_large, large_element] += 1
+
+            i_small += i_small_step
+            j_small += j_small_step
+            k_small += k_small_step
+            i_large += i_large_step
+            j_large += j_large_step
+            k_large += k_large_step
+        end
+    end
+
+    return nothing
+end
 end # @muladd
