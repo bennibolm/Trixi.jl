@@ -247,6 +247,38 @@ end
         # Corresponding issue: https://github.com/trixi-framework/Trixi.jl/issues/1877
         @test_allocations(Trixi.rhs!, semi, sol, 15_000)
     end
+
+    @trixi_testset "local limiting" begin
+        @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_euler_mortar_sc_subcell.jl"),
+                            positivity_variables_cons=["rho"],
+                            positivity_variables_nonlinear=[pressure],
+                            local_twosided_variables_cons=["rho"],
+                            local_onesided_variables_nonlinear=[(entropy_guermond_etal,
+                                                                 min)],
+                            cfl=0.7,
+                            l2=[
+                                0.0038284883152897714,
+                                0.00382848831528977,
+                                0.00382848831528977,
+                                0.0038284883152897736,
+                                0.0057427324729345565
+                            ],
+                            linf=[
+                                0.07328302416770893,
+                                0.07328302416770893,
+                                0.07328302416770893,
+                                0.07328302416770915,
+                                0.10992453625156529
+                            ],
+                            tspan=(0.0, 0.1),)
+        # Ensure that we do not have excessive memory allocations
+        # (e.g., from type instabilities)
+        # Larger values for allowed allocations due to usage of custom
+        # integrator which are not *recorded* for the methods from
+        # OrdinaryDiffEq.jl
+        # Corresponding issue: https://github.com/trixi-framework/Trixi.jl/issues/1877
+        @test_allocations(Trixi.rhs!, semi, sol, 15_000)
+    end
 end
 
 @trixi_testset "elixir_euler_taylor_green_vortex.jl" begin
