@@ -31,7 +31,9 @@ polydeg = 3
 basis = LobattoLegendreBasis(polydeg)
 limiter_idp = SubcellLimiterIDP(equations, basis;
                                 positivity_variables_cons = [],
-                                positivity_variables_nonlinear = [])
+                                positivity_variables_nonlinear = [],
+                                local_twosided_variables_cons = [],
+                                local_onesided_variables_nonlinear = [])
 volume_integral = VolumeIntegralSubcellLimiting(limiter_idp;
                                                 volume_flux_dg = volume_flux,
                                                 volume_flux_fv = surface_flux)
@@ -78,21 +80,11 @@ save_solution = SaveSolutionCallback(interval = 50,
                                      solution_variables = cons2prim,
                                      extra_node_variables = (:limiting_coefficient,))
 
-amr_controller = ControllerThreeLevel(semi, IndicatorMax(semi, variable = first),
-                                      base_level = 3,
-                                      med_level = 4, med_threshold = 1.05,
-                                      max_level = 5, max_threshold = 1.3)
-amr_callback = AMRCallback(semi, amr_controller,
-                           interval = 5,
-                           adapt_initial_condition = true,
-                           adapt_initial_condition_only_refine = true)
-
 stepsize_callback = StepsizeCallback(cfl = 0.8)
 
 callbacks = CallbackSet(summary_callback,
                         analysis_callback, alive_callback,
                         save_solution,
-                        # amr_callback,
                         stepsize_callback);
 
 ###############################################################################

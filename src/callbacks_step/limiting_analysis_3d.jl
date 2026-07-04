@@ -15,7 +15,8 @@ function analyze_coefficient(mesh::TreeMesh3D, equations, dg, cache,
     for element in eachelement(dg, cache)
         jacobian = inv(cache.elements.inverse_jacobian[element])
         for k in eachnode(dg), j in eachnode(dg), i in eachnode(dg)
-            alpha_avg += jacobian * weights[i] * weights[j] * weights[k] * alpha[i, j, k, element]
+            alpha_avg += jacobian * weights[i] * weights[j] * weights[k] *
+                         alpha[i, j, k, element]
             total_volume += jacobian * weights[i] * weights[j] * weights[k]
         end
     end
@@ -34,7 +35,8 @@ function analyze_coefficient(mesh::Union{StructuredMesh{3}, P4estMesh{3}},
     for element in eachelement(dg, cache)
         for k in eachnode(dg), j in eachnode(dg), i in eachnode(dg)
             jacobian = inv(cache.elements.inverse_jacobian[i, j, k, element])
-            alpha_avg += jacobian * weights[i] * weights[j] * weights[k] * alpha[i, j, k, element]
+            alpha_avg += jacobian * weights[i] * weights[j] * weights[k] *
+                         alpha[i, j, k, element]
             total_volume += jacobian * weights[i] * weights[j] * weights[k]
         end
     end
