@@ -111,8 +111,8 @@ function SubcellLimiterIDP(equations::AbstractEquations, basis;
     positivity = (length(positivity_variables_cons) +
                   length(positivity_variables_nonlinear) > 0)
 
-    if indicator !== nothing && ndims(equations) == 3
-        error("The indicator is not yet implemented in 3D.")
+    if indicator !== nothing && ndims(equations) != 2
+        error("The smoothness indicator is only implemented in 2D.")
     end
 
     # When passing `min` or `max` in the elixir, the specific function of Base is used.
@@ -372,18 +372,7 @@ function (limiter::SubcellLimiterIDP)(u, semi, equations, dg::DGSEM,
                                                                    u, t, dt, semi)
     end
 
-    # merge alphas
-    if ndims(equations) != 2
-        error("Merging of local and global limiting factors is only implemented for 2D problems.")
-    end
-    for element in eachelement(dg, semi.cache)
-        for j in eachnode(dg), i in eachnode(dg)
-            alpha[i, j, element] = (1 - alpha_indicator[element]) *
-                                   alpha[i, j, element] +
-                                   alpha_indicator[element] *
-                                   alpha_local[i, j, element]
-        end
-    end
+    merge_alphas!(alpha, alpha_local, alpha_indicator, dg, semi.cache)
 
     return nothing
 end
@@ -490,17 +479,8 @@ end
                                   variable, min_or_max)
     end
 
-    # merge
-    (; neighbor_ids) = cache.mortars
-    for mortar in eachmortar(solver, cache)
-        @trixi_timeit timer() "alpha element" alpha_element=maximum(ntuple(i -> alpha_indicator[neighbor_ids[i,
-                                                                                                             mortar]],
-                                                                           size(neighbor_ids,
-                                                                                1)))
-
-        limiting_factor[mortar] = (1 - alpha_element) * limiting_factor[mortar] +
-                                  alpha_element * limiting_factor_local[mortar]
-    end
+    merge_alphas_mortar!(limiting_factor, limiting_factor_local, alpha_indicator,
+                         solver, mesh, cache)
 
     return nothing
 end
