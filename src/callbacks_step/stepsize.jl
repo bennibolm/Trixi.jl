@@ -193,11 +193,8 @@ function calculate_dt(u_ode, t, cfl_hyperbolic::Real, cfl_parabolic::Real,
 end
 
 function max_dt(u, t, mesh, constant_speed, semi, equations, solver, cache,
-                volume_integral::AbstractVolumeIntegral, bar_states)
-    if volume_integral isa VolumeIntegralAdaptive && bar_states == true
-        error("`bar_states=true` is currently not supported in combination with the adaptive volume integral.")
-    end
-    max_dt(u, t, mesh, constant_speed, equations, solver, cache)
+                volume_integral::AbstractVolumeIntegral, bar_states::True)
+    error("`bar_states=true` is currently not supported in combination with $(typeof(volume_integral)).")
 end
 
 @inline function max_dt(u, t, mesh,
