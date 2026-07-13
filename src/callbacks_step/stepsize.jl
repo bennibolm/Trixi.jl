@@ -149,13 +149,25 @@ end
 
 # General case for an abstract single (i.e., non-coupled) semidiscretization
 function calculate_dt(u_ode, t, cfl_hyperbolic, cfl_parabolic,
-                      semi::AbstractSemidiscretization, bar_states)
+                      semi::AbstractSemidiscretization, bar_states::True)
     mesh, equations, solver, cache = mesh_equations_solver_cache(semi)
     u = wrap_array(u_ode, mesh, equations, solver, cache)
 
     return cfl_hyperbolic(t) * max_dt(u, t, mesh,
                   have_constant_speed(equations), semi, equations, solver, cache,
                   solver.volume_integral, bar_states)
+end
+function calculate_dt(u_ode, t, cfl_hyperbolic, cfl_parabolic,
+                      semi::AbstractSemidiscretization, bar_states::False)
+    return calculate_dt(u_ode, t, cfl_hyperbolic, cfl_parabolic, semi)
+end
+function calculate_dt(u_ode, t, cfl_hyperbolic, cfl_parabolic,
+                      semi::AbstractSemidiscretization)
+    mesh, equations, solver, cache = mesh_equations_solver_cache(semi)
+    u = wrap_array(u_ode, mesh, equations, solver, cache)
+
+    return cfl_hyperbolic(t) * max_dt(u, t, mesh,
+                  have_constant_speed(equations), equations, solver, cache)
 end
 
 # Case for a purely parabolic semidiscretization
@@ -193,14 +205,11 @@ end
                         volume_integral::VolumeIntegralSubcellLimiting,
                         bar_states)
     @unpack limiter = volume_integral
-    if bar_states == true && limiter.bar_states == true
-        return max_dt(u, t, mesh, constant_speed, equations, semi, solver, cache,
-                      limiter)
-    elseif bar_states == true && limiter.bar_states != true
+    if limiter.bar_states == false
         error("The `StepsizeCallback` was configured with `bar_states = true`, but the `VolumeIntegralSubcellLimiting` in the solver is configured with `bar_states = false`. The time step size will be computed without considering the subcell limiting, which may lead to instabilities. To fix this, either set `bar_states = false` in the `StepsizeCallback` or set `bar_states = true` in the `VolumeIntegralSubcellLimiting`.")
-    else
-        return max_dt(u, t, mesh, constant_speed, equations, solver, cache)
     end
+
+    return max_dt(u, t, mesh, constant_speed, equations, semi, solver, cache, limiter)
 end
 
 # Case for a hyperbolic-parabolic semidiscretization
