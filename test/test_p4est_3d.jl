@@ -646,7 +646,10 @@ end
     @test_allocations(Trixi.rhs!, semi, sol, 1000)
 end
 
-@testitem "P4estMesh3D: elixir_euler_source_terms_nonperiodic_hohqmesh_sc_subcell.jl (positivity bounds)" setup=[Setup, P4estMesh3D] tags=[:p4est_part2] begin
+@testitem "P4estMesh3D: elixir_euler_source_terms_nonperiodic_hohqmesh_sc_subcell.jl (positivity bounds)" setup=[
+    Setup,
+    P4estMesh3D
+] tags=[:p4est_part2] begin
     @test_trixi_include(joinpath(EXAMPLES_DIR,
                                  "elixir_euler_source_terms_nonperiodic_hohqmesh_sc_subcell.jl"),
                         l2=[
@@ -673,7 +676,10 @@ end
     @test_allocations(Trixi.rhs!, semi, sol, 15_000)
 end
 
-@testitem "P4estMesh3D: elixir_euler_source_terms_nonperiodic_hohqmesh_sc_subcell.jl (local bounds)" setup=[Setup, P4estMesh3D] tags=[:p4est_part2] begin
+@testitem "P4estMesh3D: elixir_euler_source_terms_nonperiodic_hohqmesh_sc_subcell.jl (local bounds)" setup=[
+    Setup,
+    P4estMesh3D
+] tags=[:p4est_part2] begin
     @test_trixi_include(joinpath(EXAMPLES_DIR,
                                  "elixir_euler_source_terms_nonperiodic_hohqmesh_sc_subcell.jl"),
                         local_twosided_variables_cons=["rho"],
