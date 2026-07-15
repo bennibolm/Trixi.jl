@@ -254,7 +254,7 @@ end
     @test_allocations(Trixi.rhs!, semi, sol, 15_000)
 end
 
-@testitem "TreeMesh3D Euler: elixir_euler_mortar_sc_subcell.jl (local limiting, low-order bounds)" setup=[
+@testitem "TreeMesh3D Euler: elixir_euler_mortar_sc_subcell.jl (local limiting)" setup=[
     Setup,
     TreeMesh3DEuler
 ] tags=[:tree_part4] begin
@@ -289,7 +289,7 @@ end
     @test_allocations(Trixi.rhs!, semi, sol, 15_000)
 end
 
-@testitem "TreeMesh3D Euler: elixir_euler_mortar_sc_subcell.jl (local limiting, bar states bounds)" setup=[
+@testitem "TreeMesh3D Euler: elixir_euler_mortar_sc_subcell.jl (local limiting with bar states)" setup=[
     Setup,
     TreeMesh3DEuler
 ] tags=[:tree_part4] begin
@@ -698,7 +698,7 @@ end
     @test_allocations(Trixi.rhs!, semi, sol, 1000)
 end
 
-@testitem "TreeMesh3D Euler: elixir_euler_sedov_blast_wave_sc_subcell.jl (low-order bounds)" setup=[
+@testitem "TreeMesh3D Euler: elixir_euler_sedov_blast_wave_sc_subcell.jl (local limiting)" setup=[
     Setup,
     TreeMesh3DEuler
 ] tags=[:tree_part4] begin
@@ -728,7 +728,7 @@ end
     @test_allocations(Trixi.rhs!, semi, sol, 15_000)
 end
 
-@testitem "TreeMesh3D Euler: elixir_euler_sedov_blast_wave_sc_subcell.jl (bar state bounds)" setup=[
+@testitem "TreeMesh3D Euler: elixir_euler_sedov_blast_wave_sc_subcell.jl (local limiting with bar states)" setup=[
     Setup,
     TreeMesh3DEuler
 ] tags=[:tree_part4] begin

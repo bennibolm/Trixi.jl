@@ -104,6 +104,34 @@ end
     return max_dt
 end
 
+@inline function max_dt(u, t, mesh::P4estMesh{3},
+                        constant_speed::False, equations, semi, dg::DG, cache,
+                        limiter::SubcellLimiterIDP)
+    @unpack inverse_weights = dg.basis
+    calc_lambdas_bar_states!(u, t, mesh, have_nonconservative_terms(equations),
+                             equations, limiter, dg, cache, semi.boundary_conditions;
+                             calc_bar_states = false)
+    @unpack lambda1, lambda2, lambda3 = limiter.cache.container_bar_states
+
+    max_dt = floatmax(typeof(t))
+    @batch reduction=(min, max_dt) for element in eachelement(dg, cache)
+        max_dt_element = floatmax(typeof(t))
+        for k in eachnode(dg), j in eachnode(dg), i in eachnode(dg)
+            jacobian = 1 / cache.elements.inverse_jacobian[i, j, k, element]
+            denom = inverse_weights[i] *
+                    (lambda1[i, j, k, element] + lambda1[i + 1, j, k, element]) +
+                    inverse_weights[j] *
+                    (lambda2[i, j, k, element] + lambda2[i, j + 1, k, element]) +
+                    inverse_weights[k] *
+                    (lambda3[i, j, k, element] + lambda3[i, j, k + 1, element])
+            max_dt_element = Base.min(max_dt_element, jacobian / denom)
+        end
+        max_dt = Base.min(max_dt, max_dt_element)
+    end
+
+    return max_dt
+end
+
 function max_dt(u, t,
                 mesh::Union{StructuredMesh{3}, P4estMesh{3}, T8codeMesh{3}},
                 constant_speed, equations, dg::DG, cache)
