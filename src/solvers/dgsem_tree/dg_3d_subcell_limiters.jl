@@ -1487,27 +1487,34 @@ end
                                         orientation, equations,
                                         lambda_indices_large, large_element,
                                         lambda_indices_small, small_element,
-                                        bar_state, weight_large, weight_small)
+                                        bar_state, weight,
+                                        weight_sum_large, weight_sum_small)
     if orientation == 1
         for v in eachvariable(equations)
-            bar_states1[v, lambda_indices_large..., large_element] += weight_large *
-                                                                      bar_state[v]
-            bar_states1[v, lambda_indices_small..., small_element] += weight_small *
-                                                                      bar_state[v]
+            bar_states1[v, lambda_indices_large..., large_element] += weight *
+                                                                      bar_state[v] /
+                                                                      weight_sum_large
+            bar_states1[v, lambda_indices_small..., small_element] += weight *
+                                                                      bar_state[v] /
+                                                                      weight_sum_small
         end
     elseif orientation == 2
         for v in eachvariable(equations)
-            bar_states2[v, lambda_indices_large..., large_element] += weight_large *
-                                                                      bar_state[v]
-            bar_states2[v, lambda_indices_small..., small_element] += weight_small *
-                                                                      bar_state[v]
+            bar_states2[v, lambda_indices_large..., large_element] += weight *
+                                                                      bar_state[v] /
+                                                                      weight_sum_large
+            bar_states2[v, lambda_indices_small..., small_element] += weight *
+                                                                      bar_state[v] /
+                                                                      weight_sum_small
         end
     else # orientation == 3
         for v in eachvariable(equations)
-            bar_states3[v, lambda_indices_large..., large_element] += weight_large *
-                                                                      bar_state[v]
-            bar_states3[v, lambda_indices_small..., small_element] += weight_small *
-                                                                      bar_state[v]
+            bar_states3[v, lambda_indices_large..., large_element] += weight *
+                                                                      bar_state[v] /
+                                                                      weight_sum_large
+            bar_states3[v, lambda_indices_small..., small_element] += weight *
+                                                                      bar_state[v] /
+                                                                      weight_sum_small
         end
     end
 
@@ -1606,10 +1613,8 @@ end
                                            orientation, equations,
                                            lambda_indices_large, large_element,
                                            lambda_indices_small, small_element,
-                                           bar_state,
-                                           weight /
+                                           bar_state, weight,
                                            mortar_weights_sums[i_large, j_large, 2],
-                                           weight /
                                            mortar_weights_sums[i_small, j_small, 1])
                 end
             end
