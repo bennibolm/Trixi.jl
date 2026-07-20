@@ -377,7 +377,7 @@ end
     @test_allocations(Trixi.rhs!, semi, sol, 1000)
 end
 
-@testitem "P4estMesh3D: elixir_euler_sedov_sc_subcell.jl (positivity bounds)" setup=[
+@testitem "P4estMesh3D: elixir_euler_sedov_sc_subcell.jl (positivity limiting)" setup=[
     Setup,
     P4estMesh3D
 ] tags=[:p4est_part2] begin
@@ -534,6 +534,53 @@ end
     @test_allocations(Trixi.rhs!, semi, sol, 1000)
 end
 
+@testitem "P4estMesh3D: elixir_euler_mortar_sc_subcell.jl (conservation)" setup=[
+    Setup,
+    P4estMesh3D
+] tags=[:p4est_part2] begin
+    @test_trixi_include(joinpath(EXAMPLES_DIR,
+                                 "elixir_euler_weak_blast_wave_amr_sc_subcell.jl"),
+                        tspan=(0.0, 0.3),
+                        pure_low_order=true)
+    # Check for conservation
+    state_integrals = Trixi.integrate(sol.u[2], semi)
+    initial_state_integrals = analysis_callback.affect!.initial_state_integrals
+
+    @test isapprox(state_integrals[1], initial_state_integrals[1], atol = 1e-12)
+    @test isapprox(state_integrals[2], initial_state_integrals[2], atol = 1e-12)
+    @test isapprox(state_integrals[3], initial_state_integrals[3], atol = 1e-12)
+    @test isapprox(state_integrals[4], initial_state_integrals[4], atol = 1e-12)
+    @test isapprox(state_integrals[5], initial_state_integrals[5], atol = 5e-11)
+end
+@testitem "P4estMesh3D: elixir_euler_mortar_sc_subcell.jl (no limiting)" setup=[
+    Setup,
+    P4estMesh3D
+] tags=[:p4est_part2] begin
+    @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_euler_mortar_sc_subcell.jl"),
+                        l2=[# TODO
+                            0.09946224487902565,
+                            0.04863386374672001,
+                            0.048633863746720116,
+                            0.04863386374672032,
+                            0.3751015774232693
+                        ],
+                        linf=[
+                            0.789241521871487,
+                            0.42046970270100276,
+                            0.42046970270100276,
+                            0.4204697027010028,
+                            4.730877375538398
+                        ],
+                        tspan=(0.0, 0.3))
+    # Ensure that we do not have excessive memory allocations
+    # (e.g., from type instabilities)
+    # Larger values for allowed allocations due to usage of custom
+    # integrator which are not *recorded* for the methods from
+    # OrdinaryDiffEq.jl
+    # Corresponding issue: https://github.com/trixi-framework/Trixi.jl/issues/1877
+    @test_allocations(Trixi.rhs!, semi, sol, 15000)
+end
+
 @testitem "P4estMesh3D: elixir_euler_source_terms_nonconforming_earth.jl" setup=[
     Setup,
     P4estMesh3D
@@ -683,7 +730,7 @@ end
     @test_allocations(Trixi.rhs!, semi, sol, 1000)
 end
 
-@testitem "P4estMesh3D: elixir_euler_source_terms_nonperiodic_hohqmesh_sc_subcell.jl (positivity bounds)" setup=[
+@testitem "P4estMesh3D: elixir_euler_source_terms_nonperiodic_hohqmesh_sc_subcell.jl (positivity limiting)" setup=[
     Setup,
     P4estMesh3D
 ] tags=[:p4est_part2] begin

@@ -842,6 +842,50 @@ end
     return nothing
 end
 
+function prolong2mortars!(cache, u, mesh::P4estMesh{3}, equations,
+                          mortar_idp::LobattoLegendreMortarIDP, dg::DGSEM)
+    prolong2mortars!(cache, u, mesh, equations, mortar_idp.mortar_l2, dg)
+
+    (; neighbor_ids, node_indices, u_large) = cache.mortars
+    index_range = eachnode(dg)
+
+    # The data of all four small elements were already copied to the mortar cache
+    @threaded for mortar in eachmortar(dg, cache)
+        large_element = neighbor_ids[5, mortar]
+
+        # Copy solutions data from large element using "delayed indexing" with
+        # a start value and two step sizes to get the correct face and orientation.
+        large_indices = node_indices[2, mortar]
+
+        i_large_start, i_large_step_i, i_large_step_j = index_to_start_step_3d(large_indices[1],
+                                                                               index_range)
+        j_large_start, j_large_step_i, j_large_step_j = index_to_start_step_3d(large_indices[2],
+                                                                               index_range)
+        k_large_start, k_large_step_i, k_large_step_j = index_to_start_step_3d(large_indices[3],
+                                                                               index_range)
+
+        i_large = i_large_start
+        j_large = j_large_start
+        k_large = k_large_start
+        for j in eachnode(dg)
+            for i in eachnode(dg)
+                for v in eachvariable(equations)
+                    u_large[v, i, j, mortar] = u[v, i_large, j_large, k_large,
+                                                 large_element]
+                end
+                i_large += i_large_step_i
+                j_large += j_large_step_i
+                k_large += k_large_step_i
+            end
+            i_large += i_large_step_j
+            j_large += j_large_step_j
+            k_large += k_large_step_j
+        end
+    end
+
+    return nothing
+end
+
 @inline function calc_lambdas_bar_states!(u, t, mesh::P4estMesh{3},
                                           have_nonconservative_terms, equations,
                                           limiter, dg, cache, boundary_conditions;
@@ -1408,6 +1452,182 @@ end
                 i_node += i_node_step_j
                 j_node += j_node_step_j
                 k_node += k_node_step_j
+            end
+        end
+    end
+
+    return nothing
+end
+
+function calc_mortar_flux_low_order!(surface_flux_values,
+                                     mesh::P4estMesh{3},
+                                     nonconservative_terms::False, equations,
+                                     mortar_idp::LobattoLegendreMortarIDP,
+                                     surface_integral, dg::DG, cache)
+    (; surface_flux) = surface_integral
+    (; elements, mortars) = cache
+    (; neighbor_ids, node_indices, u_large) = mortars
+    (; contravariant_vectors) = elements
+    (; mortar_weights, mortar_weights_sums) = mortar_idp
+    index_range = eachnode(dg)
+
+    @threaded for mortar in eachmortar(dg, cache)
+        # Get index information on the small elements
+        small_indices = node_indices[1, mortar]
+        small_direction = indices2direction(small_indices)
+        i_small_start, i_small_step_i, i_small_step_j = index_to_start_step_3d(small_indices[1],
+                                                                               index_range)
+        j_small_start, j_small_step_i, j_small_step_j = index_to_start_step_3d(small_indices[2],
+                                                                               index_range)
+        k_small_start, k_small_step_i, k_small_step_j = index_to_start_step_3d(small_indices[3],
+                                                                               index_range)
+
+        large_indices = node_indices[2, mortar]
+        large_direction = indices2direction(large_indices)
+        i_large_start, i_large_step_i, i_large_step_j = index_to_start_step_3d(large_indices[1],
+                                                                               index_range)
+        j_large_start, j_large_step_i, j_large_step_j = index_to_start_step_3d(large_indices[2],
+                                                                               index_range)
+        k_large_start, k_large_step_i, k_large_step_j = index_to_start_step_3d(large_indices[3],
+                                                                               index_range)
+
+        for small_element_index in 1:4
+            small_element = neighbor_ids[small_element_index, mortar]
+            surface_flux_values[:, :, :, small_direction, small_element] .= zero(eltype(surface_flux_values))
+        end
+        large_element = neighbor_ids[5, mortar]
+        surface_flux_values[:, :, :, large_direction, large_element] .= zero(eltype(surface_flux_values))
+
+        for small_element_index in 1:4
+            small_element = neighbor_ids[small_element_index, mortar]
+
+            i_small = i_small_start
+            j_small = j_small_start
+            k_small = k_small_start
+            for j_small_node in eachnode(dg)
+                for i_small_node in eachnode(dg)
+                    # TODO
+                    if small_indices[1] === :i_forward ||
+                       small_indices[1] === :i_backward
+                        i_mortar_s = i_small
+                    elseif small_indices[2] === :i_forward ||
+                           small_indices[2] === :i_backward
+                        i_mortar_s = j_small
+                    else
+                        i_mortar_s = k_small
+                    end
+
+                    if small_indices[1] === :j_forward ||
+                       small_indices[1] === :j_backward
+                        j_mortar_s = i_small
+                    elseif small_indices[2] === :j_forward ||
+                           small_indices[2] === :j_backward
+                        j_mortar_s = j_small
+                    else
+                        j_mortar_s = k_small
+                    end
+
+                    u_small_local, _ = get_surface_node_vars(mortars.u, equations, dg,
+                                                             small_element_index,
+                                                             i_small_node,
+                                                             j_small_node, mortar)
+
+                    # Get the normal direction on the small element.
+                    # Note, contravariant vectors at interfaces in negative coordinate direction
+                    # are pointing inwards. This is handled by `get_normal_direction`.
+                    normal_direction_small = get_normal_direction(small_direction,
+                                                                  contravariant_vectors,
+                                                                  i_small, j_small,
+                                                                  k_small,
+                                                                  small_element)
+
+                    i_large = i_large_start
+                    j_large = j_large_start
+                    k_large = k_large_start
+                    for j_large_node in eachnode(dg)
+                        for i_large_node in eachnode(dg)
+                            if large_indices[1] === :i_forward ||
+                               large_indices[1] === :i_backward
+                                i_mortar_l = i_large
+                            elseif large_indices[2] === :i_forward ||
+                                   large_indices[2] === :i_backward
+                                i_mortar_l = j_large
+                            else
+                                i_mortar_l = k_large
+                            end
+
+                            if large_indices[1] === :j_forward ||
+                               large_indices[1] === :j_backward
+                                j_mortar_l = i_large
+                            elseif large_indices[2] === :j_forward ||
+                                   large_indices[2] === :j_backward
+                                j_mortar_l = j_large
+                            else
+                                j_mortar_l = k_large
+                            end
+
+                            factor = mortar_weights[i_mortar_l, j_mortar_l,
+                                                    i_mortar_s, j_mortar_s,
+                                                    small_element_index]
+                            if iszero(factor)
+                                i_large += i_large_step_i
+                                j_large += j_large_step_i
+                                k_large += k_large_step_i
+                                continue
+                            end
+
+                            u_large_local = get_node_vars(u_large, equations, dg,
+                                                          i_large_node,
+                                                          j_large_node, mortar)
+
+                            flux = surface_flux(u_small_local, u_large_local,
+                                                normal_direction_small, equations)
+
+                            # Add flux to small element
+                            multiply_add_to_node_vars!(surface_flux_values,
+                                                       factor /
+                                                       mortar_weights_sums[i_mortar_s,
+                                                                           j_mortar_s,
+                                                                           1],
+                                                       flux, equations, dg,
+                                                       i_small, j_small,
+                                                       small_direction,
+                                                       small_element)
+
+                            # Add flux to large element
+                            # The flux is calculated in the outward direction of the small elements,
+                            # so the sign must be switched to get the flux in outward direction
+                            # of the large element.
+                            # The contravariant vectors of the large element (and therefore the normal
+                            # vectors of the large element as well) are twice as large as the
+                            # contravariant vectors of the small elements. Therefore, the flux needs
+                            # to be scaled by a factor of 2 to obtain the flux of the large element.
+                            multiply_add_to_node_vars!(surface_flux_values,
+                                                       -2 * factor /
+                                                       mortar_weights_sums[i_mortar_l,
+                                                                           j_mortar_l,
+                                                                           2],
+                                                       flux, equations, dg,
+                                                       i_large, j_large,
+                                                       large_direction,
+                                                       large_element)
+
+                            i_large += i_large_step_i
+                            j_large += j_large_step_i
+                            k_large += k_large_step_i
+                        end
+                        i_large += i_large_step_j
+                        j_large += j_large_step_j
+                        k_large += k_large_step_j
+                    end
+
+                    i_small += i_small_step_i
+                    j_small += j_small_step_i
+                    k_small += k_small_step_i
+                end
+                i_small += i_small_step_j
+                j_small += j_small_step_j
+                k_small += k_small_step_j
             end
         end
     end
