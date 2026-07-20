@@ -1177,25 +1177,8 @@ end
             k_small = k_small_start
             for j_small_node in eachnode(dg)
                 for i_small_node in eachnode(dg)
-                    if small_indices[1] === :i_forward ||
-                       small_indices[1] === :i_backward
-                        i_mortar_s = i_small
-                    elseif small_indices[2] === :i_forward ||
-                           small_indices[2] === :i_backward
-                        i_mortar_s = j_small
-                    else
-                        i_mortar_s = k_small
-                    end
-
-                    if small_indices[1] === :j_forward ||
-                       small_indices[1] === :j_backward
-                        j_mortar_s = i_small
-                    elseif small_indices[2] === :j_forward ||
-                           small_indices[2] === :j_backward
-                        j_mortar_s = j_small
-                    else
-                        j_mortar_s = k_small
-                    end
+                    i_mortar_s, j_mortar_s = get_mortar_index(small_indices,
+                                                              i_small, j_small, k_small)
 
                     u_small = get_node_vars(u, equations, dg, i_small, j_small,
                                             k_small, small_element)
@@ -1209,25 +1192,10 @@ end
                     k_large = k_large_start
                     for j_large_node in eachnode(dg)
                         for i_large_node in eachnode(dg)
-                            if large_indices[1] === :i_forward ||
-                               large_indices[1] === :i_backward
-                                i_mortar_l = i_large
-                            elseif large_indices[2] === :i_forward ||
-                                   large_indices[2] === :i_backward
-                                i_mortar_l = j_large
-                            else
-                                i_mortar_l = k_large
-                            end
-
-                            if large_indices[1] === :j_forward ||
-                               large_indices[1] === :j_backward
-                                j_mortar_l = i_large
-                            elseif large_indices[2] === :j_forward ||
-                                   large_indices[2] === :j_backward
-                                j_mortar_l = j_large
-                            else
-                                j_mortar_l = k_large
-                            end
+                            i_mortar_l, j_mortar_l = get_mortar_index(large_indices,
+                                                                      i_large,
+                                                                      j_large,
+                                                                      k_large)
 
                             weight = mortar_weights[i_mortar_l, j_mortar_l,
                                                     i_mortar_s, j_mortar_s,
@@ -1506,26 +1474,8 @@ function calc_mortar_flux_low_order!(surface_flux_values,
             k_small = k_small_start
             for j_small_node in eachnode(dg)
                 for i_small_node in eachnode(dg)
-                    # TODO
-                    if small_indices[1] === :i_forward ||
-                       small_indices[1] === :i_backward
-                        i_mortar_s = i_small
-                    elseif small_indices[2] === :i_forward ||
-                           small_indices[2] === :i_backward
-                        i_mortar_s = j_small
-                    else
-                        i_mortar_s = k_small
-                    end
-
-                    if small_indices[1] === :j_forward ||
-                       small_indices[1] === :j_backward
-                        j_mortar_s = i_small
-                    elseif small_indices[2] === :j_forward ||
-                           small_indices[2] === :j_backward
-                        j_mortar_s = j_small
-                    else
-                        j_mortar_s = k_small
-                    end
+                    i_mortar_s, j_mortar_s = get_mortar_index(small_indices,
+                                                              i_small, j_small, k_small)
 
                     u_small_local, _ = get_surface_node_vars(mortars.u, equations, dg,
                                                              small_element_index,
@@ -1546,25 +1496,10 @@ function calc_mortar_flux_low_order!(surface_flux_values,
                     k_large = k_large_start
                     for j_large_node in eachnode(dg)
                         for i_large_node in eachnode(dg)
-                            if large_indices[1] === :i_forward ||
-                               large_indices[1] === :i_backward
-                                i_mortar_l = i_large
-                            elseif large_indices[2] === :i_forward ||
-                                   large_indices[2] === :i_backward
-                                i_mortar_l = j_large
-                            else
-                                i_mortar_l = k_large
-                            end
-
-                            if large_indices[1] === :j_forward ||
-                               large_indices[1] === :j_backward
-                                j_mortar_l = i_large
-                            elseif large_indices[2] === :j_forward ||
-                                   large_indices[2] === :j_backward
-                                j_mortar_l = j_large
-                            else
-                                j_mortar_l = k_large
-                            end
+                            i_mortar_l, j_mortar_l = get_mortar_index(large_indices,
+                                                                      i_large,
+                                                                      j_large,
+                                                                      k_large)
 
                             factor = mortar_weights[i_mortar_l, j_mortar_l,
                                                     i_mortar_s, j_mortar_s,

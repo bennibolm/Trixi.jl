@@ -156,7 +156,8 @@ end
 
 # Initialize node_indices of mortar container
 # faces[1] is expected to be the face of the small side.
-@inline function init_mortar_node_indices!(mortars::P4estMortarContainer{3},
+@inline function init_mortar_node_indices!(mortars::Union{P4estMortarContainer{3},
+                                                          P4estIDPMortarContainer{3}},
                                            faces, orientation, mortar_id)
     for side in 1:2
         # Align mortar at small side.

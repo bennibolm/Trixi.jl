@@ -130,6 +130,7 @@ function perform_idp_mortar_correction(u, dt, mesh::TreeMesh{3}, equations, dg, 
         if isapprox(limiting_factor[mortar], one(eltype(limiting_factor)))
             continue
         end
+        large_element = neighbor_ids[5, mortar]
 
         orientation = orientations[mortar]
         if large_sides[mortar] == 1 # -> small elements on right side
@@ -169,6 +170,25 @@ function perform_idp_mortar_correction(u, dt, mesh::TreeMesh{3}, equations, dg, 
                 indices_large = (i, j, node_large)
             end
 
+            # large element
+            inverse_jacobian_large = get_inverse_jacobian(cache.elements.inverse_jacobian,
+                                                          mesh, indices_large...,
+                                                          large_element)
+
+            flux_large_high_order = get_node_vars(surface_flux_values_high_order,
+                                                  equations, dg, i, j, direction_large,
+                                                  large_element)
+            flux_large_low_order = get_node_vars(surface_flux_values, equations, dg,
+                                                 i, j, direction_large, large_element)
+            flux_difference_large = factor_large *
+                                    (flux_large_high_order .- flux_large_low_order)
+
+            multiply_add_to_node_vars!(u,
+                                       dt * inverse_jacobian_large *
+                                       (1 - limiting_factor[mortar]),
+                                       flux_difference_large, equations, dg,
+                                       indices_large..., large_element)
+
             # small elements
             for small_element_index in 1:4
                 small_element = neighbor_ids[small_element_index, mortar]
@@ -192,26 +212,6 @@ function perform_idp_mortar_correction(u, dt, mesh::TreeMesh{3}, equations, dg, 
                                            flux_difference_small, equations, dg,
                                            indices_small..., small_element)
             end
-
-            # large element
-            large_element = neighbor_ids[5, mortar]
-            inverse_jacobian_large = get_inverse_jacobian(cache.elements.inverse_jacobian,
-                                                          mesh, indices_large...,
-                                                          large_element)
-
-            flux_large_high_order = get_node_vars(surface_flux_values_high_order,
-                                                  equations, dg, i, j, direction_large,
-                                                  large_element)
-            flux_large_low_order = get_node_vars(surface_flux_values, equations, dg,
-                                                 i, j, direction_large, large_element)
-            flux_difference_large = factor_large *
-                                    (flux_large_high_order .- flux_large_low_order)
-
-            multiply_add_to_node_vars!(u,
-                                       dt * inverse_jacobian_large *
-                                       (1 - limiting_factor[mortar]),
-                                       flux_difference_large, equations, dg,
-                                       indices_large..., large_element)
         end
     end
 
@@ -265,6 +265,7 @@ function perform_idp_mortar_correction(u, dt, mesh::P4estMesh{3}, equations, dg,
         k_large = k_large_start
         for j in eachnode(dg)
             for i in eachnode(dg)
+                # large element
                 inverse_jacobian_large = get_inverse_jacobian(cache.elements.inverse_jacobian,
                                                               mesh,
                                                               i_large, j_large, k_large,
