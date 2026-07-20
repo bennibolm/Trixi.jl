@@ -538,8 +538,7 @@ end
     Setup,
     P4estMesh3D
 ] tags=[:p4est_part2] begin
-    @test_trixi_include(joinpath(EXAMPLES_DIR,
-                                 "elixir_euler_weak_blast_wave_amr_sc_subcell.jl"),
+    @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_euler_mortar_sc_subcell.jl"),
                         tspan=(0.0, 0.3),
                         pure_low_order=true)
     # Check for conservation
@@ -557,19 +556,19 @@ end
     P4estMesh3D
 ] tags=[:p4est_part2] begin
     @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_euler_mortar_sc_subcell.jl"),
-                        l2=[# TODO
-                            0.09946224487902565,
-                            0.04863386374672001,
-                            0.048633863746720116,
-                            0.04863386374672032,
-                            0.3751015774232693
+                        l2=[
+                            0.011148595040635862,
+                            0.011148595040635858,
+                            0.011148595040635853,
+                            0.011148595040635848,
+                            0.016722892560951823
                         ],
                         linf=[
-                            0.789241521871487,
-                            0.42046970270100276,
-                            0.42046970270100276,
-                            0.4204697027010028,
-                            4.730877375538398
+                            0.2128507307245624,
+                            0.21285073072456062,
+                            0.21285073072456373,
+                            0.2128507307245624,
+                            0.31927609608684193
                         ],
                         tspan=(0.0, 0.3))
     # Ensure that we do not have excessive memory allocations
