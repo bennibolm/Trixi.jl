@@ -569,10 +569,9 @@ end
 
             # Compute blending coefficient avoiding division by zero
             # (as in paper of [Guermond, Nazarov, Popov, Thomas] (4.8))
-            Qp = abs(Qp) /
-                 (abs(Pp) + eps(typeof(Qp)) * 100 * abs(var_max[i, j, element]))
-            Qm = abs(Qm) /
-                 (abs(Pm) + eps(typeof(Qm)) * 100 * abs(var_max[i, j, element]))
+            eps_ = eps(typeof(Qp)) * 100 * abs(var_max[i, j, element])
+            Qp = abs(Qp) / (abs(Pp) + eps_)
+            Qm = abs(Qm) / (abs(Pm) + eps_)
 
             # Calculate alpha at nodes
             alpha[i, j, element] = max(alpha[i, j, element], 1 - min(1, Qp, Qm))
@@ -681,7 +680,8 @@ end
 
             # Compute blending coefficient avoiding division by zero
             # (as in paper of [Guermond, Nazarov, Popov, Thomas] (4.8))
-            Qm = abs(Qm) / (abs(Pm) + eps(typeof(Qm)) * 100)
+            eps_ = eps(typeof(Qm)) * 100
+            Qm = abs(Qm) / (abs(Pm) + eps_)
 
             # Calculate alpha
             alpha[i, j, element] = max(alpha[i, j, element], 1 - Qm)
@@ -851,13 +851,12 @@ end
     var_min = variable_bounds[Symbol(variable_string, "_min")]
     var_max = variable_bounds[Symbol(variable_string, "_max")]
 
-    for mortar in eachmortar(dg, cache)
+    @threaded for mortar in eachmortar(dg, cache)
         isone(limiting_factor[mortar]) && continue # Skip if alpha is already 1 (no limiting needed)
 
         large_element = neighbor_ids[3, mortar]
         upper_element = neighbor_ids[2, mortar]
         lower_element = neighbor_ids[1, mortar]
-
         if perform_subcell_limiting(dg.volume_integral, large_element) ||
            perform_subcell_limiting(dg.volume_integral, lower_element) ||
            perform_subcell_limiting(dg.volume_integral, upper_element)
@@ -1198,7 +1197,7 @@ end
     (; variable_bounds, n_mortars_per_node) = dg.mortar.limiter.cache.subcell_limiter_coefficients
     var_min = variable_bounds[Symbol(string(var_index), "_min")]
 
-    for mortar in eachmortar(dg, cache)
+    @threaded for mortar in eachmortar(dg, cache)
         isone(limiting_factor[mortar]) && continue # Skip if alpha is already 1 (no limiting needed)
 
         large_element = neighbor_ids[3, mortar]
@@ -1365,7 +1364,7 @@ end
 
     (; gamma_constant_newton) = limiter
 
-    for mortar in eachmortar(dg, cache)
+    @threaded for mortar in eachmortar(dg, cache)
         isone(limiting_factor[mortar]) && continue # Skip if alpha is already 1 (no limiting needed)
 
         large_element = neighbor_ids[3, mortar]

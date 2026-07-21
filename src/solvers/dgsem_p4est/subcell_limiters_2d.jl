@@ -535,11 +535,18 @@ end
         large_element = neighbor_ids[3, mortar]
         upper_element = neighbor_ids[2, mortar]
         lower_element = neighbor_ids[1, mortar]
+        if perform_subcell_limiting(dg.volume_integral, large_element) ||
+           perform_subcell_limiting(dg.volume_integral, lower_element) ||
+           perform_subcell_limiting(dg.volume_integral, upper_element)
+            # Subcell limiting is necessary for at least one of the elements => Calculate bounds at this mortar
+        else
+            # Subcell limiting is not necessary for all elements => Skip this mortar
+            continue
+        end
 
         # Get index information on the small elements
         small_indices = node_indices[1, mortar]
         small_direction = indices2direction(small_indices)
-
         i_small_start, i_small_step = index_to_start_step_2d(small_indices[1],
                                                              index_range)
         j_small_start, j_small_step = index_to_start_step_2d(small_indices[2],
@@ -547,7 +554,6 @@ end
 
         large_indices = node_indices[2, mortar]
         large_direction = indices2direction(large_indices)
-
         i_large_start, i_large_step = index_to_start_step_2d(large_indices[1],
                                                              index_range)
         j_large_start, j_large_step = index_to_start_step_2d(large_indices[2],
@@ -707,17 +713,24 @@ end
 
     index_range = eachnode(dg)
 
-    for mortar in eachmortar(dg, cache)
+    @threaded for mortar in eachmortar(dg, cache)
         isone(limiting_factor[mortar]) && continue # Skip if alpha is already 1 (no limiting needed)
 
         large_element = neighbor_ids[3, mortar]
         upper_element = neighbor_ids[2, mortar]
         lower_element = neighbor_ids[1, mortar]
+        if perform_subcell_limiting(dg.volume_integral, large_element) ||
+           perform_subcell_limiting(dg.volume_integral, lower_element) ||
+           perform_subcell_limiting(dg.volume_integral, upper_element)
+            # Subcell limiting is necessary for at least one of the elements => Calculate bounds at this mortar
+        else
+            # Subcell limiting is not necessary for all elements => Skip this mortar
+            continue
+        end
 
         # Get index information on the small elements
         small_indices = node_indices[1, mortar]
         small_direction = indices2direction(small_indices)
-
         i_small_start, i_small_step = index_to_start_step_2d(small_indices[1],
                                                              index_range)
         j_small_start, j_small_step = index_to_start_step_2d(small_indices[2],
@@ -725,7 +738,6 @@ end
 
         large_indices = node_indices[2, mortar]
         large_direction = indices2direction(large_indices)
-
         i_large_start, i_large_step = index_to_start_step_2d(large_indices[1],
                                                              index_range)
         j_large_start, j_large_step = index_to_start_step_2d(large_indices[2],
@@ -847,11 +859,18 @@ end
         large_element = neighbor_ids[3, mortar]
         upper_element = neighbor_ids[2, mortar]
         lower_element = neighbor_ids[1, mortar]
+        if perform_subcell_limiting(dg.volume_integral, large_element) ||
+           perform_subcell_limiting(dg.volume_integral, lower_element) ||
+           perform_subcell_limiting(dg.volume_integral, upper_element)
+            # Subcell limiting is necessary for at least one of the elements => Calculate bounds at this mortar
+        else
+            # Subcell limiting is not necessary for all elements => Skip this mortar
+            continue
+        end
 
         # Get index information on the small elements
         small_indices = node_indices[1, mortar]
         small_direction = indices2direction(small_indices)
-
         i_small_start, i_small_step = index_to_start_step_2d(small_indices[1],
                                                              index_range)
         j_small_start, j_small_step = index_to_start_step_2d(small_indices[2],
@@ -859,7 +878,6 @@ end
 
         large_indices = node_indices[2, mortar]
         large_direction = indices2direction(large_indices)
-
         i_large_start, i_large_step = index_to_start_step_2d(large_indices[1],
                                                              index_range)
         j_large_start, j_large_step = index_to_start_step_2d(large_indices[2],
@@ -989,17 +1007,24 @@ end
 
     index_range = eachnode(dg)
 
-    for mortar in eachmortar(dg, cache)
+    @threaded for mortar in eachmortar(dg, cache)
         isone(limiting_factor[mortar]) && continue # Skip if alpha is already 1 (no limiting needed)
 
         large_element = neighbor_ids[3, mortar]
         upper_element = neighbor_ids[2, mortar]
         lower_element = neighbor_ids[1, mortar]
+        if perform_subcell_limiting(dg.volume_integral, large_element) ||
+           perform_subcell_limiting(dg.volume_integral, lower_element) ||
+           perform_subcell_limiting(dg.volume_integral, upper_element)
+            # Subcell limiting is necessary for at least one of the elements => Calculate bounds at this mortar
+        else
+            # Subcell limiting is not necessary for all elements => Skip this mortar
+            continue
+        end
 
         # Get index information on the small elements
         small_indices = node_indices[1, mortar]
         small_direction = indices2direction(small_indices)
-
         i_small_start, i_small_step = index_to_start_step_2d(small_indices[1],
                                                              index_range)
         j_small_start, j_small_step = index_to_start_step_2d(small_indices[2],
@@ -1007,7 +1032,6 @@ end
 
         large_indices = node_indices[2, mortar]
         large_direction = indices2direction(large_indices)
-
         i_large_start, i_large_step = index_to_start_step_2d(large_indices[1],
                                                              index_range)
         j_large_start, j_large_step = index_to_start_step_2d(large_indices[2],
