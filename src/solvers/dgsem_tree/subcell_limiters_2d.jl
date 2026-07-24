@@ -961,7 +961,7 @@ end
             # Calculate limiting factor
             Q = min(1, Qp_large, Qm_large)
 
-            # small elements
+            # Small elements
             for small_element_index in 1:2
                 small_element = neighbor_ids[small_element_index, mortar]
                 var_small = u[var_index, indices_small..., small_element]
