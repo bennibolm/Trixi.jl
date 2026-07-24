@@ -1078,9 +1078,9 @@ end
                         local_twosided_variables_cons=["rho"],
                         local_onesided_variables_nonlinear=[(entropy_guermond_etal,
                                                              min)],
-                        max_iterations_newton=40,
+                        max_iterations_newton=30,
                         cfl=0.3,
-                        l2=[
+                        l2=[#TODO
                             0.1210919940169424,
                             0.12072017016293893,
                             0.12071950806079143,
@@ -1111,10 +1111,10 @@ end
                         local_twosided_variables_cons=["rho"],
                         local_onesided_variables_nonlinear=[(entropy_guermond_etal,
                                                              min)],
-                        max_iterations_newton=40,
+                        max_iterations_newton=30,
                         bar_states=true,
                         cfl=0.9,
-                        l2=[
+                        l2=[#TODO
                             0.12809804755386675,
                             0.124742338056976,
                             0.12474233817682814,
