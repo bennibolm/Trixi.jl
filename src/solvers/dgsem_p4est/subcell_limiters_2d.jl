@@ -609,8 +609,8 @@ end
             # A node can be on multiple mortars. Scale the antidiffusive flux contribution
             # to account for this. Similar to scaling with `gamma_constant_newton`.
             n_mortars_large = n_mortars_per_node[i_large, j_large, large_element]
-            Pp_large *= n_mortars_large
-            Pm_large *= n_mortars_large
+            Pp_large = n_mortars_large * Pp_large
+            Pm_large = n_mortars_large * Pm_large
 
             eps_ = eps(typeof(Qp_large)) * 100 * abs(var_max_large)
             Qp_large = abs(Qp_large) / (abs(Pp_large) + eps_)

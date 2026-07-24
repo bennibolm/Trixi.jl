@@ -947,8 +947,8 @@ end
             # A node can be on multiple mortars. Scale the antidiffusive flux contribution
             # to account for this. Similar to scaling with `gamma_constant_newton`.
             n_mortars_large = n_mortars_per_node[indices_large..., large_element]
-            Pp_large *= n_mortars_large
-            Pm_large *= n_mortars_large
+            Pp_large = n_mortars_large * Pp_large
+            Pm_large = n_mortars_large * Pm_large
 
             eps_ = eps(typeof(Qp_large)) * 100 * abs(var_max_large)
             Qp_large = abs(Qp_large) / (abs(Pp_large) + eps_)
@@ -994,8 +994,8 @@ end
                 Pm_small = inverse_jacobian_small * Pm_small
 
                 n_mortars_small = n_mortars_per_node[indices_small..., small_element]
-                Pp_small *= n_mortars_small
-                Pm_small *= n_mortars_small
+                Pp_small = n_mortars_small * Pp_small
+                Pm_small = n_mortars_small * Pm_small
 
                 eps_ = eps(typeof(Qp_small)) * 100 * abs(var_max_small)
                 Qp_small = abs(Qp_small) / (abs(Pp_small) + eps_)
@@ -1249,7 +1249,7 @@ end
 
             # A node can be on multiple mortars. Scale the antidiffusive flux contribution
             # to account for this. Similar to scaling with `gamma_constant_newton`.
-            Pm_large *= n_mortars_per_node[indices_large..., large_element]
+            Pm_large = n_mortars_per_node[indices_large..., large_element] * Pm_large
 
             inverse_jacobian_large = get_inverse_jacobian(inverse_jacobian, mesh,
                                                           indices_large...,
@@ -1291,7 +1291,8 @@ end
 
                 # A node can be on multiple mortars. Scale the antidiffusive flux contribution
                 # to account for this. Similar to scaling with `gamma_constant_newton`.
-                Pm_small *= n_mortars_per_node[indices_small..., small_element]
+                Pm_small = n_mortars_per_node[indices_small..., small_element] *
+                           Pm_small
 
                 inverse_jacobian_small = get_inverse_jacobian(inverse_jacobian, mesh,
                                                               indices_small...,
