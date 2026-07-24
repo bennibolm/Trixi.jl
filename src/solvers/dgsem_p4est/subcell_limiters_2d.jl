@@ -743,72 +743,56 @@ end
         i_large = i_large_start
         j_large = j_large_start
         for i in eachnode(dg)
-            inverse_jacobian_upper = get_inverse_jacobian(cache.elements.inverse_jacobian,
-                                                          mesh, i_small, j_small,
-                                                          upper_element)
-            inverse_jacobian_lower = get_inverse_jacobian(cache.elements.inverse_jacobian,
-                                                          mesh, i_small, j_small,
-                                                          lower_element)
-            inverse_jacobian_large = get_inverse_jacobian(cache.elements.inverse_jacobian,
-                                                          mesh, i_large, j_large,
-                                                          large_element)
+            isone(limiting_factor[mortar]) && break # Skip if alpha is already 1 (no limiting needed)
 
-            u_lower = get_node_vars(u, equations, dg, i_small, j_small, lower_element)
-            u_upper = get_node_vars(u, equations, dg, i_small, j_small, upper_element)
+            # small elements
+            for small_element_index in 1:2
+                small_element = neighbor_ids[small_element_index, mortar]
+
+                u_small = get_node_vars(u, equations, dg,
+                                        i_small, j_small, small_element)
+                bound_small = var_minmax[i_small, j_small, small_element]
+
+                flux_small_high_order = get_node_vars(surface_flux_values_high_order,
+                                                      equations, dg,
+                                                      i, small_direction, small_element)
+                if !all(isfinite, flux_small_high_order)
+                    limiting_factor[mortar] = 1
+                    break
+                end
+                flux_small_low_order = get_node_vars(surface_flux_values, equations, dg,
+                                                     i, small_direction, small_element)
+                inverse_jacobian_small = get_inverse_jacobian(cache.elements.inverse_jacobian,
+                                                              mesh, i_small, j_small,
+                                                              small_element)
+                antidiffusive_flux_small = gamma_constant_newton * factor *
+                                           inverse_jacobian_small *
+                                           (flux_small_high_order .-
+                                            flux_small_low_order)
+
+                newton_loop!(limiting_factor, bound_small, u_small, (mortar,), variable,
+                             min_or_max, initial_check_local_onesided_newton_idp,
+                             final_check_local_onesided_newton_idp,
+                             equations, dt, limiter, antidiffusive_flux_small)
+            end
+
+            # Large element
             u_large = get_node_vars(u, equations, dg, i_large, j_large, large_element)
-
-            bound_lower = var_minmax[i_small, j_small, lower_element]
-            bound_upper = var_minmax[i_small, j_small, upper_element]
             bound_large = var_minmax[i_large, j_large, large_element]
 
-            # lower element
-            flux_lower_high_order = get_node_vars(surface_flux_values_high_order,
-                                                  equations, dg,
-                                                  i, small_direction, lower_element)
-            flux_lower_low_order = get_node_vars(surface_flux_values, equations, dg,
-                                                 i, small_direction, lower_element)
-            if !all(isfinite, flux_lower_high_order)
-                limiting_factor[mortar] = 1
-                break
-            end
-            antidiffusive_flux_lower = gamma_constant_newton * factor *
-                                       inverse_jacobian_lower *
-                                       (flux_lower_high_order .- flux_lower_low_order)
-
-            newton_loop!(limiting_factor, bound_lower, u_lower, (mortar,), variable,
-                         min_or_max, initial_check_local_onesided_newton_idp,
-                         final_check_local_onesided_newton_idp,
-                         equations, dt, limiter, antidiffusive_flux_lower)
-
-            # upper element
-            flux_upper_high_order = get_node_vars(surface_flux_values_high_order,
-                                                  equations, dg,
-                                                  i, small_direction, upper_element)
-            flux_upper_low_order = get_node_vars(surface_flux_values, equations, dg,
-                                                 i, small_direction, upper_element)
-            if !all(isfinite, flux_upper_high_order)
-                limiting_factor[mortar] = 1
-                break
-            end
-            antidiffusive_flux_upper = gamma_constant_newton * factor *
-                                       inverse_jacobian_upper *
-                                       (flux_upper_high_order .- flux_upper_low_order)
-
-            newton_loop!(limiting_factor, bound_upper, u_upper, (mortar,), variable,
-                         min_or_max, initial_check_local_onesided_newton_idp,
-                         final_check_local_onesided_newton_idp,
-                         equations, dt, limiter, antidiffusive_flux_upper)
-
-            # large element
             flux_large_high_order = get_node_vars(surface_flux_values_high_order,
                                                   equations, dg,
                                                   i, large_direction, large_element)
-            flux_large_low_order = get_node_vars(surface_flux_values, equations, dg,
-                                                 i, large_direction, large_element)
+            # Check if high-order flux is finite. Otherwise, use pure low-order fluxes.
             if !all(isfinite, flux_large_high_order)
                 limiting_factor[mortar] = 1
                 break
             end
+            flux_large_low_order = get_node_vars(surface_flux_values, equations, dg,
+                                                 i, large_direction, large_element)
+            inverse_jacobian_large = get_inverse_jacobian(cache.elements.inverse_jacobian,
+                                                          mesh, i_large, j_large,
+                                                          large_element)
             antidiffusive_flux_large = gamma_constant_newton * factor *
                                        inverse_jacobian_large *
                                        (flux_large_high_order .- flux_large_low_order)
