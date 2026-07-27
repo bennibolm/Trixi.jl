@@ -377,7 +377,7 @@ end
     @test_allocations(Trixi.rhs!, semi, sol, 1000)
 end
 
-@testitem "P4estMesh3D: elixir_euler_sedov_sc_subcell.jl (positivity bounds)" setup=[
+@testitem "P4estMesh3D: elixir_euler_sedov_sc_subcell.jl (positivity limiting)" setup=[
     Setup,
     P4estMesh3D
 ] tags=[:p4est_part2] begin
@@ -406,7 +406,7 @@ end
     @test_allocations(Trixi.rhs!, semi, sol, 15_000)
 end
 
-@testitem "P4estMesh3D: elixir_euler_sedov_sc_subcell.jl (local bounds)" setup=[
+@testitem "P4estMesh3D: elixir_euler_sedov_sc_subcell.jl (local limiting)" setup=[
     Setup,
     P4estMesh3D
 ] tags=[:p4est_part2] begin
@@ -439,7 +439,7 @@ end
     @test_allocations(Trixi.rhs!, semi, sol, 15_000)
 end
 
-@testitem "P4estMesh3D: elixir_euler_sedov_sc_subcell.jl (local bounds, nonperiodic)" setup=[
+@testitem "P4estMesh3D: elixir_euler_sedov_sc_subcell.jl (local limiting, nonperiodic)" setup=[
     Setup,
     P4estMesh3D
 ] tags=[:p4est_part2] begin
@@ -474,6 +474,43 @@ end
     @test_allocations(Trixi.rhs!, semi, sol, 15_000)
 end
 
+@testitem "P4estMesh3D: elixir_euler_sedov_sc_subcell.jl (local limiting with bar states, nonperiodic)" setup=[
+    Setup,
+    P4estMesh3D
+] tags=[:p4est_part2] begin
+    @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_euler_sedov_sc_subcell.jl"),
+                        local_twosided_variables_cons=["rho"],
+                        local_onesided_variables_nonlinear=[(entropy_guermond_etal,
+                                                             min)],
+                        max_iterations_newton=50,
+                        periodicity=false,
+                        boundary_conditions=BoundaryConditionDirichlet(initial_condition),
+                        bar_states=true,
+                        cfl=0.9,
+                        l2=[
+                            0.19565621363170324,
+                            0.07480763221129977,
+                            0.07480763221132762,
+                            0.07480763221120078,
+                            0.3673794676791642
+                        ],
+                        linf=[
+                            1.4424829194162667,
+                            1.2480460723645113,
+                            1.2480460723786466,
+                            1.2480460723859172,
+                            4.837713773958067
+                        ],
+                        tspan=(0.0, 0.3))
+    # Ensure that we do not have excessive memory allocations
+    # (e.g., from type instabilities)
+    # Larger values for allowed allocations due to usage of custom
+    # integrator which are not *recorded* for the methods from
+    # OrdinaryDiffEq.jl
+    # Corresponding issue: https://github.com/trixi-framework/Trixi.jl/issues/1877
+    @test_allocations(Trixi.rhs!, semi, sol, 15_000)
+end
+
 @testitem "P4estMesh3D: elixir_euler_sedov.jl (HLLE)" setup=[Setup, P4estMesh3D] tags=[:p4est_part2] begin
     @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_euler_sedov.jl"),
                         l2=[
@@ -495,6 +532,52 @@ end
     # Ensure that we do not have excessive memory allocations
     # (e.g., from type instabilities)
     @test_allocations(Trixi.rhs!, semi, sol, 1000)
+end
+
+@testitem "P4estMesh3D: elixir_euler_mortar_sc_subcell.jl (conservation)" setup=[
+    Setup,
+    P4estMesh3D
+] tags=[:p4est_part2] begin
+    @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_euler_mortar_sc_subcell.jl"),
+                        tspan=(0.0, 0.3),
+                        pure_low_order=true)
+    # Check for conservation
+    state_integrals = Trixi.integrate(sol.u[2], semi)
+    initial_state_integrals = analysis_callback.affect!.initial_state_integrals
+
+    @test isapprox(state_integrals[1], initial_state_integrals[1], atol = 1e-12)
+    @test isapprox(state_integrals[2], initial_state_integrals[2], atol = 1e-12)
+    @test isapprox(state_integrals[3], initial_state_integrals[3], atol = 1e-12)
+    @test isapprox(state_integrals[4], initial_state_integrals[4], atol = 1e-12)
+    @test isapprox(state_integrals[5], initial_state_integrals[5], atol = 5e-11)
+end
+@testitem "P4estMesh3D: elixir_euler_mortar_sc_subcell.jl (no limiting)" setup=[
+    Setup,
+    P4estMesh3D
+] tags=[:p4est_part2] begin
+    @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_euler_mortar_sc_subcell.jl"),
+                        l2=[
+                            0.011148595040635862,
+                            0.011148595040635858,
+                            0.011148595040635853,
+                            0.011148595040635848,
+                            0.016722892560951823
+                        ],
+                        linf=[
+                            0.2128507307245624,
+                            0.21285073072456062,
+                            0.21285073072456373,
+                            0.2128507307245624,
+                            0.31927609608684193
+                        ],
+                        tspan=(0.0, 0.3))
+    # Ensure that we do not have excessive memory allocations
+    # (e.g., from type instabilities)
+    # Larger values for allowed allocations due to usage of custom
+    # integrator which are not *recorded* for the methods from
+    # OrdinaryDiffEq.jl
+    # Corresponding issue: https://github.com/trixi-framework/Trixi.jl/issues/1877
+    @test_allocations(Trixi.rhs!, semi, sol, 15000)
 end
 
 @testitem "P4estMesh3D: elixir_euler_source_terms_nonconforming_earth.jl" setup=[
@@ -646,7 +729,7 @@ end
     @test_allocations(Trixi.rhs!, semi, sol, 1000)
 end
 
-@testitem "P4estMesh3D: elixir_euler_source_terms_nonperiodic_hohqmesh_sc_subcell.jl (positivity bounds)" setup=[
+@testitem "P4estMesh3D: elixir_euler_source_terms_nonperiodic_hohqmesh_sc_subcell.jl (positivity limiting)" setup=[
     Setup,
     P4estMesh3D
 ] tags=[:p4est_part2] begin
@@ -676,7 +759,7 @@ end
     @test_allocations(Trixi.rhs!, semi, sol, 15_000)
 end
 
-@testitem "P4estMesh3D: elixir_euler_source_terms_nonperiodic_hohqmesh_sc_subcell.jl (local bounds)" setup=[
+@testitem "P4estMesh3D: elixir_euler_source_terms_nonperiodic_hohqmesh_sc_subcell.jl (local limiting)" setup=[
     Setup,
     P4estMesh3D
 ] tags=[:p4est_part2] begin
@@ -699,6 +782,42 @@ end
                             0.10474759248351417,
                             0.07545726460168245,
                             0.26949807234431944
+                        ],
+                        tspan=(0.0, 0.3))
+    # Ensure that we do not have excessive memory allocations
+    # (e.g., from type instabilities)
+    # Larger values for allowed allocations due to usage of custom
+    # integrator which are not *recorded* for the methods from
+    # OrdinaryDiffEq.jl
+    # Corresponding issue: https://github.com/trixi-framework/Trixi.jl/issues/1877
+    @test_allocations(Trixi.rhs!, semi, sol, 15_000)
+end
+
+@testitem "P4estMesh3D: elixir_euler_source_terms_nonperiodic_hohqmesh_sc_subcell.jl (local limiting with bar states)" setup=[
+    Setup,
+    P4estMesh3D
+] tags=[:p4est_part2] begin
+    @test_trixi_include(joinpath(EXAMPLES_DIR,
+                                 "elixir_euler_source_terms_nonperiodic_hohqmesh_sc_subcell.jl"),
+                        local_twosided_variables_cons=["rho"],
+                        local_onesided_variables_nonlinear=[(entropy_guermond_etal,
+                                                             min)],
+                        max_iterations_newton=30,
+                        bar_states=true,
+                        cfl=0.9,
+                        l2=[
+                            0.01463589517915295,
+                            0.013726105990678288,
+                            0.013639327348303138,
+                            0.01465200607104538,
+                            0.05746568649560187
+                        ],
+                        linf=[
+                            0.10568997784216227,
+                            0.1148519073938088,
+                            0.11764849829145962,
+                            0.12983475641471687,
+                            0.28320410560095244
                         ],
                         tspan=(0.0, 0.3))
     # Ensure that we do not have excessive memory allocations

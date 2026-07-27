@@ -38,25 +38,39 @@ limiter_idp = SubcellLimiterIDP(equations, basis;
 volume_integral = VolumeIntegralSubcellLimiting(limiter_idp;
                                                 volume_flux_dg = volume_flux,
                                                 volume_flux_fv = surface_flux)
+
 mortar = MortarIDP(equations, basis, limiter_idp;
                    pure_low_order = false)
 solver = DGSEM(basis, surface_flux, volume_integral, mortar)
 
 coordinates_min = (-5.0, -5.0, -5.0)
 coordinates_max = (5.0, 5.0, 5.0)
-refinement_patches = ((type = "box", coordinates_min = (0.0, -5.0, -5.0),
-                       coordinates_max = (1.0, 5.0, 5.0)),
-                      (type = "box", coordinates_min = (0.0, -1.0, -1.0),
-                       coordinates_max = (0.5, 0.0, 0.0)),
-                      (type = "box", coordinates_min = (-3.0, 0.0, 0.0),
-                       coordinates_max = (-2.0, 5.0, 5.0)),
-                      (type = "box", coordinates_min = (-3.0, 0.0, -1.0),
-                       coordinates_max = (-2.5, 1.0, 0.0)))
-mesh = TreeMesh(coordinates_min, coordinates_max,
-                initial_refinement_level = 3,
-                refinement_patches = refinement_patches,
-                n_cells_max = 100_000,
-                periodicity = true)
+trees_per_dimension = (8, 8, 8)
+mesh = P4estMesh(trees_per_dimension,
+                 polydeg = 1, initial_refinement_level = 0,
+                 coordinates_min = coordinates_min, coordinates_max = coordinates_max,
+                 periodicity = true)
+
+# Note: Workaround to add a refinement patch after mesh is constructed
+# Refine bottom left quadrant of each tree to level 1
+function refine_fn(p8est, which_tree, quadrant)
+    quadrant_obj = unsafe_load(quadrant)
+    if quadrant_obj.x == 0 && quadrant_obj.y == 0 && quadrant_obj.z == 0 &&
+       quadrant_obj.level < 1
+        # return true (refine)
+        return Cint(1)
+    else
+        # return false (don't refine)
+        return Cint(0)
+    end
+end
+
+# Refine recursively until each bottom left quadrant of a tree has level 1
+# The mesh will be rebalanced before the simulation starts
+refine_fn_c = @cfunction(refine_fn, Cint,
+                         (Ptr{Trixi.p8est_t}, Ptr{Trixi.p4est_topidx_t},
+                          Ptr{Trixi.p8est_quadrant_t}))
+Trixi.refine_p4est!(mesh.p4est, true, refine_fn_c, C_NULL)
 
 semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, solver,
                                     boundary_conditions = boundary_condition_periodic)
@@ -71,6 +85,7 @@ summary_callback = SummaryCallback()
 
 analysis_interval = 100
 analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
+                                     extra_analysis_errors = (:conservation_error,),
                                      extra_analysis_integrals = (entropy,))
 
 alive_callback = AliveCallback(analysis_interval = analysis_interval)

@@ -289,6 +289,42 @@ end
     @test_allocations(Trixi.rhs!, semi, sol, 15_000)
 end
 
+@testitem "TreeMesh3D Euler: elixir_euler_mortar_sc_subcell.jl (local limiting with bar states)" setup=[
+    Setup,
+    TreeMesh3DEuler
+] tags=[:tree_part4] begin
+    @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_euler_mortar_sc_subcell.jl"),
+                        positivity_variables_cons=["rho"],
+                        positivity_variables_nonlinear=[pressure],
+                        local_twosided_variables_cons=["rho"],
+                        local_onesided_variables_nonlinear=[(entropy_guermond_etal,
+                                                             min)],
+                        cfl=0.9,
+                        bar_states=true,
+                        l2=[
+                            0.0038793425274162643,
+                            0.0038793425274162604,
+                            0.0038793425274162513,
+                            0.0038793425274162604,
+                            0.005819013791124279
+                        ],
+                        linf=[
+                            0.12606269472364873,
+                            0.12606269472364873,
+                            0.12606269472364873,
+                            0.12606269472364984,
+                            0.18909404208547276
+                        ],
+                        tspan=(0.0, 0.1),)
+    # Ensure that we do not have excessive memory allocations
+    # (e.g., from type instabilities)
+    # Larger values for allowed allocations due to usage of custom
+    # integrator which are not *recorded* for the methods from
+    # OrdinaryDiffEq.jl
+    # Corresponding issue: https://github.com/trixi-framework/Trixi.jl/issues/1877
+    @test_allocations(Trixi.rhs!, semi, sol, 15_000)
+end
+
 @testitem "TreeMesh3D Euler: elixir_euler_taylor_green_vortex.jl" setup=[
     Setup,
     TreeMesh3DEuler
@@ -662,7 +698,7 @@ end
     @test_allocations(Trixi.rhs!, semi, sol, 1000)
 end
 
-@testitem "TreeMesh3D Euler: elixir_euler_sedov_blast_wave_sc_subcell.jl" setup=[
+@testitem "TreeMesh3D Euler: elixir_euler_sedov_blast_wave_sc_subcell.jl (local limiting)" setup=[
     Setup,
     TreeMesh3DEuler
 ] tags=[:tree_part4] begin
@@ -681,6 +717,38 @@ end
                             0.5730095685845291,
                             0.5730095686063774,
                             4.861205850307592
+                        ],
+                        tspan=(0.0, 0.5))
+    # Ensure that we do not have excessive memory allocations
+    # (e.g., from type instabilities)
+    # Larger values for allowed allocations due to usage of custom
+    # integrator which are not *recorded* for the methods from
+    # OrdinaryDiffEq.jl
+    # Corresponding issue: https://github.com/trixi-framework/Trixi.jl/issues/1877
+    @test_allocations(Trixi.rhs!, semi, sol, 15_000)
+end
+
+@testitem "TreeMesh3D Euler: elixir_euler_sedov_blast_wave_sc_subcell.jl (local limiting with bar states)" setup=[
+    Setup,
+    TreeMesh3DEuler
+] tags=[:tree_part4] begin
+    @test_trixi_include(joinpath(EXAMPLES_DIR,
+                                 "elixir_euler_sedov_blast_wave_sc_subcell.jl"),
+                        bar_states=true,
+                        cfl=0.9,
+                        l2=[
+                            0.2960492292328468,
+                            0.08512047820593988,
+                            0.08512047820593965,
+                            0.08512047820593949,
+                            0.3609542574151516
+                        ],
+                        linf=[
+                            2.4259056167143993,
+                            1.0219422034990642,
+                            1.0219422034990757,
+                            1.0219422034990806,
+                            4.8231988553627305
                         ],
                         tspan=(0.0, 0.5))
     # Ensure that we do not have excessive memory allocations
