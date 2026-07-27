@@ -674,10 +674,9 @@ end
 
             # Compute blending coefficient avoiding division by zero
             # (as in paper of [Guermond, Nazarov, Popov, Thomas] (4.8))
-            Qp = abs(Qp) /
-                 (abs(Pp) + eps(typeof(Qp)) * 100 * abs(var_max[i, j, k, element]))
-            Qm = abs(Qm) /
-                 (abs(Pm) + eps(typeof(Qm)) * 100 * abs(var_max[i, j, k, element]))
+            eps_ = eps(typeof(Qp)) * 100 * abs(var_max[i, j, k, element])
+            Qp = abs(Qp) / (abs(Pp) + eps_)
+            Qm = abs(Qm) / (abs(Pm) + eps_)
 
             # Calculate alpha at nodes
             alpha[i, j, k, element] = max(alpha[i, j, k, element], 1 - min(1, Qp, Qm))
@@ -986,7 +985,7 @@ end
     var_min = variable_bounds[Symbol(variable_string, "_min")]
     var_max = variable_bounds[Symbol(variable_string, "_max")]
 
-    for mortar in eachmortar(dg, cache)
+    @threaded for mortar in eachmortar(dg, cache)
         isone(limiting_factor[mortar]) && continue # Skip if alpha is already 1 (no limiting needed)
 
         small_element_1 = neighbor_ids[1, mortar]
@@ -994,7 +993,6 @@ end
         small_element_3 = neighbor_ids[3, mortar]
         small_element_4 = neighbor_ids[4, mortar]
         large_element = neighbor_ids[5, mortar]
-
         if perform_subcell_limiting(dg.volume_integral, large_element) ||
            perform_subcell_limiting(dg.volume_integral, small_element_1) ||
            perform_subcell_limiting(dg.volume_integral, small_element_2) ||
@@ -1032,6 +1030,7 @@ end
 
         # Compute limiting factor
         for j in eachnode(dg), i in eachnode(dg)
+            isone(limiting_factor[mortar]) && break # Skip if alpha is already 1 (no limiting needed)
             if orientation == 1
                 # L2 mortars in x-direction
                 indices_small = (node_small, i, j)
@@ -1045,133 +1044,42 @@ end
                 indices_small = (i, j, node_small)
                 indices_large = (i, j, node_large)
             end
-            var_small_1 = u[var_index, indices_small..., small_element_1]
-            var_small_2 = u[var_index, indices_small..., small_element_2]
-            var_small_3 = u[var_index, indices_small..., small_element_3]
-            var_small_4 = u[var_index, indices_small..., small_element_4]
-            var_large = u[var_index, indices_large..., large_element]
 
-            if min(var_small_1, var_small_2, var_small_3, var_small_4, var_large) < 0
+            # Large element
+            var_large = u[var_index, indices_large..., large_element]
+            if var_large < 0
                 error("Safe low-order method produces negative value for conservative variable rho. Try a smaller time step.")
             end
 
-            Qp_small_1 = max(0,
-                             (var_max[indices_small..., small_element_1] -
-                              var_small_1) / dt)
-            Qm_small_1 = min(0,
-                             (var_min[indices_small..., small_element_1] -
-                              var_small_1) / dt)
-            Qp_small_2 = max(0,
-                             (var_max[indices_small..., small_element_2] -
-                              var_small_2) / dt)
-            Qm_small_2 = min(0,
-                             (var_min[indices_small..., small_element_2] -
-                              var_small_2) / dt)
-            Qp_small_3 = max(0,
-                             (var_max[indices_small..., small_element_3] -
-                              var_small_3) / dt)
-            Qm_small_3 = min(0,
-                             (var_min[indices_small..., small_element_3] -
-                              var_small_3) / dt)
-            Qp_small_4 = max(0,
-                             (var_max[indices_small..., small_element_4] -
-                              var_small_4) / dt)
-            Qm_small_4 = min(0,
-                             (var_min[indices_small..., small_element_4] -
-                              var_small_4) / dt)
-            Qp_large = max(0,
-                           (var_max[indices_large..., large_element] - var_large) / dt)
-            Qm_large = min(0,
-                           (var_min[indices_large..., large_element] - var_large) / dt)
+            # Two-sided local bounds
+            var_min_large = var_min[indices_large..., large_element]
+            var_max_large = var_max[indices_large..., large_element]
+
+            # Real Zalesak type limiter
+            #   * Zalesak (1979). "Fully multidimensional flux-corrected transport algorithms for fluids"
+            #   * Kuzmin et al. (2010). "Failsafe flux limiting and constrained data projections for equations of gas dynamics"
+            #   Note: The Zalesak limiter has to be computed, even if the state is valid, because the correction is
+            #         for each interface, not each node
+            Qp_large = max(0, (var_max_large - var_large) / dt)
+            Qm_large = min(0, (var_min_large - var_large) / dt)
 
             # Compute flux differences
-            flux_small_1_high_order = surface_flux_values_high_order[var_index, i, j,
-                                                                     direction_small,
-                                                                     small_element_1]
-            flux_small_1_low_order = surface_flux_values[var_index, i, j,
-                                                         direction_small,
-                                                         small_element_1]
-            flux_difference_small_1 = factor_small *
-                                      (flux_small_1_high_order -
-                                       flux_small_1_low_order)
-            flux_small_2_high_order = surface_flux_values_high_order[var_index, i, j,
-                                                                     direction_small,
-                                                                     small_element_2]
-            flux_small_2_low_order = surface_flux_values[var_index, i, j,
-                                                         direction_small,
-                                                         small_element_2]
-            flux_difference_small_2 = factor_small *
-                                      (flux_small_2_high_order -
-                                       flux_small_2_low_order)
-            flux_small_3_high_order = surface_flux_values_high_order[var_index, i, j,
-                                                                     direction_small,
-                                                                     small_element_3]
-            flux_small_3_low_order = surface_flux_values[var_index, i, j,
-                                                         direction_small,
-                                                         small_element_3]
-            flux_difference_small_3 = factor_small *
-                                      (flux_small_3_high_order -
-                                       flux_small_3_low_order)
-            flux_small_4_high_order = surface_flux_values_high_order[var_index, i, j,
-                                                                     direction_small,
-                                                                     small_element_4]
-            flux_small_4_low_order = surface_flux_values[var_index, i, j,
-                                                         direction_small,
-                                                         small_element_4]
-            flux_difference_small_4 = factor_small *
-                                      (flux_small_4_high_order -
-                                       flux_small_4_low_order)
             flux_large_high_order = surface_flux_values_high_order[var_index, i, j,
                                                                    direction_large,
                                                                    large_element]
-            flux_large_low_order = surface_flux_values[var_index, i, j,
-                                                       direction_large,
+            # Check if high-order flux is finite. Otherwise, use pure low-order fluxes.
+            if !isfinite(flux_large_high_order)
+                limiting_factor[mortar] = 1
+                break
+            end
+            flux_large_low_order = surface_flux_values[var_index, i, j, direction_large,
                                                        large_element]
             flux_difference_large = factor_large *
                                     (flux_large_high_order - flux_large_low_order)
 
-            # Use pure low-order fluxes if high-order fluxes are not finite.
-            if !isfinite(flux_small_1_high_order) ||
-               !isfinite(flux_small_2_high_order) ||
-               !isfinite(flux_small_3_high_order) ||
-               !isfinite(flux_small_4_high_order) ||
-               !isfinite(flux_large_high_order)
-                limiting_factor[mortar] = 1
-                break
-            end
-
-            inverse_jacobian_small_1 = get_inverse_jacobian(inverse_jacobian, mesh,
-                                                            indices_small...,
-                                                            small_element_1)
-            inverse_jacobian_small_2 = get_inverse_jacobian(inverse_jacobian, mesh,
-                                                            indices_small...,
-                                                            small_element_2)
-            inverse_jacobian_small_3 = get_inverse_jacobian(inverse_jacobian, mesh,
-                                                            indices_small...,
-                                                            small_element_3)
-            inverse_jacobian_small_4 = get_inverse_jacobian(inverse_jacobian, mesh,
-                                                            indices_small...,
-                                                            small_element_4)
             inverse_jacobian_large = get_inverse_jacobian(inverse_jacobian, mesh,
                                                           indices_large...,
                                                           large_element)
-
-            Pp_small_1 = max(0, flux_difference_small_1)
-            Pm_small_1 = min(0, flux_difference_small_1)
-            Pp_small_1 = inverse_jacobian_small_1 * Pp_small_1
-            Pm_small_1 = inverse_jacobian_small_1 * Pm_small_1
-            Pp_small_2 = max(0, flux_difference_small_2)
-            Pm_small_2 = min(0, flux_difference_small_2)
-            Pp_small_2 = inverse_jacobian_small_2 * Pp_small_2
-            Pm_small_2 = inverse_jacobian_small_2 * Pm_small_2
-            Pp_small_3 = max(0, flux_difference_small_3)
-            Pm_small_3 = min(0, flux_difference_small_3)
-            Pp_small_3 = inverse_jacobian_small_3 * Pp_small_3
-            Pm_small_3 = inverse_jacobian_small_3 * Pm_small_3
-            Pp_small_4 = max(0, flux_difference_small_4)
-            Pm_small_4 = min(0, flux_difference_small_4)
-            Pp_small_4 = inverse_jacobian_small_4 * Pp_small_4
-            Pm_small_4 = inverse_jacobian_small_4 * Pm_small_4
             Pp_large = max(0, flux_difference_large)
             Pm_large = min(0, flux_difference_large)
             Pp_large = inverse_jacobian_large * Pp_large
@@ -1179,67 +1087,65 @@ end
 
             # A node can be on multiple mortars. Scale the antidiffusive flux contribution
             # to account for this. Similar to scaling with `gamma_constant_newton`.
-            n_mortars_small_1 = n_mortars_per_node[indices_small..., small_element_1]
-            n_mortars_small_2 = n_mortars_per_node[indices_small..., small_element_2]
-            n_mortars_small_3 = n_mortars_per_node[indices_small..., small_element_3]
-            n_mortars_small_4 = n_mortars_per_node[indices_small..., small_element_4]
             n_mortars_large = n_mortars_per_node[indices_large..., large_element]
-            Pp_small_1 *= n_mortars_small_1
-            Pm_small_1 *= n_mortars_small_1
-            Pp_small_2 *= n_mortars_small_2
-            Pm_small_2 *= n_mortars_small_2
-            Pp_small_3 *= n_mortars_small_3
-            Pm_small_3 *= n_mortars_small_3
-            Pp_small_4 *= n_mortars_small_4
-            Pm_small_4 *= n_mortars_small_4
             Pp_large *= n_mortars_large
             Pm_large *= n_mortars_large
 
-            Qp_small_1 = abs(Qp_small_1) /
-                         (abs(Pp_small_1) +
-                          eps(typeof(Qp_small_1)) * 100 *
-                          abs(var_max[indices_small..., small_element_1]))
-            Qm_small_1 = abs(Qm_small_1) /
-                         (abs(Pm_small_1) +
-                          eps(typeof(Qm_small_1)) * 100 *
-                          abs(var_max[indices_small..., small_element_1]))
-            Qp_small_2 = abs(Qp_small_2) /
-                         (abs(Pp_small_2) +
-                          eps(typeof(Qp_small_2)) * 100 *
-                          abs(var_max[indices_small..., small_element_2]))
-            Qm_small_2 = abs(Qm_small_2) /
-                         (abs(Pm_small_2) +
-                          eps(typeof(Qm_small_2)) * 100 *
-                          abs(var_max[indices_small..., small_element_2]))
-            Qp_small_3 = abs(Qp_small_3) /
-                         (abs(Pp_small_3) +
-                          eps(typeof(Qp_small_3)) * 100 *
-                          abs(var_max[indices_small..., small_element_3]))
-            Qm_small_3 = abs(Qm_small_3) /
-                         (abs(Pm_small_3) +
-                          eps(typeof(Qm_small_3)) * 100 *
-                          abs(var_max[indices_small..., small_element_3]))
-            Qp_small_4 = abs(Qp_small_4) /
-                         (abs(Pp_small_4) +
-                          eps(typeof(Qp_small_4)) * 100 *
-                          abs(var_max[indices_small..., small_element_4]))
-            Qm_small_4 = abs(Qm_small_4) /
-                         (abs(Pm_small_4) +
-                          eps(typeof(Qm_small_4)) * 100 *
-                          abs(var_max[indices_small..., small_element_4]))
-            Qp_large = abs(Qp_large) /
-                       (abs(Pp_large) +
-                        eps(typeof(Qp_large)) * 100 *
-                        abs(var_max[indices_large..., large_element]))
-            Qm_large = abs(Qm_large) /
-                       (abs(Pm_large) +
-                        eps(typeof(Qm_large)) * 100 *
-                        abs(var_max[indices_large..., large_element]))
+            eps_ = eps(typeof(Qp_large)) * 100 * abs(var_max_large)
+            Qp_large = abs(Qp_large) / (abs(Pp_large) + eps_)
+            Qm_large = abs(Qm_large) / (abs(Pm_large) + eps_)
 
             # Calculate limiting factor
-            Q = min(1, Qp_small_1, Qm_small_1, Qp_small_2, Qm_small_2,
-                    Qp_small_3, Qm_small_3, Qp_small_4, Qm_small_4,
-                    Qp_large, Qm_large)
+            Q = min(1, Qp_large, Qm_large)
+
+            # Small elements
+            for small_element_index in 1:4
+                small_element = neighbor_ids[small_element_index, mortar]
+                var_small = u[var_index, indices_small..., small_element]
+                if var_small < 0
+                    error("Safe low-order method produces negative value for conservative variable rho. Try a smaller time step.")
+                end
+
+                var_min_small = var_min[indices_small..., small_element]
+                var_max_small = var_max[indices_small..., small_element]
+
+                Qp_small = max(0, (var_max_small - var_small) / dt)
+                Qm_small = min(0, (var_min_small - var_small) / dt)
+
+                # Compute flux differences
+                flux_small_high_order = surface_flux_values_high_order[var_index, i, j,
+                                                                       direction_small,
+                                                                       small_element]
+                if !isfinite(flux_small_high_order)
+                    limiting_factor[mortar] = 1
+                    break
+                end
+                flux_small_low_order = surface_flux_values[var_index, i, j,
+                                                           direction_small,
+                                                           small_element]
+                flux_difference_small = factor_small *
+                                        (flux_small_high_order - flux_small_low_order)
+
+                inverse_jacobian_small = get_inverse_jacobian(inverse_jacobian, mesh,
+                                                              indices_small...,
+                                                              small_element)
+                Pp_small = max(0, flux_difference_small)
+                Pm_small = min(0, flux_difference_small)
+                Pp_small = inverse_jacobian_small * Pp_small
+                Pm_small = inverse_jacobian_small * Pm_small
+
+                n_mortars_small = n_mortars_per_node[indices_small..., small_element]
+                Pp_small *= n_mortars_small
+                Pm_small *= n_mortars_small
+
+                eps_ = eps(typeof(Qp_small)) * 100 * abs(var_max_small)
+                Qp_small = abs(Qp_small) / (abs(Pp_small) + eps_)
+                Qm_small = abs(Qm_small) / (abs(Pm_small) + eps_)
+
+                Q = min(Q, Qp_small, Qm_small)
+            end
+
+            # Calculate limiting factor
             limiting_factor[mortar] = max(limiting_factor[mortar], 1 - Q)
         end
     end
@@ -1268,7 +1174,7 @@ end
 
     (; gamma_constant_newton) = limiter
 
-    for mortar in eachmortar(dg, cache)
+    @threaded for mortar in eachmortar(dg, cache)
         isone(limiting_factor[mortar]) && continue # Skip if alpha is already 1 (no limiting needed)
 
         small_element_1 = neighbor_ids[1, mortar]
@@ -1276,7 +1182,6 @@ end
         small_element_3 = neighbor_ids[3, mortar]
         small_element_4 = neighbor_ids[4, mortar]
         large_element = neighbor_ids[5, mortar]
-
         if perform_subcell_limiting(dg.volume_integral, large_element) ||
            perform_subcell_limiting(dg.volume_integral, small_element_1) ||
            perform_subcell_limiting(dg.volume_integral, small_element_2) ||
@@ -1410,7 +1315,7 @@ end
     (; variable_bounds, n_mortars_per_node) = dg.volume_integral.limiter.cache.subcell_limiter_coefficients
     var_min = variable_bounds[Symbol(string(var_index), "_min")]
 
-    for mortar in eachmortar(dg, cache)
+    @threaded for mortar in eachmortar(dg, cache)
         isone(limiting_factor[mortar]) && continue # Skip if alpha is already 1 (no limiting needed)
 
         small_element_1 = neighbor_ids[1, mortar]
@@ -1418,7 +1323,6 @@ end
         small_element_3 = neighbor_ids[3, mortar]
         small_element_4 = neighbor_ids[4, mortar]
         large_element = neighbor_ids[5, mortar]
-
         if perform_subcell_limiting(dg.volume_integral, large_element) ||
            perform_subcell_limiting(dg.volume_integral, small_element_1) ||
            perform_subcell_limiting(dg.volume_integral, small_element_2) ||
@@ -1456,6 +1360,8 @@ end
 
         # Compute limiting factor
         for j in eachnode(dg), i in eachnode(dg)
+            isone(limiting_factor[mortar]) && break # Skip if alpha is already 1 (no limiting needed)
+
             if orientation == 1
                 # L2 mortars in x-direction
                 indices_small = (node_small, i, j)
@@ -1469,144 +1375,95 @@ end
                 indices_small = (i, j, node_small)
                 indices_large = (i, j, node_large)
             end
-            var_small_1 = u[var_index, indices_small..., small_element_1]
-            var_small_2 = u[var_index, indices_small..., small_element_2]
-            var_small_3 = u[var_index, indices_small..., small_element_3]
-            var_small_4 = u[var_index, indices_small..., small_element_4]
-            var_large = u[var_index, indices_large..., large_element]
 
-            if min(var_small_1, var_small_2, var_small_3, var_small_4, var_large) < 0
+            # Large element
+            var_large = u[var_index, indices_large..., large_element]
+            if var_large < 0
                 error("Safe low-order method produces negative value for conservative variable rho. Try a smaller time step.")
             end
 
             # Minimum bound
-            var_min_small_1 = var_min[indices_small..., small_element_1]
-            var_min_small_2 = var_min[indices_small..., small_element_2]
-            var_min_small_3 = var_min[indices_small..., small_element_3]
-            var_min_small_4 = var_min[indices_small..., small_element_4]
             var_min_large = var_min[indices_large..., large_element]
-
-            # Compute flux differences
-            flux_small_1_high_order = surface_flux_values_high_order[var_index, i, j,
-                                                                     direction_small,
-                                                                     small_element_1]
-            flux_small_1_low_order = surface_flux_values[var_index, i, j,
-                                                         direction_small,
-                                                         small_element_1]
-            flux_difference_small_1 = factor_small *
-                                      (flux_small_1_high_order - flux_small_1_low_order)
-
-            flux_small_2_high_order = surface_flux_values_high_order[var_index, i, j,
-                                                                     direction_small,
-                                                                     small_element_2]
-            flux_small_2_low_order = surface_flux_values[var_index, i, j,
-                                                         direction_small,
-                                                         small_element_2]
-            flux_difference_small_2 = factor_small *
-                                      (flux_small_2_high_order - flux_small_2_low_order)
-
-            flux_small_3_high_order = surface_flux_values_high_order[var_index, i, j,
-                                                                     direction_small,
-                                                                     small_element_3]
-            flux_small_3_low_order = surface_flux_values[var_index, i, j,
-                                                         direction_small,
-                                                         small_element_3]
-            flux_difference_small_3 = factor_small *
-                                      (flux_small_3_high_order - flux_small_3_low_order)
-
-            flux_small_4_high_order = surface_flux_values_high_order[var_index, i, j,
-                                                                     direction_small,
-                                                                     small_element_4]
-            flux_small_4_low_order = surface_flux_values[var_index, i, j,
-                                                         direction_small,
-                                                         small_element_4]
-            flux_difference_small_4 = factor_small *
-                                      (flux_small_4_high_order - flux_small_4_low_order)
 
             flux_large_high_order = surface_flux_values_high_order[var_index, i, j,
                                                                    direction_large,
                                                                    large_element]
+            # Check if high-order flux is finite. Otherwise, use pure low-order fluxes.
+            if !isfinite(flux_large_high_order)
+                limiting_factor[mortar] = 1
+                break
+            end
             flux_large_low_order = surface_flux_values[var_index, i, j, direction_large,
                                                        large_element]
             flux_difference_large = factor_large *
                                     (flux_large_high_order - flux_large_low_order)
-
-            # Use pure low-order fluxes if high-order fluxes are not finite.
-            if !isfinite(flux_small_1_high_order) ||
-               !isfinite(flux_small_2_high_order) ||
-               !isfinite(flux_small_3_high_order) ||
-               !isfinite(flux_small_4_high_order) ||
-               !isfinite(flux_large_high_order)
-                limiting_factor[mortar] = 1
-                break
-            end
-
-            inverse_jacobian_small_1 = get_inverse_jacobian(inverse_jacobian, mesh,
-                                                            indices_small...,
-                                                            small_element_1)
-            inverse_jacobian_small_2 = get_inverse_jacobian(inverse_jacobian, mesh,
-                                                            indices_small...,
-                                                            small_element_2)
-            inverse_jacobian_small_3 = get_inverse_jacobian(inverse_jacobian, mesh,
-                                                            indices_small...,
-                                                            small_element_3)
-            inverse_jacobian_small_4 = get_inverse_jacobian(inverse_jacobian, mesh,
-                                                            indices_small...,
-                                                            small_element_4)
-            inverse_jacobian_large = get_inverse_jacobian(inverse_jacobian, mesh,
-                                                          indices_large...,
-                                                          large_element)
 
             # Real one-sided Zalesak-type limiter
             # * Zalesak (1979). "Fully multidimensional flux-corrected transport algorithms for fluids"
             # * Kuzmin et al. (2010). "Failsafe flux limiting and constrained data projections for equations of gas dynamics"
             # Note: The Zalesak limiter has to be computed, even if the state is valid, because the correction is
             #       for each mortar, not each node
-            Qm_small_1 = min(0, var_min_small_1 - var_small_1)
-            Qm_small_2 = min(0, var_min_small_2 - var_small_2)
-            Qm_small_3 = min(0, var_min_small_3 - var_small_3)
-            Qm_small_4 = min(0, var_min_small_4 - var_small_4)
             Qm_large = min(0, var_min_large - var_large)
-
-            Pm_small_1 = min(0, flux_difference_small_1)
-            Pm_small_2 = min(0, flux_difference_small_2)
-            Pm_small_3 = min(0, flux_difference_small_3)
-            Pm_small_4 = min(0, flux_difference_small_4)
             Pm_large = min(0, flux_difference_large)
 
             # A node can be on multiple mortars. Scale the antidiffusive flux contribution
             # to account for this. Similar to scaling with `gamma_constant_newton`.
-            n_mortars_small_1 = n_mortars_per_node[indices_small..., small_element_1]
-            n_mortars_small_2 = n_mortars_per_node[indices_small..., small_element_2]
-            n_mortars_small_3 = n_mortars_per_node[indices_small..., small_element_3]
-            n_mortars_small_4 = n_mortars_per_node[indices_small..., small_element_4]
-            n_mortars_large = n_mortars_per_node[indices_large..., large_element]
-            Pm_small_1 *= n_mortars_small_1
-            Pm_small_2 *= n_mortars_small_2
-            Pm_small_3 *= n_mortars_small_3
-            Pm_small_4 *= n_mortars_small_4
-            Pm_large *= n_mortars_large
+            Pm_large *= n_mortars_per_node[indices_large..., large_element]
 
-            Pm_small_1 = dt * inverse_jacobian_small_1 * Pm_small_1
-            Pm_small_2 = dt * inverse_jacobian_small_2 * Pm_small_2
-            Pm_small_3 = dt * inverse_jacobian_small_3 * Pm_small_3
-            Pm_small_4 = dt * inverse_jacobian_small_4 * Pm_small_4
+            inverse_jacobian_large = get_inverse_jacobian(inverse_jacobian, mesh,
+                                                          indices_large...,
+                                                          large_element)
             Pm_large = dt * inverse_jacobian_large * Pm_large
 
             # Compute blending coefficient avoiding division by zero
             # (as in paper of [Guermond, Nazarov, Popov, Thomas] (4.8))
-            Qm_small_1 = abs(Qm_small_1) /
-                         (abs(Pm_small_1) + eps(typeof(Qm_small_1)) * 100)
-            Qm_small_2 = abs(Qm_small_2) /
-                         (abs(Pm_small_2) + eps(typeof(Qm_small_2)) * 100)
-            Qm_small_3 = abs(Qm_small_3) /
-                         (abs(Pm_small_3) + eps(typeof(Qm_small_3)) * 100)
-            Qm_small_4 = abs(Qm_small_4) /
-                         (abs(Pm_small_4) + eps(typeof(Qm_small_4)) * 100)
-            Qm_large = abs(Qm_large) / (abs(Pm_large) + eps(typeof(Qm_large)) * 100)
+            eps_ = eps(typeof(Qm_large)) * 100
+            Qm_large = abs(Qm_large) / (abs(Pm_large) + eps_)
+            Qm = min(1, Qm_large)
+
+            # small elements
+            for small_element_index in 1:4
+                small_element = neighbor_ids[small_element_index, mortar]
+                var_small = u[var_index, indices_small..., small_element]
+                if var_small < 0
+                    error("Safe low-order method produces negative value for conservative variable rho. Try a smaller time step.")
+                end
+
+                # Compute flux differences
+                flux_small_high_order = surface_flux_values_high_order[var_index, i, j,
+                                                                       direction_small,
+                                                                       small_element]
+                if !isfinite(flux_small_high_order)
+                    limiting_factor[mortar] = 1
+                    break
+                end
+                flux_small_low_order = surface_flux_values[var_index, i, j,
+                                                           direction_small,
+                                                           small_element]
+                flux_difference_small = factor_small *
+                                        (flux_small_high_order - flux_small_low_order)
+
+                # Minimum bound
+                var_min_small = var_min[indices_small..., small_element]
+                Qm_small = min(0, var_min_small - var_small)
+                Pm_small = min(0, flux_difference_small)
+
+                # A node can be on multiple mortars. Scale the antidiffusive flux contribution
+                # to account for this. Similar to scaling with `gamma_constant_newton`.
+                Pm_small *= n_mortars_per_node[indices_small..., small_element]
+
+                inverse_jacobian_small = get_inverse_jacobian(inverse_jacobian, mesh,
+                                                              indices_small...,
+                                                              small_element)
+                Pm_small = dt * inverse_jacobian_small * Pm_small
+
+                # Compute blending coefficient avoiding division by zero
+                # (as in paper of [Guermond, Nazarov, Popov, Thomas] (4.8))
+                Qm_small = abs(Qm_small) / (abs(Pm_small) + eps_)
+                Qm = min(Qm, Qm_small)
+            end
 
             # Calculate limiting factor
-            Qm = min(1, Qm_small_1, Qm_small_2, Qm_small_3, Qm_small_4, Qm_large)
             limiting_factor[mortar] = max(limiting_factor[mortar], 1 - Qm)
         end
     end
@@ -1633,7 +1490,7 @@ end
 
     (; gamma_constant_newton) = limiter
 
-    for mortar in eachmortar(dg, cache)
+    @threaded for mortar in eachmortar(dg, cache)
         isone(limiting_factor[mortar]) && continue # Skip if alpha is already 1 (no limiting needed)
 
         small_element_1 = neighbor_ids[1, mortar]
