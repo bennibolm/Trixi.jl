@@ -538,7 +538,7 @@ end
         perform_subcell_limiting(dg.volume_integral, element) || continue
 
         for j in eachnode(dg), i in eachnode(dg)
-            isone(alpha[i, j, element]) && continue # Skip if alpha is already 1 (no limiting needed)
+            isone(alpha[i, j, element]) && continue # Skip if alpha is already 1
 
             var = u[variable, i, j, element]
             # Real Zalesak type limiter
@@ -604,7 +604,7 @@ end
         perform_subcell_limiting(dg.volume_integral, element) || continue
 
         for j in eachnode(dg), i in eachnode(dg)
-            isone(alpha[i, j, element]) && continue # Skip if alpha is already 1 (no limiting needed)
+            isone(alpha[i, j, element]) && continue # Skip if alpha is already 1
 
             inverse_jacobian = get_inverse_jacobian(cache.elements.inverse_jacobian,
                                                     mesh, i, j, element)
@@ -655,7 +655,7 @@ end
             end
             var_min[i, j, element] = positivity_correction_factor * var
 
-            isone(alpha[i, j, element]) && continue # Skip if alpha is already 1 (no limiting needed)
+            isone(alpha[i, j, element]) && continue # Skip if alpha is already 1
 
             # Real one-sided Zalesak-type limiter
             # * Zalesak (1979). "Fully multidimensional flux-corrected transport algorithms for fluids"
@@ -750,7 +750,7 @@ end
     (; gamma_constant_newton) = limiter
 
     indices = (i, j, element)
-    isone(alpha[indices...]) && return # Skip if alpha is already 1 (no limiting needed)
+    isone(alpha[indices...]) && return # Skip if alpha is already 1
 
     # negative xi direction
     antidiffusive_flux = gamma_constant_newton * inverse_jacobian * inverse_weights[i] *
@@ -856,7 +856,7 @@ end
     var_max = variable_bounds[Symbol(variable_string, "_max")]
 
     @threaded for mortar in eachmortar(dg, cache)
-        isone(limiting_factor[mortar]) && continue # Skip if alpha is already 1 (no limiting needed)
+        isone(limiting_factor[mortar]) && continue # Skip if alpha is already 1
 
         large_element = neighbor_ids[3, mortar]
         upper_element = neighbor_ids[2, mortar]
@@ -896,7 +896,7 @@ end
 
         # Compute limiting factor
         for i in eachnode(dg)
-            isone(limiting_factor[mortar]) && break # Skip if alpha is already 1 (no limiting needed)
+            isone(limiting_factor[mortar]) && break # Skip if alpha is already 1
 
             if orientation == 1
                 # L2 mortars in x-direction
@@ -963,6 +963,8 @@ end
 
             # Small elements
             for small_element_index in 1:2
+                isone(limiting_factor[mortar]) && break # Skip if alpha is already 1
+
                 small_element = neighbor_ids[small_element_index, mortar]
                 var_small = u[var_index, indices_small..., small_element]
                 if var_small < 0
@@ -1038,7 +1040,7 @@ end
     (; gamma_constant_newton) = limiter
 
     @threaded for mortar in eachmortar(dg, cache)
-        isone(limiting_factor[mortar]) && continue # Skip if alpha is already 1 (no limiting needed)
+        isone(limiting_factor[mortar]) && continue # Skip if alpha is already 1
 
         large_element = neighbor_ids[3, mortar]
         upper_element = neighbor_ids[2, mortar]
@@ -1184,7 +1186,7 @@ end
     var_min = variable_bounds[Symbol(string(var_index), "_min")]
 
     @threaded for mortar in eachmortar(dg, cache)
-        isone(limiting_factor[mortar]) && continue # Skip if alpha is already 1 (no limiting needed)
+        isone(limiting_factor[mortar]) && continue # Skip if alpha is already 1
 
         large_element = neighbor_ids[3, mortar]
         upper_element = neighbor_ids[2, mortar]
@@ -1225,7 +1227,7 @@ end
 
         # Compute limiting factor
         for i in eachnode(dg)
-            isone(limiting_factor[mortar]) && break # Skip if alpha is already 1 (no limiting needed)
+            isone(limiting_factor[mortar]) && break # Skip if alpha is already 1
 
             if orientation == 1
                 # L2 mortars in x-direction
@@ -1284,6 +1286,8 @@ end
 
             # small elements
             for small_element_index in 1:2
+                isone(limiting_factor[mortar]) && break # Skip if alpha is already 1
+
                 small_element = neighbor_ids[small_element_index, mortar]
                 var_small = u[var_index, indices_small..., small_element]
                 if var_small < 0
@@ -1352,7 +1356,7 @@ end
     (; gamma_constant_newton) = limiter
 
     @threaded for mortar in eachmortar(dg, cache)
-        isone(limiting_factor[mortar]) && continue # Skip if alpha is already 1 (no limiting needed)
+        isone(limiting_factor[mortar]) && continue # Skip if alpha is already 1
 
         large_element = neighbor_ids[3, mortar]
         upper_element = neighbor_ids[2, mortar]
