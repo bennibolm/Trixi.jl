@@ -164,6 +164,24 @@ end
     @test_allocations(Trixi.rhs!, semi, sol, 1000)
 end
 
+@testitem "TreeMesh3D Euler: elixir_euler_mortar_sc_subcell.jl (conservation)" setup=[
+    Setup,
+    TreeMesh3DEuler
+] tags=[:tree_part4] begin
+    @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_euler_mortar_sc_subcell.jl"),
+                        tspan=(0.0, 0.3),
+                        pure_low_order=true)
+    # Check for conservation
+    state_integrals = Trixi.integrate(sol.u[2], semi)
+    initial_state_integrals = analysis_callback.affect!.initial_state_integrals
+
+    @test isapprox(state_integrals[1], initial_state_integrals[1], atol = 1e-12)
+    @test isapprox(state_integrals[2], initial_state_integrals[2], atol = 1e-12)
+    @test isapprox(state_integrals[3], initial_state_integrals[3], atol = 1e-12)
+    @test isapprox(state_integrals[4], initial_state_integrals[4], atol = 1e-12)
+    @test isapprox(state_integrals[5], initial_state_integrals[5], atol = 5e-11)
+end
+
 @testitem "TreeMesh3D Euler: elixir_euler_mortar_sc_subcell.jl (no limiting)" setup=[
     Setup,
     TreeMesh3DEuler
