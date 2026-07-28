@@ -90,6 +90,7 @@ callbacks = CallbackSet(summary_callback,
                         analysis_callback,
                         alive_callback,
                         save_solution,
+                        LimitingAnalysisCallback(interval = 100),
                         stepsize_callback)
 
 ###############################################################################
