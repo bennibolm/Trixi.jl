@@ -956,7 +956,6 @@ end
                 flux_difference_small = factor *
                                         (flux_small_high_order - flux_small_low_order)
 
-                # Minimum bound
                 var_min_small = var_min[i_small, j_small, small_element]
                 Qm_small = min(0, var_min_small - var_small)
                 Pm_small = min(0, flux_difference_small)
