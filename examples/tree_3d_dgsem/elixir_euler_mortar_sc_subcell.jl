@@ -12,7 +12,8 @@ A Gaussian pulse in the density with constant velocity and pressure; reduces the
 compressible Euler equations to the linear advection equations.
 """
 function initial_condition_density_pulse(x, t, equations::CompressibleEulerEquations3D)
-    rho = 1 + exp(-(x[1]^2 + x[2]^2 + x[3]^2)) / 2
+    rho_0 = 0.01
+    rho = rho_0 + exp(-(x[1]^2 + x[2]^2 + x[3]^2)) / 2
     v1 = 1
     v2 = 1
     v3 = 1

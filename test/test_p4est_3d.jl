@@ -551,12 +551,13 @@ end
     @test isapprox(state_integrals[4], initial_state_integrals[4], atol = 1e-12)
     @test isapprox(state_integrals[5], initial_state_integrals[5], atol = 5e-11)
 end
+
 @testitem "P4estMesh3D: elixir_euler_mortar_sc_subcell.jl (no limiting)" setup=[
     Setup,
     P4estMesh3D
 ] tags=[:p4est_part2] begin
     @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_euler_mortar_sc_subcell.jl"),
-                        l2=[
+                        l2=[# TODO
                             0.011148595040635862,
                             0.011148595040635858,
                             0.011148595040635853,

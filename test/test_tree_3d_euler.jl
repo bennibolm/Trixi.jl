@@ -187,7 +187,7 @@ end
     TreeMesh3DEuler
 ] tags=[:tree_part4] begin
     @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_euler_mortar_sc_subcell.jl"),
-                        l2=[
+                        l2=[#TODO
                             0.0038284883152897714,
                             0.00382848831528977,
                             0.00382848831528977,
@@ -217,7 +217,7 @@ end
 ] tags=[:tree_part4] begin
     @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_euler_mortar_sc_subcell.jl"),
                         pure_low_order=true,
-                        l2=[
+                        l2=[#TODO
                             0.0038986085532178786,
                             0.0038986085532178795,
                             0.0038986085532178795,
@@ -248,7 +248,7 @@ end
     @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_euler_mortar_sc_subcell.jl"),
                         positivity_variables_cons=["rho"],
                         positivity_variables_nonlinear=[pressure],
-                        l2=[
+                        l2=[#TODO
                             0.0038284883152897714,
                             0.00382848831528977,
                             0.00382848831528977,
@@ -283,7 +283,7 @@ end
                         local_onesided_variables_nonlinear=[(entropy_guermond_etal,
                                                              min)],
                         cfl=0.7,
-                        l2=[
+                        l2=[#TODO
                             0.003911571862061461,
                             0.003911571862061463,
                             0.00391157186206146,
@@ -319,7 +319,7 @@ end
                                                              min)],
                         cfl=0.9,
                         bar_states=true,
-                        l2=[
+                        l2=[#TODO
                             0.0038793425274162643,
                             0.0038793425274162604,
                             0.0038793425274162513,

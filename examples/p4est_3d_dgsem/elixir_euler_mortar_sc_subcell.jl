@@ -12,7 +12,8 @@ A Gaussian pulse in the density with constant velocity and pressure; reduces the
 compressible Euler equations to the linear advection equations.
 """
 function initial_condition_density_pulse(x, t, equations::CompressibleEulerEquations3D)
-    rho = 1 + exp(-(x[1]^2 + x[2]^2 + x[3]^2)) / 2
+    rho_0 = 0.01
+    rho = rho_0 + exp(-(x[1]^2 + x[2]^2 + x[3]^2)) / 2
     v1 = 1
     v2 = 1
     v3 = 1
@@ -45,9 +46,9 @@ solver = DGSEM(basis, surface_flux, volume_integral, mortar)
 
 coordinates_min = (-5.0, -5.0, -5.0)
 coordinates_max = (5.0, 5.0, 5.0)
-trees_per_dimension = (8, 8, 8)
+trees_per_dimension = (4, 4, 4)
 mesh = P4estMesh(trees_per_dimension,
-                 polydeg = 1, initial_refinement_level = 0,
+                 polydeg = 1, initial_refinement_level = 1,
                  coordinates_min = coordinates_min, coordinates_max = coordinates_max,
                  periodicity = true)
 
@@ -56,7 +57,7 @@ mesh = P4estMesh(trees_per_dimension,
 function refine_fn(p8est, which_tree, quadrant)
     quadrant_obj = unsafe_load(quadrant)
     if quadrant_obj.x == 0 && quadrant_obj.y == 0 && quadrant_obj.z == 0 &&
-       quadrant_obj.level < 1
+       quadrant_obj.level < 2
         # return true (refine)
         return Cint(1)
     else
