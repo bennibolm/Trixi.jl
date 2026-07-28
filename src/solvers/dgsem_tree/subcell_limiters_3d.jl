@@ -451,7 +451,6 @@ end
                 indices_large = (i, j, node_large)
             end
 
-
             u_small = (get_node_vars(u, equations, dg, indices_small...,
                                      neighbor_ids[1, mortar]),
                        get_node_vars(u, equations, dg, indices_small...,

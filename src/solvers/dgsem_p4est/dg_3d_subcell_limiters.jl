@@ -1466,16 +1466,16 @@ function calc_mortar_flux_low_order!(surface_flux_values,
         large_element = neighbor_ids[5, mortar]
         surface_flux_values[:, :, :, large_direction, large_element] .= zero(eltype(surface_flux_values))
 
-        for small_element_index in 1:4
-            small_element = neighbor_ids[small_element_index, mortar]
+        i_small = i_small_start
+        j_small = j_small_start
+        k_small = k_small_start
+        for j_small_node in eachnode(dg)
+            for i_small_node in eachnode(dg)
+                i_mortar_s, j_mortar_s = get_mortar_index(small_indices,
+                                                          i_small, j_small, k_small)
 
-            i_small = i_small_start
-            j_small = j_small_start
-            k_small = k_small_start
-            for j_small_node in eachnode(dg)
-                for i_small_node in eachnode(dg)
-                    i_mortar_s, j_mortar_s = get_mortar_index(small_indices,
-                                                              i_small, j_small, k_small)
+                for small_element_index in 1:4
+                    small_element = neighbor_ids[small_element_index, mortar]
 
                     u_small_local, _ = get_surface_node_vars(mortars.u, equations, dg,
                                                              small_element_index,
@@ -1504,48 +1504,43 @@ function calc_mortar_flux_low_order!(surface_flux_values,
                             factor = mortar_weights[i_mortar_l, j_mortar_l,
                                                     i_mortar_s, j_mortar_s,
                                                     small_element_index]
-                            if iszero(factor)
-                                i_large += i_large_step_i
-                                j_large += j_large_step_i
-                                k_large += k_large_step_i
-                                continue
+                            if !isapprox(factor, zero(typeof(factor)))
+                                u_large_local = get_node_vars(u_large, equations, dg,
+                                                              i_large_node,
+                                                              j_large_node, mortar)
+
+                                flux = surface_flux(u_small_local, u_large_local,
+                                                    normal_direction_small, equations)
+
+                                # Add flux to small element
+                                multiply_add_to_node_vars!(surface_flux_values,
+                                                           factor /
+                                                           mortar_weights_sums[i_mortar_s,
+                                                                               j_mortar_s,
+                                                                               1],
+                                                           flux, equations, dg,
+                                                           i_small_node, j_small_node,
+                                                           small_direction,
+                                                           small_element)
+
+                                # Add flux to large element
+                                # The flux is calculated in the outward direction of the small elements,
+                                # so the sign must be switched to get the flux in outward direction
+                                # of the large element.
+                                # The contravariant vectors of the large element (and therefore the normal
+                                # vectors of the large element as well) are twice as large as the
+                                # contravariant vectors of the small elements. Therefore, the flux needs
+                                # to be scaled by a factor of 2 to obtain the flux of the large element.
+                                multiply_add_to_node_vars!(surface_flux_values,
+                                                           -2 * factor /
+                                                           mortar_weights_sums[i_mortar_l,
+                                                                               j_mortar_l,
+                                                                               2],
+                                                           flux, equations, dg,
+                                                           i_large_node, j_large_node,
+                                                           large_direction,
+                                                           large_element)
                             end
-
-                            u_large_local = get_node_vars(u_large, equations, dg,
-                                                          i_large_node,
-                                                          j_large_node, mortar)
-
-                            flux = surface_flux(u_small_local, u_large_local,
-                                                normal_direction_small, equations)
-
-                            # Add flux to small element
-                            multiply_add_to_node_vars!(surface_flux_values,
-                                                       factor /
-                                                       mortar_weights_sums[i_mortar_s,
-                                                                           j_mortar_s,
-                                                                           1],
-                                                       flux, equations, dg,
-                                                       i_small, j_small,
-                                                       small_direction,
-                                                       small_element)
-
-                            # Add flux to large element
-                            # The flux is calculated in the outward direction of the small elements,
-                            # so the sign must be switched to get the flux in outward direction
-                            # of the large element.
-                            # The contravariant vectors of the large element (and therefore the normal
-                            # vectors of the large element as well) are twice as large as the
-                            # contravariant vectors of the small elements. Therefore, the flux needs
-                            # to be scaled by a factor of 2 to obtain the flux of the large element.
-                            multiply_add_to_node_vars!(surface_flux_values,
-                                                       -2 * factor /
-                                                       mortar_weights_sums[i_mortar_l,
-                                                                           j_mortar_l,
-                                                                           2],
-                                                       flux, equations, dg,
-                                                       i_large, j_large,
-                                                       large_direction,
-                                                       large_element)
 
                             i_large += i_large_step_i
                             j_large += j_large_step_i
@@ -1555,15 +1550,14 @@ function calc_mortar_flux_low_order!(surface_flux_values,
                         j_large += j_large_step_j
                         k_large += k_large_step_j
                     end
-
-                    i_small += i_small_step_i
-                    j_small += j_small_step_i
-                    k_small += k_small_step_i
                 end
-                i_small += i_small_step_j
-                j_small += j_small_step_j
-                k_small += k_small_step_j
+                i_small += i_small_step_i
+                j_small += j_small_step_i
+                k_small += k_small_step_i
             end
+            i_small += i_small_step_j
+            j_small += j_small_step_j
+            k_small += k_small_step_j
         end
     end
 

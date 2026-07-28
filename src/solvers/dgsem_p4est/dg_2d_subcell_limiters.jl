@@ -394,10 +394,10 @@ function calc_mortar_flux_low_order!(surface_flux_values,
                                      nonconservative_terms::False, equations,
                                      mortar_idp::LobattoLegendreMortarIDP,
                                      surface_integral, dg::DG, cache)
-    @unpack surface_flux = surface_integral
-    @unpack elements, mortars = cache
-    @unpack neighbor_ids, node_indices, u_large = mortars
-    @unpack contravariant_vectors = elements
+    (; surface_flux) = surface_integral
+    (; elements, mortars) = cache
+    (; neighbor_ids, node_indices, u_large) = mortars
+    (; contravariant_vectors) = elements
     (; mortar_weights, mortar_weights_sums) = mortar_idp
     index_range = eachnode(dg)
 
