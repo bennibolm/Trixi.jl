@@ -1528,11 +1528,11 @@ function calc_mortar_flux_low_order!(surface_flux_values,
                                 # so the sign must be switched to get the flux in outward direction
                                 # of the large element.
                                 # The contravariant vectors of the large element (and therefore the normal
-                                # vectors of the large element as well) are twice as large as the
+                                # vectors of the large element as well) are four times as large as the
                                 # contravariant vectors of the small elements. Therefore, the flux needs
-                                # to be scaled by a factor of 2 to obtain the flux of the large element.
+                                # to be scaled by a factor of 4 to obtain the flux of the large element.
                                 multiply_add_to_node_vars!(surface_flux_values,
-                                                           -2 * factor /
+                                                           -4 * factor /
                                                            mortar_weights_sums[i_mortar_l,
                                                                                j_mortar_l,
                                                                                2],
