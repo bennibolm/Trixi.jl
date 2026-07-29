@@ -581,6 +581,37 @@ end
     @test_allocations(Trixi.rhs!, semi, sol, 15000)
 end
 
+@testitem "P4estMesh3D: elixir_euler_mortar_sc_subcell.jl (positivity limiting)" setup=[
+    Setup,
+    P4estMesh3D
+] tags=[:p4est_part2] begin
+    @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_euler_mortar_sc_subcell.jl"),
+                        positivity_variables_cons=["rho"],
+                        positivity_variables_nonlinear=[pressure],
+                        l2=[# TODO
+                            0.09946224487902565,
+                            0.04863386374672001,
+                            0.048633863746720116,
+                            0.04863386374672032,
+                            0.3751015774232693
+                        ],
+                        linf=[
+                            0.789241521871487,
+                            0.42046970270100276,
+                            0.42046970270100276,
+                            0.4204697027010028,
+                            4.730877375538398
+                        ],
+                        tspan=(0.0, 0.3))
+    # Ensure that we do not have excessive memory allocations
+    # (e.g., from type instabilities)
+    # Larger values for allowed allocations due to usage of custom
+    # integrator which are not *recorded* for the methods from
+    # OrdinaryDiffEq.jl
+    # Corresponding issue: https://github.com/trixi-framework/Trixi.jl/issues/1877
+    @test_allocations(Trixi.rhs!, semi, sol, 15000)
+end
+
 @testitem "P4estMesh3D: elixir_euler_source_terms_nonconforming_earth.jl" setup=[
     Setup,
     P4estMesh3D
