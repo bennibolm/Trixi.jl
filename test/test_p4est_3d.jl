@@ -612,10 +612,10 @@ end
     @test_allocations(Trixi.rhs!, semi, sol, 15000)
 end
 
-@testitem "TreeMesh3D Euler: elixir_euler_mortar_sc_subcell.jl (local limiting)" setup=[
+@testitem "P4estMesh3D: elixir_euler_mortar_sc_subcell.jl (local limiting)" setup=[
     Setup,
-    TreeMesh3DEuler
-] tags=[:tree_part4] begin
+    P4estMesh3D
+] tags=[:p4est_part2] begin
     @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_euler_mortar_sc_subcell.jl"),
                         positivity_variables_cons=["rho"],
                         positivity_variables_nonlinear=[pressure],
@@ -623,19 +623,19 @@ end
                         local_onesided_variables_nonlinear=[(entropy_guermond_etal,
                                                              min)],
                         cfl=0.7,
-                        l2=[#TODO
-                            0.003911571862061461,
-                            0.003911571862061463,
-                            0.00391157186206146,
-                            0.00391157186206146,
-                            0.005867357793092059
+                        l2=[
+                            0.003898555320756325,
+                            0.0038985553207563244,
+                            0.003898555320756325,
+                            0.003898555320756326,
+                            0.00584783298113438
                         ],
                         linf=[
-                            0.13920943717561562,
-                            0.13920943717561562,
-                            0.13920943717561562,
-                            0.13920943717561518,
-                            0.20881415576342377
+                            0.10861568663755472,
+                            0.10861568663755505,
+                            0.10861568663755478,
+                            0.10861568663755478,
+                            0.16292352995633141
                         ],
                         tspan=(0.0, 0.1),)
     # Ensure that we do not have excessive memory allocations
@@ -647,10 +647,10 @@ end
     @test_allocations(Trixi.rhs!, semi, sol, 15_000)
 end
 
-@testitem "TreeMesh3D Euler: elixir_euler_mortar_sc_subcell.jl (local limiting with bar states)" setup=[
+@testitem "P4estMesh3D Euler: elixir_euler_mortar_sc_subcell.jl (local limiting with bar states)" setup=[
     Setup,
-    TreeMesh3DEuler
-] tags=[:tree_part4] begin
+    P4estMesh3D
+] tags=[:p4est_part2] begin
     @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_euler_mortar_sc_subcell.jl"),
                         positivity_variables_cons=["rho"],
                         positivity_variables_nonlinear=[pressure],
@@ -659,19 +659,19 @@ end
                                                              min)],
                         cfl=0.9,
                         bar_states=true,
-                        l2=[# TODO
-                            0.0038793425274162643,
-                            0.0038793425274162604,
-                            0.0038793425274162513,
-                            0.0038793425274162604,
-                            0.005819013791124279
+                        l2=[
+                            0.0038599864284701497,
+                            0.003859986428470149,
+                            0.0038599864284701497,
+                            0.0038599864284701506,
+                            0.0057899796427051484
                         ],
                         linf=[
-                            0.12606269472364873,
-                            0.12606269472364873,
-                            0.12606269472364873,
-                            0.12606269472364984,
-                            0.18909404208547276
+                            0.0965859655237484,
+                            0.09658596552374873,
+                            0.09658596552374837,
+                            0.09658596552374868,
+                            0.14487894828562276
                         ],
                         tspan=(0.0, 0.1),)
     # Ensure that we do not have excessive memory allocations
