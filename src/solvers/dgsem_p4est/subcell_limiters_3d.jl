@@ -810,7 +810,6 @@ end
                 Pp_large = max(0, flux_difference_large)
                 Pm_large = min(0, flux_difference_large)
 
-
                 inverse_jacobian_large = get_inverse_jacobian(cache.elements.inverse_jacobian,
                                                               mesh,
                                                               i_large, j_large, k_large,
@@ -869,8 +868,7 @@ end
 
                     inverse_jacobian_small = get_inverse_jacobian(cache.elements.inverse_jacobian,
                                                                   mesh, i_small,
-                                                                  j_small,
-                                                                  k_small,
+                                                                  j_small, k_small,
                                                                   small_element)
                     Pp_small = inverse_jacobian_small * Pp_small
                     Pm_small = inverse_jacobian_small * Pm_small
