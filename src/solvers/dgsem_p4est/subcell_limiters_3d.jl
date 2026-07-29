@@ -652,22 +652,22 @@ end
         small_element_4 = neighbor_ids[4, mortar]
         large_element = neighbor_ids[5, mortar]
 
-        # Get index information on the small elements
+        # Get index information on the elements
         small_indices = node_indices[1, mortar]
-        i_small_start, i_small_step = index_to_start_step_2d(small_indices[1],
-                                                             index_range)
-        j_small_start, j_small_step = index_to_start_step_2d(small_indices[2],
-                                                             index_range)
-        k_small_start, k_small_step = index_to_start_step_2d(small_indices[3],
-                                                             index_range)
+        i_small_start, i_small_step_i, i_small_step_j = index_to_start_step_3d(small_indices[1],
+                                                                               index_range)
+        j_small_start, j_small_step_i, j_small_step_j = index_to_start_step_3d(small_indices[2],
+                                                                               index_range)
+        k_small_start, k_small_step_i, k_small_step_j = index_to_start_step_3d(small_indices[3],
+                                                                               index_range)
 
         large_indices = node_indices[2, mortar]
-        i_large_start, i_large_step = index_to_start_step_2d(large_indices[1],
-                                                             index_range)
-        j_large_start, j_large_step = index_to_start_step_2d(large_indices[2],
-                                                             index_range)
-        k_large_start, k_large_step = index_to_start_step_2d(large_indices[3],
-                                                             index_range)
+        i_large_start, i_large_step_i, i_large_step_j = index_to_start_step_3d(large_indices[1],
+                                                                               index_range)
+        j_large_start, j_large_step_i, j_large_step_j = index_to_start_step_3d(large_indices[2],
+                                                                               index_range)
+        k_large_start, k_large_step_i, k_large_step_j = index_to_start_step_3d(large_indices[3],
+                                                                               index_range)
 
         i_small = i_small_start
         j_small = j_small_start
@@ -675,19 +675,28 @@ end
         i_large = i_large_start
         j_large = j_large_start
         k_large = k_large_start
-        for node in eachnode(dg)
-            n_mortars_per_node[i_small, j_small, k_small, small_element_1] += 1
-            n_mortars_per_node[i_small, j_small, k_small, small_element_2] += 1
-            n_mortars_per_node[i_small, j_small, k_small, small_element_3] += 1
-            n_mortars_per_node[i_small, j_small, k_small, small_element_4] += 1
-            n_mortars_per_node[i_large, j_large, k_large, large_element] += 1
+        for j in eachnode(dg)
+            for i in eachnode(dg)
+                # Increment the number of mortars per node for each element
+                n_mortars_per_node[i_small, j_small, k_small, small_element_1] += 1
+                n_mortars_per_node[i_small, j_small, k_small, small_element_2] += 1
+                n_mortars_per_node[i_small, j_small, k_small, small_element_3] += 1
+                n_mortars_per_node[i_small, j_small, k_small, small_element_4] += 1
+                n_mortars_per_node[i_large, j_large, k_large, large_element] += 1
 
-            i_small += i_small_step
-            j_small += j_small_step
-            k_small += k_small_step
-            i_large += i_large_step
-            j_large += j_large_step
-            k_large += k_large_step
+                i_small += i_small_step_i
+                j_small += j_small_step_i
+                k_small += k_small_step_i
+                i_large += i_large_step_i
+                j_large += j_large_step_i
+                k_large += k_large_step_i
+            end
+            i_small += i_small_step_j
+            j_small += j_small_step_j
+            k_small += k_small_step_j
+            i_large += i_large_step_j
+            j_large += j_large_step_j
+            k_large += k_large_step_j
         end
     end
 
