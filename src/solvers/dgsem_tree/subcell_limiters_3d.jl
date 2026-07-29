@@ -1184,15 +1184,10 @@ end
                 indices_large = (i, j, node_large)
             end
 
+            # Large element
             u_large = get_node_vars(u, equations, dg, indices_large..., large_element)
-
-            bound_small = (var_minmax[indices_small..., small_element_1],
-                           var_minmax[indices_small..., small_element_2],
-                           var_minmax[indices_small..., small_element_3],
-                           var_minmax[indices_small..., small_element_4])
             bound_large = var_minmax[indices_large..., large_element]
 
-            # Large element
             flux_large_high_order = get_node_vars(surface_flux_values_high_order,
                                                   equations, dg,
                                                   i, j, direction_large, large_element)
@@ -1219,8 +1214,10 @@ end
                 isone(limiting_factor[mortar]) && break # Skip if alpha is already 1
 
                 small_element = neighbor_ids[small_element_index, mortar]
+
                 u_small = get_node_vars(u, equations, dg, indices_small...,
                                         small_element)
+                bound_small = var_minmax[indices_small..., small_element]
 
                 flux_small_high_order = get_node_vars(surface_flux_values_high_order,
                                                       equations, dg,
@@ -1241,7 +1238,7 @@ end
                                            (flux_small_high_order .-
                                             flux_small_low_order)
 
-                newton_loop!(limiting_factor, bound_small[small_element_index],
+                newton_loop!(limiting_factor, bound_small,
                              u_small, (mortar,), variable, min_or_max,
                              initial_check_local_onesided_newton_idp,
                              final_check_local_onesided_newton_idp,
@@ -1375,7 +1372,7 @@ end
             Qm_large = abs(Qm_large) / (abs(Pm_large) + eps_)
             Qm = min(1, Qm_large)
 
-            # small elements
+            # Small elements
             for small_element_index in 1:4
                 isone(limiting_factor[mortar]) && break # Skip if alpha is already 1
 
@@ -1506,41 +1503,15 @@ end
                 indices_large = (i, j, node_large)
             end
 
-            u_small_1 = get_node_vars(u, equations, dg, indices_small...,
-                                      small_element_1)
-            u_small_2 = get_node_vars(u, equations, dg, indices_small...,
-                                      small_element_2)
-            u_small_3 = get_node_vars(u, equations, dg, indices_small...,
-                                      small_element_3)
-            u_small_4 = get_node_vars(u, equations, dg, indices_small...,
-                                      small_element_4)
-            u_large = get_node_vars(u, equations, dg, indices_large..., large_element)
-            var_small_1 = variable(u_small_1, equations)
-            var_small_1 = variable(u_small_1, equations)
-            var_small_2 = variable(u_small_2, equations)
-            var_small_3 = variable(u_small_3, equations)
-            var_small_4 = variable(u_small_4, equations)
-            var_large = variable(u_large, equations)
-            if var_small_1 < 0 || var_small_2 < 0 ||
-               var_small_3 < 0 || var_small_4 < 0 ||
-               var_large < 0
-                error("Safe low-order method produces negative value for variable $variable. Try a smaller time step.")
-            end
-
-            # Minimum bound
-            var_min_small_1 = var_min[indices_small..., small_element_1]
-            var_min_small_2 = var_min[indices_small..., small_element_2]
-            var_min_small_3 = var_min[indices_small..., small_element_3]
-            var_min_small_4 = var_min[indices_small..., small_element_4]
-            var_min_small = (var_min_small_1, var_min_small_2,
-                             var_min_small_3, var_min_small_4)
-            var_min_large = var_min[indices_large..., large_element]
-
-            # small elements
+            # Small elements
             for small_element_index in 1:4
                 isone(limiting_factor[mortar]) && break # Skip if alpha is already 1
 
                 small_element = neighbor_ids[small_element_index, mortar]
+
+                u_small = get_node_vars(u, equations, dg, indices_small...,
+                                        small_element)
+                var_min_small = var_min[indices_small..., small_element]
 
                 # Compute flux differences
                 flux_small_high_order = get_node_vars(surface_flux_values_high_order,
@@ -1565,19 +1536,18 @@ end
                                            inverse_jacobian_small *
                                            flux_difference_small
 
-                u_small = get_node_vars(u, equations, dg, indices_small...,
-                                        small_element)
-                newton_loop!(limiting_factor, var_min_small[small_element_index],
+                newton_loop!(limiting_factor, var_min_small,
                              u_small, (mortar,), variable, min,
                              initial_check_nonnegative_newton_idp,
                              final_check_nonnegative_newton_idp,
                              equations, dt, limiter, antidiffusive_flux_small)
             end
-            if limiting_factor[mortar] == 1
-                break
-            end
+            isone(limiting_factor[mortar]) && break # Skip if alpha is already 1
 
-            # large element
+            # Large element
+            u_large = get_node_vars(u, equations, dg, indices_large..., large_element)
+            var_min_large = var_min[indices_large..., large_element]
+
             inverse_jacobian_large = get_inverse_jacobian(inverse_jacobian, mesh,
                                                           indices_large...,
                                                           large_element)
