@@ -647,7 +647,7 @@ end
     @test_allocations(Trixi.rhs!, semi, sol, 15_000)
 end
 
-@testitem "P4estMesh3D Euler: elixir_euler_mortar_sc_subcell.jl (local limiting with bar states)" setup=[
+@testitem "P4estMesh3D: elixir_euler_mortar_sc_subcell.jl (local limiting with bar states)" setup=[
     Setup,
     P4estMesh3D
 ] tags=[:p4est_part2] begin
