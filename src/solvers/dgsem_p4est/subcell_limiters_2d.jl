@@ -597,12 +597,13 @@ end
                                                        large_element]
             flux_difference_large = factor *
                                     (flux_large_high_order - flux_large_low_order)
-            inverse_jacobian_large = get_inverse_jacobian(cache.elements.inverse_jacobian,
-                                                          mesh, i_large, j_large,
-                                                          large_element)
+
             Pp_large = max(0, flux_difference_large)
             Pm_large = min(0, flux_difference_large)
 
+            inverse_jacobian_large = get_inverse_jacobian(cache.elements.inverse_jacobian,
+                                                          mesh, i_large, j_large,
+                                                          large_element)
             Pp_large = inverse_jacobian_large * Pp_large
             Pm_large = inverse_jacobian_large * Pm_large
 
@@ -650,13 +651,12 @@ end
                 flux_difference_small = factor *
                                         (flux_small_high_order - flux_small_low_order)
 
-                inverse_jacobian_small = get_inverse_jacobian(cache.elements.inverse_jacobian,
-                                                              mesh, i_small, j_small,
-                                                              small_element)
-
                 Pp_small = max(0, flux_difference_small)
                 Pm_small = min(0, flux_difference_small)
 
+                inverse_jacobian_small = get_inverse_jacobian(cache.elements.inverse_jacobian,
+                                                              mesh, i_small, j_small,
+                                                              small_element)
                 Pp_small = inverse_jacobian_small * Pp_small
                 Pm_small = inverse_jacobian_small * Pm_small
 
@@ -956,7 +956,6 @@ end
 
                 # Compute blending coefficient avoiding division by zero
                 # (as in paper of [Guermond, Nazarov, Popov, Thomas] (4.8))
-                eps_ = eps(typeof(Qm_small)) * 100
                 Qm_small = abs(Qm_small) / (abs(Pm_small) + eps_)
                 Qm = min(Qm, Qm_small)
             end

@@ -1508,6 +1508,13 @@ function calc_mortar_flux_low_order!(surface_flux_values,
                                 u_large_local = get_node_vars(u_large, equations, dg,
                                                               i_large_node,
                                                               j_large_node, mortar)
+                                # TODO: Use normal vector of large element for actual curved elements
+                                # normal_direction_large = get_normal_direction(large_direction,
+                                #                                               contravariant_vectors,
+                                #                                               i_large,
+                                #                                               j_large,
+                                #                                               k_large,
+                                #                                               large_element)
 
                                 flux = surface_flux(u_small_local, u_large_local,
                                                     normal_direction_small, equations)
