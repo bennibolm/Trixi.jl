@@ -978,11 +978,16 @@ end
         end
     end
 
+    # Calc lambdas and bar states at element interfaces and periodic boundaries
     calc_lambdas_bar_states_interface!(u, t, limiter, boundary_conditions, mesh,
                                        equations, dg, cache;
                                        calc_bar_states = calc_bar_states)
+
+    # Calc lambdas and bar states at mortar interfaces
     calc_lambdas_bar_states_mortar!(u, t, limiter, boundary_conditions, mesh, equations,
                                     dg, cache; calc_bar_states = calc_bar_states)
+
+    # Calc lambdas and bar states at physical boundaries
     calc_lambdas_bar_states_boundary!(u, t, limiter, boundary_conditions, mesh,
                                       equations, dg, cache;
                                       calc_bar_states = calc_bar_states)
