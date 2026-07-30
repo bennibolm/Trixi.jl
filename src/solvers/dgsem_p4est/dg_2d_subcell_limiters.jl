@@ -452,11 +452,11 @@ function calc_mortar_flux_low_order!(surface_flux_values,
                     if !isapprox(factor, zero(typeof(factor)))
                         u_large_local = get_node_vars(u_large, equations, dg, j, mortar)
 
+                        # TODO: Use normal vector of large element for actual curved elements
                         # normal_direction_large = get_normal_direction(large_direction,
                         #                                               contravariant_vectors,
                         #                                               i_large, j_large,
                         #                                               large_element)
-                        # TODO: What do I do with the normal_directions? Doesn't make sense right now. See theory.
 
                         flux = surface_flux(u_small_local, u_large_local,
                                             normal_direction_small, equations)
