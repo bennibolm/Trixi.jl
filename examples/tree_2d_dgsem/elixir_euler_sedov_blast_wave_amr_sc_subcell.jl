@@ -48,7 +48,7 @@ limiter_idp = SubcellLimiterIDP(equations, basis;
                                 local_twosided_variables_cons = ["rho"],
                                 local_onesided_variables_nonlinear = [(entropy_guermond_etal,
                                                                        min)],
-                                # Default parameters are not sufficient to fulfill bounds properly.
+                                # Default parameter is not sufficient to fulfill bounds properly.
                                 max_iterations_newton = 70,
                                 bar_states = false)
 volume_integral = VolumeIntegralSubcellLimiting(limiter_idp;
