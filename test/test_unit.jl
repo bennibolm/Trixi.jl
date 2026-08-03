@@ -686,8 +686,7 @@ end
                                                     volume_flux_fv = flux_lax_friedrichs)
     solver = DGSEM(basis, flux_lax_friedrichs, volume_integral)
     mesh = TreeMesh((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0);
-                    initial_refinement_level = 1, n_cells_max = 100,
-                    periodicity = true)
+                    initial_refinement_level = 1, periodicity = true)
     semi = SemidiscretizationHyperbolic(mesh, equations,
                                         initial_condition_bar_states_test, solver;
                                         boundary_conditions = boundary_condition_periodic)
@@ -729,8 +728,7 @@ end
                                                     volume_flux_fv = flux_lax_friedrichs)
     solver = DGSEM(basis, flux_lax_friedrichs, volume_integral)
     mesh = TreeMesh((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0);
-                    initial_refinement_level = 1, n_cells_max = 100,
-                    periodicity = false)
+                    initial_refinement_level = 1, periodicity = false)
     boundary_conditions = BoundaryConditionDirichlet(initial_condition_bar_states_test)
     semi = SemidiscretizationHyperbolic(mesh, equations,
                                         initial_condition_bar_states_test,
