@@ -202,7 +202,8 @@ end
     # The approach used in `calc_bounds_twosided!` is not used here because it requires more
     # evaluations of the variable and is therefore slower.
 
-    init_value = min_or_max === max ? typemin(eltype(var_minmax)) : typemax(eltype(var_minmax))
+    init_value = min_or_max === max ? typemin(eltype(var_minmax)) :
+                 typemax(eltype(var_minmax))
 
     # Calc bounds inside elements
     @threaded for element in eachelement(dg, cache)
