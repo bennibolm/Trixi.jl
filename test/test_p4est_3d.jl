@@ -526,7 +526,7 @@ end
     # integrator which are not *recorded* for the methods from
     # OrdinaryDiffEq.jl
     # Corresponding issue: https://github.com/trixi-framework/Trixi.jl/issues/1877
-    @test_allocations(Trixi.rhs!, semi, sol, 15_000)
+    @test_allocations(Trixi.rhs_hyperbolic!, semi, sol, 15_000)
 end
 
 @testitem "P4estMesh3D: elixir_euler_sedov.jl (HLLE)" setup=[Setup, P4estMesh3D] tags=[:p4est_part2] begin
@@ -596,7 +596,7 @@ end
     # integrator which are not *recorded* for the methods from
     # OrdinaryDiffEq.jl
     # Corresponding issue: https://github.com/trixi-framework/Trixi.jl/issues/1877
-    @test_allocations(Trixi.rhs!, semi, sol, 15000)
+    @test_allocations(Trixi.rhs_hyperbolic!, semi, sol, 15000)
 end
 
 @testitem "P4estMesh3D: elixir_euler_mortar_sc_subcell.jl (positivity limiting)" setup=[
@@ -627,7 +627,7 @@ end
     # integrator which are not *recorded* for the methods from
     # OrdinaryDiffEq.jl
     # Corresponding issue: https://github.com/trixi-framework/Trixi.jl/issues/1877
-    @test_allocations(Trixi.rhs!, semi, sol, 15000)
+    @test_allocations(Trixi.rhs_hyperbolic!, semi, sol, 15000)
 end
 
 @testitem "P4estMesh3D: elixir_euler_mortar_sc_subcell.jl (local limiting)" setup=[
@@ -662,7 +662,7 @@ end
     # integrator which are not *recorded* for the methods from
     # OrdinaryDiffEq.jl
     # Corresponding issue: https://github.com/trixi-framework/Trixi.jl/issues/1877
-    @test_allocations(Trixi.rhs!, semi, sol, 15_000)
+    @test_allocations(Trixi.rhs_hyperbolic!, semi, sol, 15_000)
 end
 
 @testitem "P4estMesh3D: elixir_euler_mortar_sc_subcell.jl (local limiting with bar states)" setup=[
@@ -698,7 +698,7 @@ end
     # integrator which are not *recorded* for the methods from
     # OrdinaryDiffEq.jl
     # Corresponding issue: https://github.com/trixi-framework/Trixi.jl/issues/1877
-    @test_allocations(Trixi.rhs!, semi, sol, 15_000)
+    @test_allocations(Trixi.rhs_hyperbolic!, semi, sol, 15_000)
 end
 
 @testitem "P4estMesh3D: elixir_euler_source_terms_nonconforming_earth.jl" setup=[
@@ -877,7 +877,7 @@ end
     # integrator which are not *recorded* for the methods from
     # OrdinaryDiffEq.jl
     # Corresponding issue: https://github.com/trixi-framework/Trixi.jl/issues/1877
-    @test_allocations(Trixi.rhs!, semi, sol, 15_000)
+    @test_allocations(Trixi.rhs_hyperbolic!, semi, sol, 15_000)
 end
 
 @testitem "P4estMesh3D: elixir_euler_source_terms_nonperiodic_hohqmesh_sc_subcell.jl (local limiting)" setup=[
@@ -911,7 +911,7 @@ end
     # integrator which are not *recorded* for the methods from
     # OrdinaryDiffEq.jl
     # Corresponding issue: https://github.com/trixi-framework/Trixi.jl/issues/1877
-    @test_allocations(Trixi.rhs!, semi, sol, 15_000)
+    @test_allocations(Trixi.rhs_hyperbolic!, semi, sol, 15_000)
 end
 
 @testitem "P4estMesh3D: elixir_euler_source_terms_nonperiodic_hohqmesh_sc_subcell.jl (local limiting with bar states)" setup=[
@@ -947,7 +947,7 @@ end
     # integrator which are not *recorded* for the methods from
     # OrdinaryDiffEq.jl
     # Corresponding issue: https://github.com/trixi-framework/Trixi.jl/issues/1877
-    @test_allocations(Trixi.rhs!, semi, sol, 15_000)
+    @test_allocations(Trixi.rhs_hyperbolic!, semi, sol, 15_000)
 end
 
 @testitem "P4estMesh3D: elixir_mhd_alfven_wave_er.jl" setup=[Setup, P4estMesh3D] tags=[:p4est_part2] begin
