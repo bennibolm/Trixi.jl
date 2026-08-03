@@ -753,8 +753,8 @@ end
     indices = (i, j, element)
     isone(alpha[indices...]) && return # Skip if alpha is already 1
 
+    # negative xi direction
     if i > 1
-        # negative xi direction
         antidiffusive_flux = gamma_constant_newton * inverse_jacobian *
                              inverse_weights[i] *
                              get_node_vars(antidiffusive_flux1_R, equations, dg,
@@ -763,8 +763,8 @@ end
                      final_check, equations, dt, limiter, antidiffusive_flux)
     end
 
+    # positive xi direction
     if i < nnodes(dg)
-        # positive xi direction
         antidiffusive_flux = -gamma_constant_newton * inverse_jacobian *
                              inverse_weights[i] *
                              get_node_vars(antidiffusive_flux1_L, equations, dg,
@@ -773,8 +773,8 @@ end
                      final_check, equations, dt, limiter, antidiffusive_flux)
     end
 
+    # negative eta direction
     if j > 1
-        # negative eta direction
         antidiffusive_flux = gamma_constant_newton * inverse_jacobian *
                              inverse_weights[j] *
                              get_node_vars(antidiffusive_flux2_R, equations, dg,
@@ -783,8 +783,8 @@ end
                      final_check, equations, dt, limiter, antidiffusive_flux)
     end
 
+    # positive eta direction
     if j < nnodes(dg)
-        # positive eta direction
         antidiffusive_flux = -gamma_constant_newton * inverse_jacobian *
                              inverse_weights[j] *
                              get_node_vars(antidiffusive_flux2_L, equations, dg,
