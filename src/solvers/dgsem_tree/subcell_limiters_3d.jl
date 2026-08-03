@@ -98,7 +98,7 @@ end
             continue
         end
 
-        orientation = cache.interfaces.orientations[interface]
+        orientation = orientations[interface]
 
         for j in eachnode(dg), i in eachnode(dg)
             # Define node indices for left and right element based on the interface orientation
@@ -379,7 +379,7 @@ end
             continue
         end
 
-        orientation = cache.interfaces.orientations[interface]
+        orientation = orientations[interface]
 
         for j in eachnode(dg), i in eachnode(dg)
             # Define node indices for left and right element based on the interface orientation
