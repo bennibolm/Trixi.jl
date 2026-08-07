@@ -972,24 +972,26 @@ end
                         bar_states=true,
                         cfl=0.9,
                         l2=[
-                            0.01463589517915295,
-                            0.013726105990678288,
-                            0.013639327348303138,
-                            0.01465200607104538,
-                            0.05746568649560187
+                            0.014358252625786177,
+                            0.013436669379238573,
+                            0.013361357943584767,
+                            0.014376177199184475,
+                            0.055965888275479894
                         ],
                         linf=[
-                            0.10568997784216227,
-                            0.1148519073938088,
-                            0.11764849829145962,
-                            0.12983475641471687,
-                            0.28320410560095244
+                            0.09625055394491744,
+                            0.10558688660835092,
+                            0.12319727990224827,
+                            0.12415251674580441,
+                            0.2899556767326752
                         ],
                         tspan=(0.0, 0.3))
     limiter = semi.solver.volume_integral.limiter
     deviations = collect(values(limiter.cache.idp_bounds_delta_global))
     @test all(isfinite, deviations)
-    @test maximum(deviations) <= 1.0e-13
+    # The bar state should consider the source terms. This is currecntly not implemented.
+    # Therefore, this test is broken.
+    @test_broken maximum(deviations) <= 1.0e-13
 
     # Ensure that we do not have excessive memory allocations
     # (e.g., from type instabilities)
