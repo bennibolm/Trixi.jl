@@ -639,6 +639,11 @@ end
                             484.8651130121227
                         ],
                         tspan=(0.0, 0.0001))
+    limiter = semi.solver.volume_integral.limiter
+    deviations = collect(values(limiter.cache.idp_bounds_delta_global))
+    @test all(isfinite, deviations)
+    @test maximum(deviations) <= 1.0e-13
+
     # Ensure that we do not have excessive memory allocations
     # (e.g., from type instabilities)
     # Larger values for allowed allocations due to usage of custom
@@ -669,6 +674,11 @@ end
                             467.00033830740983
                         ],
                         tspan=(0.0, 0.0001))
+    limiter = semi.solver.volume_integral.limiter
+    deviations = collect(values(limiter.cache.idp_bounds_delta_global))
+    @test all(isfinite, deviations)
+    @test maximum(deviations) <= 1.0e-13
+
     # Ensure that we do not have excessive memory allocations
     # (e.g., from type instabilities)
     # Larger values for allowed allocations due to usage of custom
@@ -1100,6 +1110,11 @@ end
                             4.451090347256024
                         ],
                         tspan=(0.0, 0.1))
+    limiter = semi.solver.volume_integral.limiter
+    deviations = collect(values(limiter.cache.idp_bounds_delta_global))
+    @test all(isfinite, deviations)
+    @test maximum(deviations) <= 1.0e-13
+
     # Ensure that we do not have excessive memory allocations
     # (e.g., from type instabilities)
     # Larger values for allowed allocations due to usage of custom
@@ -1133,6 +1148,11 @@ end
                             4.068560965697952
                         ],
                         tspan=(0.0, 0.1))
+    limiter = semi.solver.volume_integral.limiter
+    deviations = collect(values(limiter.cache.idp_bounds_delta_global))
+    @test all(isfinite, deviations)
+    @test maximum(deviations) <= 5.0e-13
+
     # Ensure that we do not have excessive memory allocations
     # (e.g., from type instabilities)
     # Larger values for allowed allocations due to usage of custom
@@ -1155,18 +1175,23 @@ end
                         bar_states=true,
                         cfl=0.9,
                         l2=[
-                            0.12809811708867533,
+                            0.12809811981277294,
                             0.12474245197640065,
                             0.1247424520264346,
                             0.7738857285332523
                         ],
                         linf=[
-                            0.5982124517205043,
-                            0.7312942203012992,
-                            0.7312942384841344,
-                            3.978825630729965
+                            0.5982110913315719,
+                            0.7312942869462081,
+                            0.7312942157355307,
+                            3.9788246470224244
                         ],
                         tspan=(0.0, 0.1))
+    limiter = semi.solver.volume_integral.limiter
+    deviations = collect(values(limiter.cache.idp_bounds_delta_global))
+    @test all(isfinite, deviations)
+    @test maximum(deviations) <= 1.0e-13
+
     # Ensure that we do not have excessive memory allocations
     # (e.g., from type instabilities)
     # Larger values for allowed allocations due to usage of custom
@@ -1192,6 +1217,47 @@ end
     @test isapprox(state_integrals[2], initial_state_integrals[2], atol = 1e-13)
     @test isapprox(state_integrals[3], initial_state_integrals[3], atol = 1e-13)
     @test isapprox(state_integrals[4], initial_state_integrals[4], atol = 1e-12)
+end
+
+@testitem "P4estMesh2D: elixir_euler_weak_blast_wave_nonconforming_rotated_sc_subcell.jl" setup=[
+    Setup,
+    P4estMesh2D
+] tags=[:p4est_part1] begin
+    @test_trixi_include(joinpath(EXAMPLES_DIR,
+                                 "elixir_euler_weak_blast_wave_nonconforming_rotated_sc_subcell.jl"),
+                        l2=[
+                            0.011454420371144533,
+                            0.020903548103080687,
+                            0.02153303511793841,
+                            0.1148676335639754
+                        ],
+                        linf=[
+                            0.30997407561599366,
+                            0.4891155873417419,
+                            0.4397493472598343,
+                            2.3824640619465263
+                        ])
+    limiter = semi.solver.volume_integral.limiter
+    deviations = collect(values(limiter.cache.idp_bounds_delta_global))
+    @test all(isfinite, deviations)
+    @test maximum(deviations) <= 1.0e-13
+
+    # Ensure that this test actually exercises mortars whose large-element face
+    # is traversed in the opposite direction of the mortar nodes.
+    dg = semi.solver
+    cache = semi.cache
+    flipped_mortars = filter(Trixi.eachmortar(dg, cache)) do mortar
+        :i_backward in cache.mortars.node_indices[2, mortar]
+    end
+    @test !isempty(flipped_mortars)
+
+    # Ensure that we do not have excessive memory allocations
+    # (e.g., from type instabilities)
+    # Larger values for allowed allocations due to usage of custom
+    # integrator which are not *recorded* for the methods from
+    # OrdinaryDiffEq.jl
+    # Corresponding issue: https://github.com/trixi-framework/Trixi.jl/issues/1877
+    @test_allocations(Trixi.rhs_hyperbolic!, semi, sol, 15000)
 end
 
 @testitem "P4estMesh2D: elixir_euler_weak_blast_wave_amr.jl" setup=[Setup, P4estMesh2D] tags=[:p4est_part1] begin
