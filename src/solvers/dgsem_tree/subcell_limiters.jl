@@ -268,23 +268,22 @@ function create_cache(limiter::Type{SubcellLimiterIDP},
     idp_bounds_delta_local = Dict{Symbol, real(basis)}()
     # Global variable contains the total maximum deviation.
     idp_bounds_delta_global = Dict{Symbol, real(basis)}()
+    # Track whether all Newton solves converged within the iteration budget.
+    # Set to `false` once the maximum number of iterations is reached.
+    idp_newton_converged = Threads.Atomic{Bool}(true)
     for key in bound_keys
         idp_bounds_delta_local[key] = zero(real(basis))
         idp_bounds_delta_global[key] = zero(real(basis))
     end
 
     return (; subcell_limiter_coefficients, idp_bounds_delta_local,
-            idp_bounds_delta_global)
+            idp_bounds_delta_global, idp_newton_converged)
 end
 
 function create_cache(limiter::Type{SubcellLimiterIDP},
-                      equations::AbstractEquations{NDIMS},
+                      equations::AbstractEquations{2},
                       basis::LobattoLegendreBasis, bound_keys,
-                      ::True) where {NDIMS}
-    if NDIMS != 2
-        error("Bar states are only implemented for 2D problems.")
-    end
-
+                      ::True)
     cache = create_cache(limiter, equations, basis, bound_keys, False())
     container_bar_states = Trixi.ContainerBarStates2D{real(basis)}(0,
                                                                    nvariables(equations),
@@ -573,6 +572,10 @@ end
         # Check absolute tolerance
         if final_check(bound, goal, newton_abstol)
             break
+        end
+
+        if iter == limiter.max_iterations_newton
+            limiter.cache.idp_newton_converged[] = false
         end
     end
 
