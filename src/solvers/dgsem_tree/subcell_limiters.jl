@@ -500,10 +500,6 @@ end
     delta_u = dt * antidiffusive_flux
     u_curr = u + beta * delta_u
 
-    # If state is valid, perform initial check and return if correction is not needed
-    if isvalid(u_curr, equations)
-        goal = goal_function_newton_idp(variable, bound, u_curr, equations)
-
     # Evaluate state validity and goal function (if valid)
     is_valid, goal, state_data = newton_state_data(variable, bound, u_curr, equations)
     if is_valid
