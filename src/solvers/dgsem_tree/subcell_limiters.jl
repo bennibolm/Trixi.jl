@@ -493,12 +493,16 @@ end
     newton_reltol, newton_abstol = limiter.newton_tolerances
 
     isone(alpha[indices...]) && return nothing # Skip if alpha is already 1
-    iszero(antidiffusive_flux) && return nothing # Skip if antidiffusive flux vanishes everywhere
+    iszero(antidiffusive_flux) && return nothing # Skip if antidiffusive flux vanishes
 
     beta = 1 - alpha[indices...]
 
     delta_u = dt * antidiffusive_flux
     u_curr = u + beta * delta_u
+
+    # If state is valid, perform initial check and return if correction is not needed
+    if isvalid(u_curr, equations)
+        goal = goal_function_newton_idp(variable, bound, u_curr, equations)
 
     # Evaluate state validity and goal function (if valid)
     is_valid, goal, state_data = newton_state_data(variable, bound, u_curr, equations)
@@ -519,7 +523,7 @@ end
             dgoal_dbeta = newton_dgoal_dbeta(variable, u_curr, delta_u, equations,
                                              state_data)
         else # Otherwise, perform a bisection step
-            dgoal_dbeta = zero(goal)
+            dgoal_dbeta = zero(beta)
         end
 
         if !iszero(dgoal_dbeta)
