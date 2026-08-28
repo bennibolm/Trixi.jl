@@ -168,9 +168,9 @@ end
         println("Note: The following deviations are only computed in elements where subcell limiting is active.")
         println("In other elements, the solution is not checked for bounds violations.")
     end
-    if ndims(semi.equations) == 2 &&
+    if (ndims(semi.equations) == 2 || ndims(semi.equations) == 3) &&
        semi.solver.volume_integral isa VolumeIntegralSubcellLimiting &&
-       limiter.indicator !== nothing
+       !isnothing(limiter.indicator)
         println("Due to the use of a smoothness indicator, a convex combination of the limiting factors of local and")
         println("positivity limiting was employed. However, the deviations are computed solely with respect to the local")
         println("bounds. Consequently, the resulting deviation statistics may not be meaningful and can exceed zero.")

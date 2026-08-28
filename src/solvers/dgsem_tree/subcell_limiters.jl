@@ -23,6 +23,7 @@ end
                       positivity_variables_nonlinear = [],
                       positivity_correction_factor = 0.1,
                       local_onesided_variables_nonlinear = [],
+                      indicator = nothing,
                       bar_states = false,
                       max_iterations_newton = 10,
                       newton_tolerances = (1.0e-12, 1.0e-14),
@@ -111,8 +112,8 @@ function SubcellLimiterIDP(equations::AbstractEquations, basis;
     positivity = (length(positivity_variables_cons) +
                   length(positivity_variables_nonlinear) > 0)
 
-    if indicator !== nothing && ndims(equations) != 2
-        error("The smoothness indicator is only implemented in 2D.")
+    if indicator !== nothing && !(ndims(equations) in (2, 3))
+        error("The smoothness indicator is only implemented in 2D and 3D.")
     end
 
     # When passing `min` or `max` in the elixir, the specific function of Base is used.

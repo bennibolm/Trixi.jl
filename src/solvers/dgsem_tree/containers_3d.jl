@@ -657,6 +657,7 @@ mutable struct IDPMortarContainer3D{uEltype <: Real} <: AbstractContainer
     large_sides::Vector{Int}  # [mortars]
     orientations::Vector{Int} # [mortars]
     limiting_factor::Vector{uEltype} # [mortars]
+    limiting_factor_local::Vector{uEltype} # [mortars]
     # internal `resize!`able storage
     _u_upper_left::Vector{uEltype}
     _u_upper_right::Vector{uEltype}
@@ -675,7 +676,7 @@ function Base.resize!(mortars::IDPMortarContainer3D, capacity)
     n_nodes = nnodes(mortars)
     n_variables = nvariables(mortars)
     @unpack _u_upper_left, _u_upper_right, _u_lower_left, _u_lower_right, _u_large, _neighbor_ids,
-    large_sides, orientations, limiting_factor = mortars
+    large_sides, orientations, limiting_factor, limiting_factor_local = mortars
 
     resize!(_u_upper_left, 2 * n_variables * n_nodes * n_nodes * capacity)
     mortars.u_upper_left = unsafe_wrap(Array, pointer(_u_upper_left),
@@ -706,6 +707,7 @@ function Base.resize!(mortars::IDPMortarContainer3D, capacity)
     resize!(orientations, capacity)
 
     resize!(limiting_factor, capacity)
+    resize!(limiting_factor_local, capacity)
 
     return nothing
 end
@@ -748,11 +750,13 @@ function IDPMortarContainer3D{uEltype}(capacity::Integer, n_variables,
     orientations = fill(typemin(Int), capacity)
 
     limiting_factor = fill(nan, capacity)
+    limiting_factor_local = fill(nan, capacity)
 
     return IDPMortarContainer3D{uEltype}(u_upper_left, u_upper_right,
                                          u_lower_left, u_lower_right,
                                          u_large, neighbor_ids,
-                                         large_sides, orientations, limiting_factor,
+                                         large_sides, orientations,
+                                         limiting_factor, limiting_factor_local,
                                          _u_upper_left, _u_upper_right,
                                          _u_lower_left, _u_lower_right,
                                          _u_large, _neighbor_ids)
