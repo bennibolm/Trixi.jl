@@ -766,6 +766,47 @@ end
     @test_allocations(Trixi.rhs_hyperbolic!, semi, sol, 15_000)
 end
 
+@testitem "TreeMesh3D Euler: elixir_euler_sedov_blast_wave_sc_subcell.jl (smoothness indicator)" setup=[
+    Setup,
+    TreeMesh3DEuler
+] tags=[:tree_part4] begin
+    @test_trixi_include(joinpath(EXAMPLES_DIR,
+                                 "elixir_euler_sedov_blast_wave_sc_subcell.jl"),
+                        # It doesn't make much of a difference to use the indicator here, but we still want to test it.
+                        indicator=IndicatorHennemannGassner(equations, basis;
+                                                            alpha_max = 1.0,
+                                                            alpha_min = 0.001,
+                                                            alpha_smooth = false,
+                                                            variable = density_pressure),
+                        l2=[ # TODO
+                            0.2960492292328468,
+                            0.08512047820593988,
+                            0.08512047820593965,
+                            0.08512047820593949,
+                            0.3609542574151516
+                        ],
+                        linf=[
+                            2.4259056167143993,
+                            1.0219422034990642,
+                            1.0219422034990757,
+                            1.0219422034990806,
+                            4.8231988553627305
+                        ],
+                        tspan=(0.0, 0.5))
+    limiter = semi.solver.volume_integral.limiter
+    deviations = collect(values(limiter.cache.idp_bounds_delta_global))
+    @test all(isfinite, deviations)
+    @test maximum(deviations) > 0
+
+    # Ensure that we do not have excessive memory allocations
+    # (e.g., from type instabilities)
+    # Larger values for allowed allocations due to usage of custom
+    # integrator which are not *recorded* for the methods from
+    # OrdinaryDiffEq.jl
+    # Corresponding issue: https://github.com/trixi-framework/Trixi.jl/issues/1877
+    @test_allocations(Trixi.rhs_hyperbolic!, semi, sol, 15_000)
+end
+
 @testitem "TreeMesh3D Euler: elixir_euler_sedov_blast_wave_sc_subcell.jl (local limiting with bar states)" setup=[
     Setup,
     TreeMesh3DEuler

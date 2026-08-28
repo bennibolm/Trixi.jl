@@ -467,6 +467,53 @@ end
     @test_allocations(Trixi.rhs_hyperbolic!, semi, sol, 15_000)
 end
 
+@testitem "P4estMesh3D: elixir_euler_sedov_sc_subcell.jl (smoothness indicator)" setup=[
+    Setup,
+    P4estMesh3D
+] tags=[:p4est_part2] begin
+    @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_euler_sedov_sc_subcell.jl"),
+                        local_twosided_variables_cons=["rho"],
+                        local_onesided_variables_nonlinear=[(entropy_guermond_etal,
+                                                             min)],
+                        # It doesn't make much of a difference to use the indicator here, but we still want to test it.
+                        indicator=IndicatorHennemannGassner(equations, basis;
+                                                            alpha_max = 1.0,
+                                                            alpha_min = 0.001,
+                                                            alpha_smooth = false,
+                                                            variable = density_pressure),
+                        max_iterations_newton=30,
+                        l2=[ # TODO
+                            0.16504565347921088,
+                            0.0646138412002418,
+                            0.06461384120034255,
+                            0.06461384120039247,
+                            0.36193245736984464
+                        ],
+                        linf=[
+                            0.9138326905655598,
+                            0.5707100370635655,
+                            0.5707100371645746,
+                            0.5707100372278868,
+                            4.777595491226442
+                        ],
+                        tspan=(0.0, 0.3))
+    limiter = semi.solver.volume_integral.limiter
+    @test all(isfinite, limiter.indicator.cache.alpha)
+    @test maximum(limiter.indicator.cache.alpha) > 0
+
+    deviations = collect(values(limiter.cache.idp_bounds_delta_global))
+    @test all(isfinite, deviations)
+    @test maximum(deviations) > 0
+
+    # Ensure that we do not have excessive memory allocations
+    # (e.g., from type instabilities)
+    # Larger values for allowed allocations due to usage of custom
+    # integrator which are not *recorded* for the methods from
+    # OrdinaryDiffEq.jl
+    # Corresponding issue: https://github.com/trixi-framework/Trixi.jl/issues/1877
+    @test_allocations(Trixi.rhs_hyperbolic!, semi, sol, 15_000)
+end
+
 # TODO: The test is still broken. I have to figure out what is going on for 3d rotated meshes.
 @testitem "P4estMesh3D: elixir_euler_weak_blast_wave_nonconforming_rotated_sc_subcell.jl" setup=[
     Setup,
@@ -722,6 +769,51 @@ end
     deviations = collect(values(limiter.cache.idp_bounds_delta_global))
     @test all(isfinite, deviations)
     @test maximum(deviations) <= 8.0e-12
+
+    # Ensure that we do not have excessive memory allocations
+    # (e.g., from type instabilities)
+    # Larger values for allowed allocations due to usage of custom
+    # integrator which are not *recorded* for the methods from
+    # OrdinaryDiffEq.jl
+    # Corresponding issue: https://github.com/trixi-framework/Trixi.jl/issues/1877
+    @test_allocations(Trixi.rhs_hyperbolic!, semi, sol, 15_000)
+end
+
+@testitem "P4estMesh3D: elixir_euler_mortar_sc_subcell.jl (smoothness indicator)" setup=[
+    Setup,
+    P4estMesh3D
+] tags=[:p4est_part2] begin
+    @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_euler_mortar_sc_subcell.jl"),
+                        positivity_variables_cons=["rho"],
+                        positivity_variables_nonlinear=[pressure],
+                        local_twosided_variables_cons=["rho"],
+                        local_onesided_variables_nonlinear=[(entropy_guermond_etal,
+                                                             min)],
+                        indicator=IndicatorHennemannGassner(equations, basis;
+                                                            alpha_max = 1.0,
+                                                            alpha_min = 0.001,
+                                                            alpha_smooth = false,
+                                                            variable = density_pressure),
+                        cfl=0.7,
+                        l2=[ # TODO
+                            0.003931221358940936,
+                            0.003931221358924581,
+                            0.003931221358956562,
+                            0.0039312213589413085,
+                            0.005896832038932221
+                        ],
+                        linf=[
+                            0.14212872795491516,
+                            0.14212872795491527,
+                            0.1421287279549155,
+                            0.14212872795491516,
+                            0.2131930919323728
+                        ],
+                        tspan=(0.0, 0.1),)
+    limiter = semi.solver.volume_integral.limiter
+    deviations = collect(values(limiter.cache.idp_bounds_delta_global))
+    @test all(isfinite, deviations)
+    @test maximum(deviations) > 0
 
     # Ensure that we do not have excessive memory allocations
     # (e.g., from type instabilities)

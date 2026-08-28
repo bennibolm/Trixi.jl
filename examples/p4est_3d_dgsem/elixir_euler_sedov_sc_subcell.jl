@@ -47,6 +47,7 @@ limiter_idp = SubcellLimiterIDP(equations, basis;
                                 positivity_variables_nonlinear = [pressure],
                                 local_twosided_variables_cons = [],
                                 local_onesided_variables_nonlinear = [],
+                                indicator = nothing,
                                 max_iterations_newton = 25,
                                 bar_states = false)
 volume_integral = VolumeIntegralSubcellLimiting(limiter_idp;
