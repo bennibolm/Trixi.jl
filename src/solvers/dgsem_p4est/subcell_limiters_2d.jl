@@ -571,9 +571,6 @@ end
             # The small-element face needs no mapping because it is always traversed forward.
             large_node = get_mortar_index(large_indices, i_large, j_large)
             var_large = u[var_index, i_large, j_large, large_element]
-            if var_large < 0
-                error("Safe low-order method produces negative value for conservative variable rho. Try a smaller time step.")
-            end
 
             # Two-sided local bounds
             var_min_large = var_min[i_large, j_large, large_element]
@@ -630,9 +627,6 @@ end
 
                 small_element = neighbor_ids[small_element_index, mortar]
                 var_small = u[var_index, i_small, j_small, small_element]
-                if var_small < 0
-                    error("Safe low-order method produces negative value for conservative variable rho. Try a smaller time step.")
-                end
 
                 # Two-sided local bounds
                 var_min_small = var_min[i_small, j_small, small_element]
@@ -884,9 +878,6 @@ end
             # The small-element face needs no mapping because it is always traversed forward.
             large_node = get_mortar_index(large_indices, i_large, j_large)
             var_large = u[var_index, i_large, j_large, large_element]
-            if var_large < 0
-                error("Safe low-order method produces negative value for conservative variable rho. Try a smaller time step.")
-            end
 
             # Calculate Pm
             flux_large_high_order = surface_flux_values_high_order[var_index,
@@ -935,9 +926,6 @@ end
 
                 small_element = neighbor_ids[small_element_index, mortar]
                 var_small = u[var_index, i_small, j_small, small_element]
-                if var_small < 0
-                    error("Safe low-order method produces negative value for conservative variable rho. Try a smaller time step.")
-                end
 
                 # Calculate Pm
                 flux_small_high_order = surface_flux_values_high_order[var_index, i,

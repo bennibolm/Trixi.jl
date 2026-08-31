@@ -258,6 +258,9 @@ end
     # The approach used in `calc_bounds_twosided!` is not used here because it requires more
     # evaluations of the variable and is therefore slower.
 
+    init_value = min_or_max === max ? typemin(eltype(var_minmax)) :
+                 typemax(eltype(var_minmax))
+
     # Calc bounds inside elements
     @threaded for element in eachelement(dg, cache)
 
@@ -266,11 +269,7 @@ end
 
         # Reset bounds
         for j in eachnode(dg), i in eachnode(dg)
-            if min_or_max === max
-                var_minmax[i, j, element] = typemin(eltype(var_minmax))
-            else
-                var_minmax[i, j, element] = typemax(eltype(var_minmax))
-            end
+            var_minmax[i, j, element] = init_value
         end
 
         # Calculate bounds at Gauss-Lobatto nodes
@@ -634,6 +633,9 @@ end
     (; variable_bounds) = limiter.cache.subcell_limiter_coefficients
     var_min = variable_bounds[Symbol(string(variable), "_min")]
 
+    was_limited_locally = limiter.local_twosided &&
+                          (variable in limiter.local_twosided_variables_cons)
+
     @threaded for element in eachelement(dg, semi.cache)
 
         # detect if subcell limiting is necessary
@@ -646,8 +648,7 @@ end
             end
 
             # Compute bound
-            if limiter.local_twosided &&
-               (variable in limiter.local_twosided_variables_cons) &&
+            if was_limited_locally &&
                (var_min[i, j, element] >= positivity_correction_factor * var)
                 # Local limiting is more restrictive that positivity limiting
                 # => Skip positivity limiting for this node
@@ -798,6 +799,69 @@ end
     return nothing
 end
 
+# Specialization for the modified specific entropy of Guermond et al. (2019) in 2D Euler equations.
+# Passes the state data to avoid recomputation in the derivative evaluation.
+@inline function newton_state_data(variable::typeof(entropy_guermond_etal), bound, u,
+                                   equations::CompressibleEulerEquations2D)
+    rho, rho_v1, rho_v2, rho_e_total = u
+
+    if rho <= 0 # State is invalid
+        return false, zero(bound), nothing
+    end
+
+    # Computation along u(beta) = u + beta * delta_u for Guermond entropy in Euler 2D:
+    # E_kin = 0.5 * (rho_v1^2 + rho_v2^2) / rho,
+    # e_int = rho_e_total - E_kin,
+    kinetic_energy = 0.5f0 * (rho_v1^2 + rho_v2^2) / rho
+    internal_energy = rho_e_total - kinetic_energy
+
+    # For Euler with gamma > 1, positivity of internal energy is equivalent
+    # to positivity of pressure.
+    if internal_energy <= 0
+        return false, zero(bound), nothing
+    end
+
+    # Modified specific entropy of Guermond et al. (2019)
+    # s = e_int * rho^(-gamma),
+    # goal = bound - s,
+    rho_to_minus_gamma = (1 / rho)^equations.gamma
+    s = internal_energy * rho_to_minus_gamma
+    goal = bound - s
+
+    state_data = (; rho, rho_v1, rho_v2, kinetic_energy,
+                  internal_energy, rho_to_minus_gamma)
+
+    return true, goal, state_data
+end
+
+# Specialization for the modified specific entropy of Guermond et al. (2019) in 2D Euler equations.
+# Receive the state data to avoid recomputation in the derivative evaluation.
+@inline function newton_dgoal_dbeta(::typeof(entropy_guermond_etal),
+                                    u, delta_u,
+                                    equations::CompressibleEulerEquations2D,
+                                    state_data)
+    (; rho, rho_v1, rho_v2, kinetic_energy,
+    internal_energy, rho_to_minus_gamma) = state_data
+
+    # Derivative along u(beta) = u + beta * delta_u:
+    # s(beta) = e_int(beta) * rho(beta)^(-gamma)
+    # ds/d(beta) = rho^(-gamma) *
+    #              (de_int/d(beta) - gamma * e_int * (d(rho)/d(beta)) / rho)
+    # d(goal)/d(beta) = -ds/d(beta), since goal = bound - s.
+
+    delta_rho, delta_rho_v1, delta_rho_v2, delta_rho_e_total = delta_u
+
+    internal_energy_derivative = delta_rho_e_total -
+                                 (rho_v1 * delta_rho_v1 + rho_v2 * delta_rho_v2) / rho +
+                                 kinetic_energy * delta_rho / rho
+
+    entropy_derivative = rho_to_minus_gamma *
+                         (internal_energy_derivative -
+                          equations.gamma * internal_energy * delta_rho / rho)
+
+    return -entropy_derivative
+end
+
 ###############################################################################
 # IDP mortar limiting
 ###############################################################################
@@ -923,9 +987,6 @@ end
 
             # Large element
             var_large = u[var_index, indices_large..., large_element]
-            if var_large < 0
-                error("Safe low-order method produces negative value for conservative variable rho. Try a smaller time step.")
-            end
 
             # Two-sided local bounds
             var_min_large = var_min[indices_large..., large_element]
@@ -980,9 +1041,6 @@ end
 
                 small_element = neighbor_ids[small_element_index, mortar]
                 var_small = u[var_index, indices_small..., small_element]
-                if var_small < 0
-                    error("Safe low-order method produces negative value for conservative variable rho. Try a smaller time step.")
-                end
 
                 var_min_small = var_min[indices_small..., small_element]
                 var_max_small = var_max[indices_small..., small_element]
@@ -1238,9 +1296,6 @@ end
 
             # Large element
             var_large = u[var_index, indices_large..., large_element]
-            if var_large < 0
-                error("Safe low-order method produces negative value for conservative variable rho. Try a smaller time step.")
-            end
 
             # Minimum bound
             var_min_large = var_min[indices_large..., large_element]
@@ -1287,9 +1342,6 @@ end
 
                 small_element = neighbor_ids[small_element_index, mortar]
                 var_small = u[var_index, indices_small..., small_element]
-                if var_small < 0
-                    error("Safe low-order method produces negative value for conservative variable rho. Try a smaller time step.")
-                end
 
                 # Compute flux differences
                 flux_small_high_order = surface_flux_values_high_order[var_index, i,
