@@ -162,7 +162,11 @@ function SubcellLimiterIDP(equations::AbstractEquations, basis;
     end
 
     bar_states = bar_states_as_static(bar_states)
-    cache = create_cache(SubcellLimiterIDP, equations, basis, bound_keys, bar_states)
+    # Only cache the variable values when they are needed for the limiter.
+    # This is the case when local one-sided limiting is used.
+    cache_variable_values = local_onesided
+    cache = create_cache(SubcellLimiterIDP, equations, basis, bound_keys, bar_states,
+                         cache_variable_values)
 
     return SubcellLimiterIDP{typeof(positivity_correction_factor),
                              typeof(positivity_variables_nonlinear),
@@ -257,12 +261,14 @@ end
 function create_cache(limiter::Type{SubcellLimiterIDP},
                       equations::AbstractEquations{NDIMS},
                       basis::LobattoLegendreBasis, bound_keys,
-                      ::False) where {NDIMS}
+                      ::False,
+                      cache_variable_values) where {NDIMS}
     # The number of elements is not yet known here. So, we initialize the container with 0 elements
     # and resize it later while creating the cache for the volume integral.
     subcell_limiter_coefficients = Trixi.ContainerSubcellLimiterIDP{NDIMS, real(basis)}(0,
                                                                                         nnodes(basis),
-                                                                                        bound_keys)
+                                                                                        bound_keys,
+                                                                                        cache_variable_values)
 
     # Memory for bounds checking routine with `BoundsCheckCallback`.
     # Local variable contains the maximum deviation since the last export.
@@ -284,8 +290,10 @@ end
 function create_cache(limiter::Type{SubcellLimiterIDP},
                       equations::AbstractEquations{2},
                       basis::LobattoLegendreBasis, bound_keys,
-                      ::True)
-    cache = create_cache(limiter, equations, basis, bound_keys, False())
+                      ::True,
+                      cache_variable_values)
+    cache = create_cache(limiter, equations, basis, bound_keys, False(),
+                         cache_variable_values)
     container_bar_states = Trixi.ContainerBarStates2D{real(basis)}(0,
                                                                    nvariables(equations),
                                                                    nnodes(basis))
@@ -313,6 +321,15 @@ function resize_subcell_limiter_cache!(limiter::SubcellLimiterIDP, new_size)
     end
 
     return nothing
+end
+
+# The following functions are used to access the subcell limiter coefficients from the volume integral.
+@inline function subcell_limiter_coefficients(volume_integral::VolumeIntegralSubcellLimiting)
+    return volume_integral.limiter.cache.subcell_limiter_coefficients
+end
+
+@inline function subcell_limiter_coefficients(volume_integral::VolumeIntegralAdaptive)
+    return subcell_limiter_coefficients(volume_integral.volume_integral_stabilized)
 end
 
 # While for the element-wise limiting with `VolumeIntegralShockCapturingHG` the indicator is
@@ -510,26 +527,27 @@ end
 
     beta = 1 - alpha[indices...]
 
-    beta_L = zero(beta) # alpha = 1
-    beta_R = beta # No higher beta (lower alpha) than the current one
+    delta_u = dt * antidiffusive_flux
+    u_curr = u + beta * delta_u
 
-    u_curr = u + beta * dt * antidiffusive_flux
-
-    # If state is valid, perform initial check and return if correction is not needed
-    if isvalid(u_curr, equations)
-        goal = goal_function_newton_idp(variable, bound, u_curr, equations)
-
+    # Evaluate state validity and goal function (if valid)
+    is_valid, goal, state_data = newton_state_data(variable, bound, u_curr, equations)
+    if is_valid
+        # If state is valid, perform initial check and return if correction is not needed
         initial_check(min_or_max, bound, goal, newton_abstol) && return nothing
     end
+
+    beta_L = zero(beta) # alpha = 1
+    beta_R = beta # No higher beta (lower alpha) than the current one
 
     # Newton iterations
     for iter in 1:(limiter.max_iterations_newton)
         beta_old = beta
 
         # If the state is valid, evaluate d(goal)/d(beta)
-        if isvalid(u_curr, equations)
-            dgoal_dbeta = dgoal_function_newton_idp(variable, u_curr, dt,
-                                                    antidiffusive_flux, equations)
+        if is_valid
+            dgoal_dbeta = newton_dgoal_dbeta(variable, u_curr, delta_u, equations,
+                                             state_data)
         else # Otherwise, perform a bisection step
             dgoal_dbeta = zero(beta)
         end
@@ -544,16 +562,17 @@ end
             # Out of bounds, do a bisection step
             beta = 0.5f0 * (beta_L + beta_R)
             # Get new u
-            u_curr = u + beta * dt * antidiffusive_flux
+            u_curr = u + beta * delta_u
+            is_valid, goal, state_data = newton_state_data(variable, bound, u_curr,
+                                                           equations)
 
             # If the state is invalid, finish bisection step without checking tolerance and iterate further
-            if !isvalid(u_curr, equations)
+            if !is_valid
                 beta_R = beta
                 continue
             end
 
             # Check new beta for condition and update bounds
-            goal = goal_function_newton_idp(variable, bound, u_curr, equations)
             if initial_check(min_or_max, bound, goal, newton_abstol)
                 # New beta fulfills condition
                 beta_L = beta
@@ -563,16 +582,15 @@ end
             end
         else
             # Get new u
-            u_curr = u + beta * dt * antidiffusive_flux
+            u_curr = u + beta * delta_u
+            is_valid, goal, state_data = newton_state_data(variable, bound, u_curr,
+                                                           equations)
 
             # If the state is invalid, redefine right bound without checking tolerance and iterate further
-            if !isvalid(u_curr, equations)
+            if !is_valid
                 beta_R = beta
                 continue
             end
-
-            # Evaluate goal function
-            goal = goal_function_newton_idp(variable, bound, u_curr, equations)
         end
 
         # Check relative tolerance
@@ -613,9 +631,25 @@ end
 # Goal and d(Goal)/d(u) function
 @inline goal_function_newton_idp(variable, bound, u, equations) = bound -
                                                                   variable(u, equations)
-@inline function dgoal_function_newton_idp(variable, u, dt, antidiffusive_flux,
-                                           equations)
-    return -dot(gradient_conservative(variable, u, equations), dt * antidiffusive_flux)
+@inline function dgoal_function_newton_idp(variable, u, delta_u, equations)
+    return -dot(gradient_conservative(variable, u, equations), delta_u)
+end
+
+# Combined Newton data evaluation (state validity and goal function).
+# The default implementation reproduces the previous behavior and is specialized by dispatch.
+# For higher speed-up, use specialized version to avoid more unnecessary recomputations.
+@inline function newton_state_data(variable, bound, u, equations)
+    is_valid = isvalid(u, equations)
+    if is_valid
+        goal = goal_function_newton_idp(variable, bound, u, equations)
+        return is_valid, goal, nothing
+    end
+
+    return false, zero(bound), nothing
+end
+
+@inline function newton_dgoal_dbeta(variable, u, delta_u, equations, state_data)
+    return dgoal_function_newton_idp(variable, u, delta_u, equations)
 end
 
 # Final checks
