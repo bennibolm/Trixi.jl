@@ -62,6 +62,119 @@ function create_cache_subcell_limiting(mesh::Union{TreeMesh{3}, P4estMesh{3}},
             flux_temp_threaded, fhat_temp_threaded)
 end
 
+function calc_mortar_weights(equations::AbstractEquations{3},
+                             basis::LobattoLegendreBasis, RealT)
+    n_nodes = nnodes(basis)
+    mortar_weights = zeros(RealT, n_nodes, n_nodes, n_nodes, n_nodes, 4) # [node_i (large), node_j (large), node_i (small), node_j (small), small element]
+    mortar_weights_sums = zeros(RealT, n_nodes, n_nodes, 2) # [node_i, node_j, small (1) / large (2) element]
+
+    calc_mortar_weights!(equations, mortar_weights, n_nodes, RealT)
+
+    # Sums of mortar weights for normalization
+    for j in eachnode(basis), i in eachnode(basis)
+        for l in eachnode(basis), k in eachnode(basis)
+            # Add weights from large element to small element
+            # Sums for all small elements are equal due to symmetry
+            mortar_weights_sums[i, j, 1] += mortar_weights[k, l, i, j, 1]
+            # Add weights from small element to large element
+            for small_element in 1:4
+                mortar_weights_sums[i, j, 2] += mortar_weights[i, j, k, l,
+                                                               small_element]
+            end
+        end
+    end
+
+    return mortar_weights, mortar_weights_sums
+end
+
+function calc_mortar_weights!(equations::AbstractEquations{3}, mortar_weights, n_nodes,
+                              RealT)
+    _, weights = gauss_lobatto_nodes_weights(n_nodes, RealT)
+
+    # Local mortar weights are of the form: `w_(ij, kl) = int_S psi_(ij) phi_(kl) ds`,
+    # where `psi_(ij)` are the basis functions of the large element and `phi_(kl)` are the basis
+    # functions of the small element. `S` is the face connecting both elements.
+    # We use piecewise constant basis functions on the LGL subgrid. So, only focus on interval,
+    # where both basis functions are non-zero. `interval = [left_bound_x, right_bound_x] x [left_bound_y, right_bound_y]`.
+    # `w_(ij, kl) = int_S psi_(ij) phi_(kl) ds = int_(interval) ds = (right_bound_x - left_bound_x) * (right_bound_y - left_bound_y)`.
+    # The bounds in each direction are independent and can be computed separately analogously to the 2D case:
+    # `right_bound = min(left_bound_large, left_bound_small)`
+    # `left_bound = max(right_bound_large, right_bound_small)`
+    # If `right_bound <= left_bound`, i.e., both intervals don't overlap, then `w_ij = 0`.
+
+    # Due to the LGL subgrid, the interval bounds are cumulative LGL quadrature weights.
+    cum_weights_large = [zero(RealT); cumsum(weights)] .- 1 # on [-1, 1]
+    cum_weights_lower = 0.5f0 * cum_weights_large .- 0.5f0  # on [-1, 0]
+    cum_weights_upper = cum_weights_lower .+ 1              # on [0, 1]
+    # So, for `w_(ij, kl)` we have
+    # `right_bound_x = min(cum_weights_large[i], cum_weights_small[k])`
+    # `left_bound_x = max(cum_weights_large[i+1], cum_weights_small[k+1])`
+    # `right_bound_y = min(cum_weights_large[j], cum_weights_small[l])`
+    # `left_bound_y = max(cum_weights_large[j+1], cum_weights_small[l+1])`
+
+    # Illustration of the positions in 3D, where ξ and η are the local coordinates
+    # of the mortar element, which are precisely the local coordinates that span
+    # the surface of the smaller side.
+    # Note that the orientation in the physical space is completely irrelevant here.
+    #   ┌─────────────┬─────────────┐  ┌───────────────────────────┐
+    #   │             │             │  │                           │
+    #   │    small    │    small    │  │                           │
+    #   │      3      │      4      │  │                           │
+    #   │             │             │  │           large           │
+    #   ├─────────────┼─────────────┤  │             5             │
+    # η │             │             │  │                           │
+    #   │    small    │    small    │  │                           │
+    # ↑ │      1      │      2      │  │                           │
+    # │ │             │             │  │                           │
+    # │ └─────────────┴─────────────┘  └───────────────────────────┘
+    # │
+    # ⋅────> ξ
+
+    for j in 1:n_nodes, i in 1:n_nodes
+        for l in 1:n_nodes, k in 1:n_nodes
+            # 1st small and large element element
+            left_x = max(cum_weights_large[i], cum_weights_lower[k])
+            right_x = min(cum_weights_large[i + 1], cum_weights_lower[k + 1])
+            left_y = max(cum_weights_large[j], cum_weights_lower[l])
+            right_y = min(cum_weights_large[j + 1], cum_weights_lower[l + 1])
+
+            # Local weight of 0 if intervals do not overlap, i.e., `right <= left`
+            if right_x > left_x && right_y > left_y
+                mortar_weights[i, j, k, l, 1] = (right_x - left_x) * (right_y - left_y)
+            end
+
+            # 2nd small and large element
+            left_x = max(cum_weights_large[i], cum_weights_upper[k])
+            right_x = min(cum_weights_large[i + 1], cum_weights_upper[k + 1])
+            left_y = max(cum_weights_large[j], cum_weights_lower[l])
+            right_y = min(cum_weights_large[j + 1], cum_weights_lower[l + 1])
+            if right_x > left_x && right_y > left_y
+                mortar_weights[i, j, k, l, 2] = (right_x - left_x) * (right_y - left_y)
+            end
+
+            # 3rd small and large element
+            left_x = max(cum_weights_large[i], cum_weights_lower[k])
+            right_x = min(cum_weights_large[i + 1], cum_weights_lower[k + 1])
+            left_y = max(cum_weights_large[j], cum_weights_upper[l])
+            right_y = min(cum_weights_large[j + 1], cum_weights_upper[l + 1])
+            if right_x > left_x && right_y > left_y
+                mortar_weights[i, j, k, l, 3] = (right_x - left_x) * (right_y - left_y)
+            end
+
+            # 4th small and large element
+            left_x = max(cum_weights_large[i], cum_weights_upper[k])
+            right_x = min(cum_weights_large[i + 1], cum_weights_upper[k + 1])
+            left_y = max(cum_weights_large[j], cum_weights_upper[l])
+            right_y = min(cum_weights_large[j + 1], cum_weights_upper[l + 1])
+            if right_x > left_x && right_y > left_y
+                mortar_weights[i, j, k, l, 4] = (right_x - left_x) * (right_y - left_y)
+            end
+        end
+    end
+
+    return mortar_weights
+end
+
 # Subcell limiting currently only implemented for certain mesh types
 @inline function volume_integral_kernel!(du, u, element,
                                          MeshT::Type{<:Union{TreeMesh{3}, P4estMesh{3}}},
@@ -343,7 +456,267 @@ end
     return nothing
 end
 
-@inline function calc_lambdas_bar_states!(u, t, mesh::Union{TreeMesh{3}, P4estMesh{3}},
+function prolong2mortars!(cache, u, mesh::TreeMesh{3}, equations,
+                          mortar_idp::LobattoLegendreMortarIDP, dg::DGSEM)
+    prolong2mortars!(cache, u, mesh, equations, mortar_idp.mortar_l2, dg)
+
+    # The data of both small elements were already copied to the mortar cache
+    @threaded for mortar in eachmortar(dg, cache)
+        large_element = cache.mortars.neighbor_ids[5, mortar]
+
+        # Copy solutions
+        if cache.mortars.large_sides[mortar] == 1 # -> small elements on right side
+            if cache.mortars.orientations[mortar] == 1
+                # IDP mortars in x-direction
+                for k in eachnode(dg), j in eachnode(dg)
+                    for v in eachvariable(equations)
+                        cache.mortars.u_large[v, j, k, mortar] = u[v, nnodes(dg), j, k,
+                                                                   large_element]
+                    end
+                end
+            elseif cache.mortars.orientations[mortar] == 2
+                # IDP mortars in y-direction
+                for k in eachnode(dg), i in eachnode(dg)
+                    for v in eachvariable(equations)
+                        cache.mortars.u_large[v, i, k, mortar] = u[v, i, nnodes(dg), k,
+                                                                   large_element]
+                    end
+                end
+            else
+                # IDP mortars in z-direction
+                for j in eachnode(dg), i in eachnode(dg)
+                    for v in eachvariable(equations)
+                        cache.mortars.u_large[v, i, j, mortar] = u[v, i, j, nnodes(dg),
+                                                                   large_element]
+                    end
+                end
+            end
+        else # large_sides[mortar] == 2 -> small elements on left side
+            if cache.mortars.orientations[mortar] == 1
+                # IDP mortars in x-direction
+                for k in eachnode(dg), j in eachnode(dg)
+                    for v in eachvariable(equations)
+                        cache.mortars.u_large[v, j, k, mortar] = u[v, 1, j, k,
+                                                                   large_element]
+                    end
+                end
+            elseif cache.mortars.orientations[mortar] == 2
+                # IDP mortars in y-direction
+                for k in eachnode(dg), i in eachnode(dg)
+                    for v in eachvariable(equations)
+                        cache.mortars.u_large[v, i, k, mortar] = u[v, i, 1, k,
+                                                                   large_element]
+                    end
+                end
+            else
+                # IDP mortars in z-direction
+                for j in eachnode(dg), i in eachnode(dg)
+                    for v in eachvariable(equations)
+                        cache.mortars.u_large[v, i, j, mortar] = u[v, i, j, 1,
+                                                                   large_element]
+                    end
+                end
+            end
+        end
+    end
+
+    return nothing
+end
+
+function calc_mortar_flux_low_order!(surface_flux_values,
+                                     mesh::TreeMesh{3},
+                                     nonconservative_terms::False, equations,
+                                     mortar_idp::LobattoLegendreMortarIDP,
+                                     surface_integral, dg::DG, cache)
+    @unpack surface_flux = surface_integral
+    @unpack u_lower_left, u_lower_right, u_upper_left, u_upper_right, u_large, orientations = cache.mortars
+    (; mortar_weights, mortar_weights_sums) = mortar_idp
+
+    @threaded for mortar in eachmortar(dg, cache)
+        lower_left_element = cache.mortars.neighbor_ids[1, mortar]
+        lower_right_element = cache.mortars.neighbor_ids[2, mortar]
+        upper_left_element = cache.mortars.neighbor_ids[3, mortar]
+        upper_right_element = cache.mortars.neighbor_ids[4, mortar]
+        large_element = cache.mortars.neighbor_ids[5, mortar]
+
+        # Calculate fluxes
+        orientation = orientations[mortar]
+
+        if cache.mortars.large_sides[mortar] == 1 # -> small elements on right side
+            if orientation == 1
+                # L2 mortars in x-direction
+                direction_small = 1
+                direction_large = 2
+            elseif orientation == 2
+                # L2 mortars in y-direction
+                direction_small = 3
+                direction_large = 4
+            else
+                # L2 mortars in z-direction
+                direction_small = 5
+                direction_large = 6
+            end
+            small_side = 2
+        else # large_sides[mortar] == 2 -> small elements on left side
+            if orientation == 1
+                # L2 mortars in x-direction
+                direction_small = 2
+                direction_large = 1
+            elseif orientation == 2
+                # L2 mortars in y-direction
+                direction_small = 4
+                direction_large = 3
+            else
+                # L2 mortars in z-direction
+                direction_small = 6
+                direction_large = 5
+            end
+            small_side = 1
+        end
+
+        surface_flux_values[:, :, :, direction_small, lower_left_element] .= zero(eltype(surface_flux_values))
+        surface_flux_values[:, :, :, direction_small, lower_right_element] .= zero(eltype(surface_flux_values))
+        surface_flux_values[:, :, :, direction_small, upper_left_element] .= zero(eltype(surface_flux_values))
+        surface_flux_values[:, :, :, direction_small, upper_right_element] .= zero(eltype(surface_flux_values))
+        surface_flux_values[:, :, :, direction_large, large_element] .= zero(eltype(surface_flux_values))
+        # Lower left element
+        for j in eachnode(dg), i in eachnode(dg)
+            u_lower_left_local = get_surface_node_vars(u_lower_left, equations, dg,
+                                                       i, j, mortar)[small_side]
+            for l in eachnode(dg), k in eachnode(dg)
+                factor = mortar_weights[k, l, i, j, 1]
+                if isapprox(factor, zero(typeof(factor)))
+                    continue
+                end
+                u_large_local = get_node_vars(u_large, equations, dg, k, l, mortar)
+
+                if small_side == 2 # -> small elements on right side
+                    flux = surface_flux(u_large_local, u_lower_left_local, orientation,
+                                        equations)
+                else # small_side == 1 -> small elements on left side
+                    flux = surface_flux(u_lower_left_local, u_large_local, orientation,
+                                        equations)
+                end
+
+                # Lower left element
+                multiply_add_to_node_vars!(surface_flux_values,
+                                           factor /
+                                           mortar_weights_sums[i, j, 1],
+                                           flux, equations, dg,
+                                           i, j, direction_small, lower_left_element)
+                # Large element
+                multiply_add_to_node_vars!(surface_flux_values,
+                                           factor /
+                                           mortar_weights_sums[k, l, 2],
+                                           flux, equations, dg,
+                                           k, l, direction_large, large_element)
+            end
+        end
+        # Lower right element
+        for j in eachnode(dg), i in eachnode(dg)
+            u_lower_right_local = get_surface_node_vars(u_lower_right, equations, dg,
+                                                        i, j, mortar)[small_side]
+            for l in eachnode(dg), k in eachnode(dg)
+                factor = mortar_weights[k, l, i, j, 2]
+                if isapprox(factor, zero(typeof(factor)))
+                    continue
+                end
+                u_large_local = get_node_vars(u_large, equations, dg, k, l, mortar)
+
+                if small_side == 2 # -> small elements on right side
+                    flux = surface_flux(u_large_local, u_lower_right_local, orientation,
+                                        equations)
+                else # small_side == 1 -> small elements on left side
+                    flux = surface_flux(u_lower_right_local, u_large_local, orientation,
+                                        equations)
+                end
+
+                # Lower right element
+                multiply_add_to_node_vars!(surface_flux_values,
+                                           factor /
+                                           mortar_weights_sums[i, j, 1],
+                                           flux, equations, dg,
+                                           i, j, direction_small, lower_right_element)
+                # Large element
+                multiply_add_to_node_vars!(surface_flux_values,
+                                           factor /
+                                           mortar_weights_sums[k, l, 2],
+                                           flux, equations, dg,
+                                           k, l, direction_large, large_element)
+            end
+        end
+        # Upper left element
+        for j in eachnode(dg), i in eachnode(dg)
+            u_upper_left_local = get_surface_node_vars(u_upper_left, equations, dg,
+                                                       i, j, mortar)[small_side]
+            for l in eachnode(dg), k in eachnode(dg)
+                factor = mortar_weights[k, l, i, j, 3]
+                if isapprox(factor, zero(typeof(factor)))
+                    continue
+                end
+                u_large_local = get_node_vars(u_large, equations, dg, k, l, mortar)
+
+                if small_side == 2 # -> small elements on right side
+                    flux = surface_flux(u_large_local, u_upper_left_local, orientation,
+                                        equations)
+                else # small_side == 1 -> small elements on left side
+                    flux = surface_flux(u_upper_left_local, u_large_local, orientation,
+                                        equations)
+                end
+
+                # Upper left element
+                multiply_add_to_node_vars!(surface_flux_values,
+                                           factor /
+                                           mortar_weights_sums[i, j, 1],
+                                           flux, equations, dg,
+                                           i, j, direction_small, upper_left_element)
+                # Large element
+                multiply_add_to_node_vars!(surface_flux_values,
+                                           factor /
+                                           mortar_weights_sums[k, l, 2],
+                                           flux, equations, dg,
+                                           k, l, direction_large, large_element)
+            end
+        end
+        # Upper right element
+        for j in eachnode(dg), i in eachnode(dg)
+            u_upper_right_local = get_surface_node_vars(u_upper_right, equations, dg,
+                                                        i, j, mortar)[small_side]
+            for l in eachnode(dg), k in eachnode(dg)
+                factor = mortar_weights[k, l, i, j, 4]
+                if isapprox(factor, zero(typeof(factor)))
+                    continue
+                end
+                u_large_local = get_node_vars(u_large, equations, dg, k, l, mortar)
+
+                if small_side == 2 # -> small elements on right side
+                    flux = surface_flux(u_large_local, u_upper_right_local, orientation,
+                                        equations)
+                else # small_side == 1 -> small elements on left side
+                    flux = surface_flux(u_upper_right_local, u_large_local, orientation,
+                                        equations)
+                end
+
+                # Upper right element
+                multiply_add_to_node_vars!(surface_flux_values,
+                                           factor /
+                                           mortar_weights_sums[i, j, 1],
+                                           flux, equations, dg,
+                                           i, j, direction_small, upper_right_element)
+                # Large element
+                multiply_add_to_node_vars!(surface_flux_values,
+                                           factor /
+                                           mortar_weights_sums[k, l, 2],
+                                           flux, equations, dg,
+                                           k, l, direction_large, large_element)
+            end
+        end
+    end
+
+    return nothing
+end
+
+@inline function calc_lambdas_bar_states!(u, t, mesh::TreeMesh{3},
                                           have_nonconservative_terms, equations,
                                           limiter, dg, cache, boundary_conditions;
                                           calc_bar_states = true)
@@ -351,7 +724,497 @@ end
         return nothing
     end
 
-    error("Bar states are only implemented for 2D problems.")
+    (; lambda1, lambda2, lambda3, bar_states1, bar_states2, bar_states3) = limiter.cache.container_bar_states
+
+    @threaded for element in eachelement(dg, cache)
+        # It is sufficient to reset the lambdas and bar states at the interfaces since only the mortar computation adds terms up.
+        lambda1[1, :, :, element] .= zero(eltype(lambda1))
+        lambda1[end, :, :, element] .= zero(eltype(lambda1))
+        lambda2[:, 1, :, element] .= zero(eltype(lambda2))
+        lambda2[:, end, :, element] .= zero(eltype(lambda2))
+        lambda3[:, :, 1, element] .= zero(eltype(lambda3))
+        lambda3[:, :, end, element] .= zero(eltype(lambda3))
+        if calc_bar_states
+            bar_states1[:, 1, :, :, element] .= zero(eltype(bar_states1))
+            bar_states1[:, end, :, :, element] .= zero(eltype(bar_states1))
+            bar_states2[:, :, 1, :, element] .= zero(eltype(bar_states2))
+            bar_states2[:, :, end, :, element] .= zero(eltype(bar_states2))
+            bar_states3[:, :, :, 1, element] .= zero(eltype(bar_states3))
+            bar_states3[:, :, :, end, element] .= zero(eltype(bar_states3))
+        end
+
+        for k in eachnode(dg), j in eachnode(dg), i in 2:nnodes(dg)
+            u_node = get_node_vars(u, equations, dg, i, j, k, element)
+            u_node_im1 = get_node_vars(u, equations, dg, i - 1, j, k, element)
+            lambda1[i, j, k, element] = max_abs_speed_naive(u_node_im1, u_node, 1,
+                                                            equations)
+
+            calc_bar_states || continue
+
+            flux1 = flux(u_node, 1, equations)
+            flux1_im1 = flux(u_node_im1, 1, equations)
+            for v in eachvariable(equations)
+                bar_states1[v, i, j, k, element] = 0.5 * (u_node[v] + u_node_im1[v]) -
+                                                   0.5 * (flux1[v] - flux1_im1[v]) /
+                                                   lambda1[i, j, k, element]
+            end
+        end
+
+        for k in eachnode(dg), j in 2:nnodes(dg), i in eachnode(dg)
+            u_node = get_node_vars(u, equations, dg, i, j, k, element)
+            u_node_jm1 = get_node_vars(u, equations, dg, i, j - 1, k, element)
+            lambda2[i, j, k, element] = max_abs_speed_naive(u_node_jm1, u_node, 2,
+                                                            equations)
+
+            calc_bar_states || continue
+
+            flux2 = flux(u_node, 2, equations)
+            flux2_jm1 = flux(u_node_jm1, 2, equations)
+            for v in eachvariable(equations)
+                bar_states2[v, i, j, k, element] = 0.5 * (u_node[v] + u_node_jm1[v]) -
+                                                   0.5 * (flux2[v] - flux2_jm1[v]) /
+                                                   lambda2[i, j, k, element]
+            end
+        end
+
+        for k in 2:nnodes(dg), j in eachnode(dg), i in eachnode(dg)
+            u_node = get_node_vars(u, equations, dg, i, j, k, element)
+            u_node_km1 = get_node_vars(u, equations, dg, i, j, k - 1, element)
+            lambda3[i, j, k, element] = max_abs_speed_naive(u_node_km1, u_node, 3,
+                                                            equations)
+
+            calc_bar_states || continue
+
+            flux3 = flux(u_node, 3, equations)
+            flux3_km1 = flux(u_node_km1, 3, equations)
+            for v in eachvariable(equations)
+                bar_states3[v, i, j, k, element] = 0.5 * (u_node[v] + u_node_km1[v]) -
+                                                   0.5 * (flux3[v] - flux3_km1[v]) /
+                                                   lambda3[i, j, k, element]
+            end
+        end
+    end
+
+    # Calc lambdas and bar states at element interfaces and periodic boundaries
+    calc_lambdas_bar_states_interface!(u, t, limiter, boundary_conditions, mesh,
+                                       equations, dg, cache;
+                                       calc_bar_states = calc_bar_states)
+
+    # Calc lambdas and bar states at mortar interfaces
+    calc_lambdas_bar_states_mortar!(u, t, limiter, boundary_conditions, mesh, equations,
+                                    dg, cache; calc_bar_states = calc_bar_states)
+
+    # Calc lambdas and bar states at physical boundaries
+    calc_lambdas_bar_states_boundary!(u, t, limiter, boundary_conditions, mesh,
+                                      equations, dg, cache;
+                                      calc_bar_states = calc_bar_states)
+
+    return nothing
+end
+
+@inline function calc_lambdas_bar_states_interface!(u, t, limiter, boundary_conditions,
+                                                    mesh::TreeMesh{3}, equations, dg,
+                                                    cache; calc_bar_states = true)
+    (; lambda1, lambda2, lambda3, bar_states1, bar_states2, bar_states3) = limiter.cache.container_bar_states
+
+    @threaded for interface in eachinterface(dg, cache)
+        # Get neighboring element ids
+        left_element = cache.interfaces.neighbor_ids[1, interface]
+        right_element = cache.interfaces.neighbor_ids[2, interface]
+
+        orientation = cache.interfaces.orientations[interface]
+
+        if orientation == 1
+            for k in eachnode(dg), j in eachnode(dg)
+                u_left = get_node_vars(u, equations, dg, nnodes(dg), j, k,
+                                       left_element)
+                u_right = get_node_vars(u, equations, dg, 1, j, k, right_element)
+                lambda = max_abs_speed_naive(u_left, u_right, orientation, equations)
+
+                lambda1[nnodes(dg) + 1, j, k, left_element] = lambda
+                lambda1[1, j, k, right_element] = lambda
+
+                calc_bar_states || continue
+
+                flux_left = flux(u_left, orientation, equations)
+                flux_right = flux(u_right, orientation, equations)
+                bar_state = 0.5 * (u_left + u_right) -
+                            0.5 * (flux_right - flux_left) / lambda
+                for v in eachvariable(equations)
+                    bar_states1[v, nnodes(dg) + 1, j, k, left_element] = bar_state[v]
+                    bar_states1[v, 1, j, k, right_element] = bar_state[v]
+                end
+            end
+        elseif orientation == 2
+            for k in eachnode(dg), i in eachnode(dg)
+                u_left = get_node_vars(u, equations, dg, i, nnodes(dg), k,
+                                       left_element)
+                u_right = get_node_vars(u, equations, dg, i, 1, k, right_element)
+                lambda = max_abs_speed_naive(u_left, u_right, orientation, equations)
+
+                lambda2[i, nnodes(dg) + 1, k, left_element] = lambda
+                lambda2[i, 1, k, right_element] = lambda
+
+                calc_bar_states || continue
+
+                flux_left = flux(u_left, orientation, equations)
+                flux_right = flux(u_right, orientation, equations)
+                bar_state = 0.5 * (u_left + u_right) -
+                            0.5 * (flux_right - flux_left) / lambda
+                for v in eachvariable(equations)
+                    bar_states2[v, i, nnodes(dg) + 1, k, left_element] = bar_state[v]
+                    bar_states2[v, i, 1, k, right_element] = bar_state[v]
+                end
+            end
+        else # orientation == 3
+            for j in eachnode(dg), i in eachnode(dg)
+                u_left = get_node_vars(u, equations, dg, i, j, nnodes(dg),
+                                       left_element)
+                u_right = get_node_vars(u, equations, dg, i, j, 1, right_element)
+                lambda = max_abs_speed_naive(u_left, u_right, orientation, equations)
+
+                lambda3[i, j, nnodes(dg) + 1, left_element] = lambda
+                lambda3[i, j, 1, right_element] = lambda
+
+                calc_bar_states || continue
+
+                flux_left = flux(u_left, orientation, equations)
+                flux_right = flux(u_right, orientation, equations)
+                bar_state = 0.5 * (u_left + u_right) -
+                            0.5 * (flux_right - flux_left) / lambda
+                for v in eachvariable(equations)
+                    bar_states3[v, i, j, nnodes(dg) + 1, left_element] = bar_state[v]
+                    bar_states3[v, i, j, 1, right_element] = bar_state[v]
+                end
+            end
+        end
+    end
+
+    return nothing
+end
+
+@inline function add_mortar_lambdas!(lambda1, lambda2, lambda3, orientation,
+                                     lambda_indices_large, large_element,
+                                     lambda_indices_small, small_element,
+                                     lambda_large, lambda_small)
+    if orientation == 1
+        lambda1[lambda_indices_large..., large_element] += lambda_large
+        lambda1[lambda_indices_small..., small_element] += lambda_small
+    elseif orientation == 2
+        lambda2[lambda_indices_large..., large_element] += lambda_large
+        lambda2[lambda_indices_small..., small_element] += lambda_small
+    else # orientation == 3
+        lambda3[lambda_indices_large..., large_element] += lambda_large
+        lambda3[lambda_indices_small..., small_element] += lambda_small
+    end
+
+    return nothing
+end
+
+@inline function add_mortar_bar_states!(bar_states1, bar_states2, bar_states3,
+                                        orientation, equations,
+                                        lambda_indices_large, large_element,
+                                        lambda_indices_small, small_element,
+                                        bar_state, weight,
+                                        weight_sum_large, weight_sum_small)
+    if orientation == 1
+        for v in eachvariable(equations)
+            bar_states1[v, lambda_indices_large..., large_element] += weight *
+                                                                      bar_state[v] /
+                                                                      weight_sum_large
+            bar_states1[v, lambda_indices_small..., small_element] += weight *
+                                                                      bar_state[v] /
+                                                                      weight_sum_small
+        end
+    elseif orientation == 2
+        for v in eachvariable(equations)
+            bar_states2[v, lambda_indices_large..., large_element] += weight *
+                                                                      bar_state[v] /
+                                                                      weight_sum_large
+            bar_states2[v, lambda_indices_small..., small_element] += weight *
+                                                                      bar_state[v] /
+                                                                      weight_sum_small
+        end
+    else # orientation == 3
+        for v in eachvariable(equations)
+            bar_states3[v, lambda_indices_large..., large_element] += weight *
+                                                                      bar_state[v] /
+                                                                      weight_sum_large
+            bar_states3[v, lambda_indices_small..., small_element] += weight *
+                                                                      bar_state[v] /
+                                                                      weight_sum_small
+        end
+    end
+
+    return nothing
+end
+
+@inline function calc_lambdas_bar_states_mortar!(u, t, limiter, boundary_conditions,
+                                                 mesh::TreeMesh{3}, equations,
+                                                 dg, cache; calc_bar_states = true)
+    (; lambda1, lambda2, lambda3, bar_states1, bar_states2, bar_states3) = limiter.cache.container_bar_states
+    if nmortars(dg, cache) == 0
+        return nothing
+    end
+    (; mortar_weights, mortar_weights_sums) = dg.mortar
+
+    @threaded for mortar in eachmortar(dg, cache)
+        large_element = cache.mortars.neighbor_ids[5, mortar]
+
+        orientation = cache.mortars.orientations[mortar]
+        small_elements_on_right = cache.mortars.large_sides[mortar] == 1
+        if small_elements_on_right
+            large_node = nnodes(dg)
+            lambda_large_node = nnodes(dg) + 1
+            small_node = 1
+            lambda_small_node = 1
+        else
+            large_node = 1
+            lambda_large_node = 1
+            small_node = nnodes(dg)
+            lambda_small_node = nnodes(dg) + 1
+        end
+
+        for j_large in eachnode(dg), i_large in eachnode(dg)
+            if orientation == 1
+                indices_large = (large_node, i_large, j_large)
+                lambda_indices_large = (lambda_large_node, i_large, j_large)
+            elseif orientation == 2
+                indices_large = (i_large, large_node, j_large)
+                lambda_indices_large = (i_large, lambda_large_node, j_large)
+            else # orientation == 3
+                indices_large = (i_large, j_large, large_node)
+                lambda_indices_large = (i_large, j_large, lambda_large_node)
+            end
+            u_large = get_node_vars(u, equations, dg, indices_large..., large_element)
+            flux_large = flux(u_large, orientation, equations)
+
+            for small_element_index in 1:4
+                small_element = cache.mortars.neighbor_ids[small_element_index, mortar]
+                for j_small in eachnode(dg), i_small in eachnode(dg)
+                    weight = mortar_weights[i_large, j_large, i_small, j_small,
+                                            small_element_index]
+                    if iszero(weight)
+                        continue
+                    end
+
+                    if orientation == 1
+                        indices_small = (small_node, i_small, j_small)
+                        lambda_indices_small = (lambda_small_node, i_small, j_small)
+                    elseif orientation == 2
+                        indices_small = (i_small, small_node, j_small)
+                        lambda_indices_small = (i_small, lambda_small_node, j_small)
+                    else # orientation == 3
+                        indices_small = (i_small, j_small, small_node)
+                        lambda_indices_small = (i_small, j_small, lambda_small_node)
+                    end
+                    u_small = get_node_vars(u, equations, dg, indices_small...,
+                                            small_element)
+
+                    if small_elements_on_right
+                        lambda = max_abs_speed_naive(u_large, u_small, orientation,
+                                                     equations)
+                    else
+                        lambda = max_abs_speed_naive(u_small, u_large, orientation,
+                                                     equations)
+                    end
+
+                    add_mortar_lambdas!(lambda1, lambda2, lambda3, orientation,
+                                        lambda_indices_large, large_element,
+                                        lambda_indices_small, small_element,
+                                        weight * lambda /
+                                        mortar_weights_sums[i_large, j_large, 2],
+                                        weight * lambda /
+                                        mortar_weights_sums[i_small, j_small, 1])
+
+                    calc_bar_states || continue
+
+                    flux_small = flux(u_small, orientation, equations)
+                    if small_elements_on_right
+                        flux_diff = flux_small - flux_large
+                    else
+                        flux_diff = flux_large - flux_small
+                    end
+                    bar_state = 0.5 * (u_small + u_large - flux_diff / lambda)
+
+                    add_mortar_bar_states!(bar_states1, bar_states2, bar_states3,
+                                           orientation, equations,
+                                           lambda_indices_large, large_element,
+                                           lambda_indices_small, small_element,
+                                           bar_state, weight,
+                                           mortar_weights_sums[i_large, j_large, 2],
+                                           mortar_weights_sums[i_small, j_small, 1])
+                end
+            end
+        end
+    end
+
+    return nothing
+end
+
+@inline function calc_lambdas_bar_states_boundary!(u, t, limiter, boundary_conditions,
+                                                   mesh::TreeMesh{3}, equations, dg,
+                                                   cache; calc_bar_states = true)
+    (; lambda1, lambda2, lambda3, bar_states1, bar_states2, bar_states3) = limiter.cache.container_bar_states
+
+    @threaded for boundary in eachboundary(dg, cache)
+        element = cache.boundaries.neighbor_ids[boundary]
+
+        orientation = cache.boundaries.orientations[boundary]
+        neighbor_side = cache.boundaries.neighbor_sides[boundary]
+
+        if orientation == 1
+            if neighbor_side == 2 # Element is on the right, boundary on the left
+                for k in eachnode(dg), j in eachnode(dg)
+                    u_inner = get_node_vars(u, equations, dg, 1, j, k, element)
+                    u_outer = get_boundary_outer_state(u_inner, t,
+                                                       boundary_conditions[1],
+                                                       orientation, 1,
+                                                       mesh, equations, dg, cache,
+                                                       1, j, k, element)
+                    lambda1[1, j, k, element] = max_abs_speed_naive(u_inner, u_outer,
+                                                                    orientation,
+                                                                    equations)
+
+                    calc_bar_states || continue
+
+                    flux_inner = flux(u_inner, orientation, equations)
+                    flux_outer = flux(u_outer, orientation, equations)
+                    bar_state = 0.5 * (u_inner + u_outer) -
+                                0.5 * (flux_inner - flux_outer) /
+                                lambda1[1, j, k, element]
+                    for v in eachvariable(equations)
+                        bar_states1[v, 1, j, k, element] = bar_state[v]
+                    end
+                end
+            else # Element is on the left, boundary on the right
+                for k in eachnode(dg), j in eachnode(dg)
+                    u_inner = get_node_vars(u, equations, dg, nnodes(dg), j, k,
+                                            element)
+                    u_outer = get_boundary_outer_state(u_inner, t,
+                                                       boundary_conditions[2],
+                                                       orientation, 2,
+                                                       mesh, equations, dg, cache,
+                                                       nnodes(dg), j, k, element)
+                    lambda1[nnodes(dg) + 1, j, k, element] = max_abs_speed_naive(u_inner,
+                                                                                 u_outer,
+                                                                                 orientation,
+                                                                                 equations)
+
+                    calc_bar_states || continue
+
+                    flux_inner = flux(u_inner, orientation, equations)
+                    flux_outer = flux(u_outer, orientation, equations)
+                    bar_state = 0.5 * (u_inner + u_outer) -
+                                0.5 * (flux_outer - flux_inner) /
+                                lambda1[nnodes(dg) + 1, j, k, element]
+                    for v in eachvariable(equations)
+                        bar_states1[v, nnodes(dg) + 1, j, k, element] = bar_state[v]
+                    end
+                end
+            end
+        elseif orientation == 2
+            if neighbor_side == 2 # Element is on the right, boundary on the left
+                for k in eachnode(dg), i in eachnode(dg)
+                    u_inner = get_node_vars(u, equations, dg, i, 1, k, element)
+                    u_outer = get_boundary_outer_state(u_inner, t,
+                                                       boundary_conditions[3],
+                                                       orientation, 3,
+                                                       mesh, equations, dg, cache,
+                                                       i, 1, k, element)
+                    lambda2[i, 1, k, element] = max_abs_speed_naive(u_inner, u_outer,
+                                                                    orientation,
+                                                                    equations)
+
+                    calc_bar_states || continue
+
+                    flux_inner = flux(u_inner, orientation, equations)
+                    flux_outer = flux(u_outer, orientation, equations)
+                    bar_state = 0.5 * (u_inner + u_outer) -
+                                0.5 * (flux_inner - flux_outer) /
+                                lambda2[i, 1, k, element]
+                    for v in eachvariable(equations)
+                        bar_states2[v, i, 1, k, element] = bar_state[v]
+                    end
+                end
+            else # Element is on the left, boundary on the right
+                for k in eachnode(dg), i in eachnode(dg)
+                    u_inner = get_node_vars(u, equations, dg, i, nnodes(dg), k,
+                                            element)
+                    u_outer = get_boundary_outer_state(u_inner, t,
+                                                       boundary_conditions[4],
+                                                       orientation, 4,
+                                                       mesh, equations, dg, cache,
+                                                       i, nnodes(dg), k, element)
+                    lambda2[i, nnodes(dg) + 1, k, element] = max_abs_speed_naive(u_inner,
+                                                                                 u_outer,
+                                                                                 orientation,
+                                                                                 equations)
+
+                    calc_bar_states || continue
+
+                    flux_inner = flux(u_inner, orientation, equations)
+                    flux_outer = flux(u_outer, orientation, equations)
+                    bar_state = 0.5 * (u_inner + u_outer) -
+                                0.5 * (flux_outer - flux_inner) /
+                                lambda2[i, nnodes(dg) + 1, k, element]
+                    for v in eachvariable(equations)
+                        bar_states2[v, i, nnodes(dg) + 1, k, element] = bar_state[v]
+                    end
+                end
+            end
+        else # orientation == 3
+            if neighbor_side == 2 # Element is on the right, boundary on the left
+                for j in eachnode(dg), i in eachnode(dg)
+                    u_inner = get_node_vars(u, equations, dg, i, j, 1, element)
+                    u_outer = get_boundary_outer_state(u_inner, t,
+                                                       boundary_conditions[5],
+                                                       orientation, 5,
+                                                       mesh, equations, dg, cache,
+                                                       i, j, 1, element)
+                    lambda3[i, j, 1, element] = max_abs_speed_naive(u_inner, u_outer,
+                                                                    orientation,
+                                                                    equations)
+
+                    calc_bar_states || continue
+
+                    flux_inner = flux(u_inner, orientation, equations)
+                    flux_outer = flux(u_outer, orientation, equations)
+                    bar_state = 0.5 * (u_inner + u_outer) -
+                                0.5 * (flux_inner - flux_outer) /
+                                lambda3[i, j, 1, element]
+                    for v in eachvariable(equations)
+                        bar_states3[v, i, j, 1, element] = bar_state[v]
+                    end
+                end
+            else # Element is on the left, boundary on the right
+                for j in eachnode(dg), i in eachnode(dg)
+                    u_inner = get_node_vars(u, equations, dg, i, j, nnodes(dg),
+                                            element)
+                    u_outer = get_boundary_outer_state(u_inner, t,
+                                                       boundary_conditions[6],
+                                                       orientation, 6,
+                                                       mesh, equations, dg, cache,
+                                                       i, j, nnodes(dg), element)
+                    lambda3[i, j, nnodes(dg) + 1, element] = max_abs_speed_naive(u_inner,
+                                                                                 u_outer,
+                                                                                 orientation,
+                                                                                 equations)
+
+                    calc_bar_states || continue
+
+                    flux_inner = flux(u_inner, orientation, equations)
+                    flux_outer = flux(u_outer, orientation, equations)
+                    bar_state = 0.5 * (u_inner + u_outer) -
+                                0.5 * (flux_outer - flux_inner) /
+                                lambda3[i, j, nnodes(dg) + 1, element]
+                    for v in eachvariable(equations)
+                        bar_states3[v, i, j, nnodes(dg) + 1, element] = bar_state[v]
+                    end
+                end
+            end
+        end
+    end
 
     return nothing
 end
@@ -362,6 +1225,136 @@ end
         return nothing
     end
 
-    error("Bar states are only implemented for 2D problems.")
+    (; variable_bounds) = limiter.cache.subcell_limiter_coefficients
+    (; bar_states1, bar_states2, bar_states3) = limiter.cache.container_bar_states
+
+    (; small_stencil) = limiter
+    @assert small_stencil "small_stencil == false is not yet implemented for 3D subcell limiting"
+
+    # Local two-sided limiting for conservative variables
+    if limiter.local_twosided
+        for v in limiter.local_twosided_variables_cons
+            v_string = string(v)
+            var_min = variable_bounds[Symbol(v_string, "_min")]
+            var_max = variable_bounds[Symbol(v_string, "_max")]
+            @threaded for element in eachelement(dg, cache)
+                for k in eachnode(dg), j in eachnode(dg), i in eachnode(dg)
+                    var_min[i, j, k, element] = typemax(eltype(var_min))
+                    var_max[i, j, k, element] = typemin(eltype(var_max))
+                end
+
+                for k in eachnode(dg), j in eachnode(dg), i in eachnode(dg)
+                    var_min[i, j, k, element] = min(var_min[i, j, k, element],
+                                                    u[v, i, j, k, element],
+                                                    bar_states1[v, i, j, k,
+                                                                element],
+                                                    bar_states1[v, i + 1, j, k,
+                                                                element],
+                                                    bar_states2[v, i, j, k,
+                                                                element],
+                                                    bar_states2[v, i, j + 1, k,
+                                                                element],
+                                                    bar_states3[v, i, j, k,
+                                                                element],
+                                                    bar_states3[v, i, j, k + 1,
+                                                                element])
+                    var_max[i, j, k, element] = max(var_max[i, j, k, element],
+                                                    u[v, i, j, k, element],
+                                                    bar_states1[v, i, j, k,
+                                                                element],
+                                                    bar_states1[v, i + 1, j, k,
+                                                                element],
+                                                    bar_states2[v, i, j, k,
+                                                                element],
+                                                    bar_states2[v, i, j + 1, k,
+                                                                element],
+                                                    bar_states3[v, i, j, k,
+                                                                element],
+                                                    bar_states3[v, i, j, k + 1,
+                                                                element])
+                end
+            end
+        end
+    end
+
+    # Local one-sided limiting for nonlinear variables
+    if limiter.local_onesided
+        for (variable, min_or_max) in limiter.local_onesided_variables_nonlinear
+            var_minmax = variable_bounds[Symbol(string(variable), "_",
+                                                string(min_or_max))]
+            @threaded for element in eachelement(dg, cache)
+                for k in eachnode(dg), j in eachnode(dg), i in eachnode(dg)
+                    var = variable(get_node_vars(u, equations, dg, i, j, k, element),
+                                   equations)
+                    var_minmax[i, j, k, element] = var
+                end
+
+                for k in eachnode(dg), j in eachnode(dg),
+                    i in 1:(nnodes(dg) + 1)
+
+                    var = variable(get_node_vars(bar_states1, equations, dg, i,
+                                                 j, k, element), equations)
+                    if i < nnodes(dg) + 1
+                        var_minmax[i, j, k, element] = min_or_max(var_minmax[i,
+                                                                             j,
+                                                                             k,
+                                                                             element],
+                                                                  var)
+                    end
+                    if i > 1
+                        var_minmax[i - 1, j, k, element] = min_or_max(var_minmax[i - 1,
+                                                                                 j,
+                                                                                 k,
+                                                                                 element],
+                                                                      var)
+                    end
+                end
+
+                for k in eachnode(dg), j in 1:(nnodes(dg) + 1),
+                    i in eachnode(dg)
+
+                    var = variable(get_node_vars(bar_states2, equations, dg, i,
+                                                 j, k, element), equations)
+                    if j < nnodes(dg) + 1
+                        var_minmax[i, j, k, element] = min_or_max(var_minmax[i,
+                                                                             j,
+                                                                             k,
+                                                                             element],
+                                                                  var)
+                    end
+                    if j > 1
+                        var_minmax[i, j - 1, k, element] = min_or_max(var_minmax[i,
+                                                                                 j - 1,
+                                                                                 k,
+                                                                                 element],
+                                                                      var)
+                    end
+                end
+
+                for k in 1:(nnodes(dg) + 1), j in eachnode(dg),
+                    i in eachnode(dg)
+
+                    var = variable(get_node_vars(bar_states3, equations, dg, i,
+                                                 j, k, element), equations)
+                    if k < nnodes(dg) + 1
+                        var_minmax[i, j, k, element] = min_or_max(var_minmax[i,
+                                                                             j,
+                                                                             k,
+                                                                             element],
+                                                                  var)
+                    end
+                    if k > 1
+                        var_minmax[i, j, k - 1, element] = min_or_max(var_minmax[i,
+                                                                                 j,
+                                                                                 k - 1,
+                                                                                 element],
+                                                                      var)
+                    end
+                end
+            end
+        end
+    end
+
+    return nothing
 end
 end # @muladd

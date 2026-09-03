@@ -23,6 +23,7 @@ end
                       positivity_variables_nonlinear = [],
                       positivity_correction_factor = 0.1,
                       local_onesided_variables_nonlinear = [],
+                      indicator = nothing,
                       bar_states = false,
                       max_iterations_newton = 10,
                       newton_tolerances = (1.0e-12, 1.0e-14),
@@ -111,8 +112,8 @@ function SubcellLimiterIDP(equations::AbstractEquations, basis;
     positivity = (length(positivity_variables_cons) +
                   length(positivity_variables_nonlinear) > 0)
 
-    if indicator !== nothing && ndims(equations) != 2
-        error("The smoothness indicator is only implemented in 2D.")
+    if indicator !== nothing && !(ndims(equations) in (2, 3))
+        error("The smoothness indicator is only implemented in 2D and 3D.")
     end
 
     # When passing `min` or `max` in the elixir, the specific function of Base is used.
@@ -294,6 +295,20 @@ function create_cache(limiter::Type{SubcellLimiterIDP},
     cache = create_cache(limiter, equations, basis, bound_keys, False(),
                          cache_variable_values)
     container_bar_states = Trixi.ContainerBarStates2D{real(basis)}(0,
+                                                                   nvariables(equations),
+                                                                   nnodes(basis))
+
+    return (; container_bar_states, cache...)
+end
+
+function create_cache(limiter::Type{SubcellLimiterIDP},
+                      equations::AbstractEquations{3},
+                      basis::LobattoLegendreBasis, bound_keys,
+                      ::True,
+                      cache_variable_values)
+    cache = create_cache(limiter, equations, basis, bound_keys, False(),
+                         cache_variable_values)
+    container_bar_states = Trixi.ContainerBarStates3D{real(basis)}(0,
                                                                    nvariables(equations),
                                                                    nnodes(basis))
 

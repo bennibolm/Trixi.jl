@@ -646,7 +646,117 @@ end
         @test size(container_2d.lambda2) == (4, 5, 3)
         @test Trixi.nvariables(container_2d) == 5
         @test Trixi.nnodes(container_2d) == 4
+
+        container_3d = Trixi.ContainerBarStates3D{Float64}(0, 5, 4)
+        resize!(container_3d, 3)
+        @test container_3d isa Trixi.ContainerBarStates3D
+        @test size(container_3d.bar_states1) == (5, 5, 4, 4, 3)
+        @test size(container_3d.bar_states2) == (5, 4, 5, 4, 3)
+        @test size(container_3d.bar_states3) == (5, 4, 4, 5, 3)
+        @test size(container_3d.lambda1) == (5, 4, 4, 3)
+        @test size(container_3d.lambda2) == (4, 5, 4, 3)
+        @test size(container_3d.lambda3) == (4, 4, 5, 3)
+        @test Trixi.nvariables(container_3d) == 5
+        @test Trixi.nnodes(container_3d) == 4
     end
+end
+
+function initial_condition_bar_states_test(x, t,
+                                           equations::CompressibleEulerEquations3D)
+    rho = 1 + 0.1 * sinpi(x[1]) * cospi(x[2]) * cospi(x[3])
+    v1 = 1.0
+    v2 = 0.5
+    v3 = -0.25
+    p = 1.0
+    rho_e = p / (equations.gamma - 1) +
+            0.5 * rho * (v1^2 + v2^2 + v3^2)
+    return SVector(rho, rho * v1, rho * v2, rho * v3, rho_e)
+end
+
+@timed_testset "3D periodic bar states" begin
+    equations = CompressibleEulerEquations3D(1.4)
+
+    basis = LobattoLegendreBasis(2)
+    limiter = SubcellLimiterIDP(equations, basis;
+                                positivity_variables_cons = ["rho"],
+                                positivity_variables_nonlinear = [],
+                                bar_states = true)
+    volume_integral = VolumeIntegralSubcellLimiting(limiter;
+                                                    volume_flux_dg = flux_ranocha,
+                                                    volume_flux_fv = flux_lax_friedrichs)
+    solver = DGSEM(basis, flux_lax_friedrichs, volume_integral)
+    mesh = TreeMesh((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0);
+                    initial_refinement_level = 1, periodicity = true)
+    semi = SemidiscretizationHyperbolic(mesh, equations,
+                                        initial_condition_bar_states_test, solver;
+                                        boundary_conditions = boundary_condition_periodic)
+
+    mesh, equations, dg, cache = Trixi.mesh_equations_solver_cache(semi)
+    limiter = dg.volume_integral.limiter
+    u_ode = Trixi.compute_coefficients(0.0, semi)
+    u = Trixi.wrap_array(u_ode, semi)
+    Trixi.calc_lambdas_bar_states!(u, 0.0, mesh,
+                                   Trixi.have_nonconservative_terms(equations),
+                                   equations, limiter, dg, cache,
+                                   boundary_condition_periodic)
+
+    container = limiter.cache.container_bar_states
+    @test all(isfinite, container.lambda1)
+    @test all(isfinite, container.lambda2)
+    @test all(isfinite, container.lambda3)
+    @test all(isfinite, container.bar_states1)
+    @test all(isfinite, container.bar_states2)
+    @test all(isfinite, container.bar_states3)
+
+    @test_nowarn Trixi.calc_lambdas_bar_states!(u, 0.0, mesh,
+                                                Trixi.have_nonconservative_terms(equations),
+                                                equations, limiter, dg, cache,
+                                                boundary_condition_periodic;
+                                                calc_bar_states = false)
+end
+
+@timed_testset "3D boundary bar states" begin
+    equations = CompressibleEulerEquations3D(1.4)
+
+    basis = LobattoLegendreBasis(2)
+    limiter = SubcellLimiterIDP(equations, basis;
+                                positivity_variables_cons = ["rho"],
+                                positivity_variables_nonlinear = [],
+                                bar_states = true)
+    volume_integral = VolumeIntegralSubcellLimiting(limiter;
+                                                    volume_flux_dg = flux_ranocha,
+                                                    volume_flux_fv = flux_lax_friedrichs)
+    solver = DGSEM(basis, flux_lax_friedrichs, volume_integral)
+    mesh = TreeMesh((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0);
+                    initial_refinement_level = 1, periodicity = false)
+    boundary_conditions = BoundaryConditionDirichlet(initial_condition_bar_states_test)
+    semi = SemidiscretizationHyperbolic(mesh, equations,
+                                        initial_condition_bar_states_test,
+                                        solver;
+                                        boundary_conditions = boundary_conditions)
+
+    mesh, equations, dg, cache = Trixi.mesh_equations_solver_cache(semi)
+    limiter = dg.volume_integral.limiter
+    u_ode = Trixi.compute_coefficients(0.0, semi)
+    u = Trixi.wrap_array(u_ode, semi)
+    Trixi.calc_lambdas_bar_states!(u, 0.0, mesh,
+                                   Trixi.have_nonconservative_terms(equations),
+                                   equations, limiter, dg, cache,
+                                   semi.boundary_conditions)
+
+    container = limiter.cache.container_bar_states
+    @test all(isfinite, container.lambda1)
+    @test all(isfinite, container.lambda2)
+    @test all(isfinite, container.lambda3)
+    @test all(isfinite, container.bar_states1)
+    @test all(isfinite, container.bar_states2)
+    @test all(isfinite, container.bar_states3)
+
+    @test_nowarn Trixi.calc_lambdas_bar_states!(u, 0.0, mesh,
+                                                Trixi.have_nonconservative_terms(equations),
+                                                equations, limiter, dg, cache,
+                                                semi.boundary_conditions;
+                                                calc_bar_states = false)
 end
 
 @testitem "Unit: example elixirs" setup=[Setup, UnitTests] tags=[:misc_part1] begin
