@@ -41,6 +41,8 @@ end
                         l2=[0.02134571266411136],
                         linf=[0.04347734797775926],
                         polydeg=1)
+    # Test `show()`
+    @trixi_test_nowarn show(IOContext(stdout, :compact => false), save_restart)
     # Ensure that we do not have excessive memory allocations
     # (e.g., from type instabilities)
     @test_allocations(Trixi.rhs_hyperbolic!, semi, sol, 1000)
@@ -141,7 +143,7 @@ end
     # integrator which are not *recorded* for the methods from
     # OrdinaryDiffEq.jl
     # Corresponding issue: https://github.com/trixi-framework/Trixi.jl/issues/1877
-    @test (@allocated Trixi.rhs_hyperbolic!(du_ode, u_ode, semi, t)) < 15000
+    @test_allocations(Trixi.rhs_hyperbolic!, semi, sol, 15000)
 end
 
 @testitem "TreeMesh2D Advection: elixir_advection_amr.jl" setup=[Setup, TreeMesh2DAdvection] tags=[:tree_part1] begin
