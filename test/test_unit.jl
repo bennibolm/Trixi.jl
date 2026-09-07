@@ -753,7 +753,7 @@ end
         is_valid, goal, state_data = Trixi.newton_state_data(entropy_guermond_etal, bound,
                                                              u, equations_2d)
         @test is_valid
-        @test state_data !== nothing
+        @test !isnothing(state_data)
 
         dgoal_dbeta = Trixi.newton_dgoal_dbeta(entropy_guermond_etal, u, delta_u,
                                                equations_2d, state_data)
@@ -775,8 +775,8 @@ end
                                                              u_invalid,
                                                              equations_2d)
         @test !is_valid
-        @test goal == zero(typeof(bound))
-        @test state_data === nothing
+        @test iszero(goal)
+        @test isnothing(state_data)
     end
 
     # Generic fallback path must preserve the legacy goal and derivative behavior.
@@ -785,7 +785,7 @@ end
 
     is_valid, goal, state_data = Trixi.newton_state_data(pressure, bound, u, equations_2d)
     @test is_valid == Trixi.isvalid(u, equations_2d)
-    @test state_data === nothing
+    @test isnothing(state_data)
     @test goal == Trixi.goal_function_newton_idp(pressure, bound, u, equations_2d)
 
     dgoal_dbeta = Trixi.newton_dgoal_dbeta(pressure, u, delta_u, equations_2d,

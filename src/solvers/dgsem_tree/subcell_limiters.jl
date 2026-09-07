@@ -553,7 +553,6 @@ end
         if (beta < beta_L) || (beta > beta_R) || iszero(dgoal_dbeta) || isnan(beta)
             # Out of bounds, do a bisection step
             beta = 0.5f0 * (beta_L + beta_R)
-
             # Get new u
             u_curr = u + beta * delta_u
             is_valid, goal, state_data = newton_state_data(variable, bound, u_curr,
