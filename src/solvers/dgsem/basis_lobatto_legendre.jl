@@ -241,8 +241,7 @@ struct LobattoLegendreMortarIDP{RealT <: Real, NNODES, NDIMS, LENGTH,
 end
 
 function MortarIDP(equations, basis::LobattoLegendreBasis, limiter;
-                   pure_low_order = false,
-                   output_directory = "out")
+                   pure_low_order = false)
     @assert limiter isa SubcellLimiterIDP
     RealT = real(basis)
     n_dims = ndims(equations)
@@ -259,8 +258,7 @@ function MortarIDP(equations, basis::LobattoLegendreBasis, limiter;
                                                 pure_low_order,
                                                 mortar_l2,
                                                 mortar_weights,
-                                                mortar_weights_sums,
-                                                output_directory)
+                                                mortar_weights_sums)
 end
 
 function Base.show(io::IO, mortar::LobattoLegendreMortarIDP)
