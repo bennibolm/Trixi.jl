@@ -84,10 +84,14 @@ end
             left_element = neighbor_ids[1, interface]
             right_element = neighbor_ids[2, interface]
 
-            # detect if subcell limiting is necessary for one of the elements
             limit_left = perform_subcell_limiting(dg.volume_integral, left_element)
             limit_right = perform_subcell_limiting(dg.volume_integral, right_element)
-            (limit_left || limit_right) || continue
+            if limit_left || limit_right
+                # Subcell limiting is necessary for at least one of the elements => Calculate bounds at this interface
+            else
+                # Subcell limiting is not necessary for both elements => Skip this interface
+                continue
+            end
 
             for i in eachnode(dg)
                 # Define node indices for left and right element based on the interface orientation
@@ -325,10 +329,14 @@ end
             left_element = neighbor_ids[1, interface]
             right_element = neighbor_ids[2, interface]
 
-            # detect if subcell limiting is necessary for one of the elements
             limit_left = perform_subcell_limiting(dg.volume_integral, left_element)
             limit_right = perform_subcell_limiting(dg.volume_integral, right_element)
-            (limit_left || limit_right) || continue
+            if limit_left || limit_right
+                # Subcell limiting is necessary for at least one of the elements => Calculate bounds at this interface
+            else
+                # Subcell limiting is not necessary for both elements => Skip this interface
+                continue
+            end
 
             for i in eachnode(dg)
                 # Define node indices for left and right element based on the interface orientation
@@ -641,6 +649,9 @@ end
     (; variable_bounds) = limiter.cache.subcell_limiter_coefficients
     var_min = variable_bounds[Symbol(string(variable), "_min")]
 
+    was_limited_locally = limiter.local_twosided &&
+                          (variable in limiter.local_twosided_variables_cons)
+
     @threaded for element in eachelement(dg, semi.cache)
 
         # detect if subcell limiting is necessary
@@ -653,8 +664,7 @@ end
             end
 
             # Compute bound
-            if limiter.local_twosided &&
-               (variable in limiter.local_twosided_variables_cons) &&
+            if was_limited_locally &&
                (var_min[i, j, element] >= positivity_correction_factor * var)
                 # Local limiting is more restrictive that positivity limiting
                 # => Skip positivity limiting for this node
@@ -805,71 +815,6 @@ end
     return nothing
 end
 
-# Specialization for the modified specific entropy of Guermond et al. (2019) in 2D Euler equations.
-# Passes the state data to avoid recomputation in the derivative evaluation.
-@inline function newton_state_data(variable::typeof(entropy_guermond_etal), bound, u,
-                                   equations::CompressibleEulerEquations2D)
-    rho, rho_v1, rho_v2, rho_e_total = u
-    zero_uEltype = zero(rho)
-
-    if rho <= 0 # State is invalid
-        named_tuple = (; kinetic_energy = zero_uEltype, internal_energy = zero_uEltype,
-                       rho_to_minus_gamma = zero_uEltype)
-        return false, zero_uEltype, named_tuple
-    end
-
-    # Computation along u(beta) = u + beta * delta_u for Guermond entropy in Euler 2D:
-    kinetic_energy = 0.5f0 * (rho_v1^2 + rho_v2^2) / rho
-    internal_energy = rho_e_total - kinetic_energy
-
-    # For Euler with gamma > 1, positivity of internal energy is equivalent
-    # to positivity of pressure.
-    if internal_energy <= 0
-        named_tuple = (; kinetic_energy = zero_uEltype, internal_energy = zero_uEltype,
-                       rho_to_minus_gamma = zero_uEltype)
-        return false, zero_uEltype, named_tuple
-    end
-
-    # Modified specific entropy of Guermond et al. (2019)
-    # s = e_int * rho^(-gamma),
-    # goal = bound - s,
-    rho_to_minus_gamma = (1 / rho)^equations.gamma
-    s = internal_energy * rho_to_minus_gamma
-    goal = bound - s
-
-    state_data = (; kinetic_energy, internal_energy, rho_to_minus_gamma)
-
-    return true, goal, state_data
-end
-
-# Specialization for the modified specific entropy of Guermond et al. (2019) in 2D Euler equations.
-# Receive the state data to avoid recomputation in the derivative evaluation.
-@inline function newton_dgoal_dbeta(::typeof(entropy_guermond_etal),
-                                    u, delta_u,
-                                    equations::CompressibleEulerEquations2D,
-                                    state_data)
-    rho, rho_v1, rho_v2, _ = u
-    (; kinetic_energy, internal_energy, rho_to_minus_gamma) = state_data
-
-    # Derivative along u(beta) = u + beta * delta_u:
-    # s(beta) = e_int(beta) * rho(beta)^(-gamma)
-    # ds/d(beta) = rho^(-gamma) *
-    #              (de_int/d(beta) - gamma * e_int * (d(rho)/d(beta)) / rho)
-    # d(goal)/d(beta) = -ds/d(beta), since goal = bound - s.
-
-    delta_rho, delta_rho_v1, delta_rho_v2, delta_rho_e_total = delta_u
-
-    internal_energy_derivative = delta_rho_e_total -
-                                 (rho_v1 * delta_rho_v1 + rho_v2 * delta_rho_v2) / rho +
-                                 kinetic_energy * delta_rho / rho
-
-    entropy_derivative = rho_to_minus_gamma *
-                         (internal_energy_derivative -
-                          equations.gamma * internal_energy * delta_rho / rho)
-
-    return -entropy_derivative
-end
-
 ###############################################################################
 # IDP mortar limiting
 ###############################################################################
@@ -995,9 +940,6 @@ end
 
             # Large element
             var_large = u[var_index, indices_large..., large_element]
-            if var_large < 0
-                error("Safe low-order method produces negative value for conservative variable rho. Try a smaller time step.")
-            end
 
             # Two-sided local bounds
             var_min_large = var_min[indices_large..., large_element]
@@ -1052,9 +994,6 @@ end
 
                 small_element = neighbor_ids[small_element_index, mortar]
                 var_small = u[var_index, indices_small..., small_element]
-                if var_small < 0
-                    error("Safe low-order method produces negative value for conservative variable rho. Try a smaller time step.")
-                end
 
                 var_min_small = var_min[indices_small..., small_element]
                 var_max_small = var_max[indices_small..., small_element]
@@ -1310,9 +1249,6 @@ end
 
             # Large element
             var_large = u[var_index, indices_large..., large_element]
-            if var_large < 0
-                error("Safe low-order method produces negative value for conservative variable rho. Try a smaller time step.")
-            end
 
             # Minimum bound
             var_min_large = var_min[indices_large..., large_element]
@@ -1359,9 +1295,6 @@ end
 
                 small_element = neighbor_ids[small_element_index, mortar]
                 var_small = u[var_index, indices_small..., small_element]
-                if var_small < 0
-                    error("Safe low-order method produces negative value for conservative variable rho. Try a smaller time step.")
-                end
 
                 # Compute flux differences
                 flux_small_high_order = surface_flux_values_high_order[var_index, i,
