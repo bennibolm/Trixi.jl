@@ -999,7 +999,7 @@ end
     (; lambda1, lambda2, bar_states1, bar_states2) = limiter.cache.container_bar_states
 
     @threaded for element in eachelement(dg, cache)
-        # It is sufficient to reset the lambdas and bar states at the interfaces since only the mortar computation adds terms up.
+        # Reset interface values since mortar contributions are accumulated.
         lambda1[1, :, element] .= zero(eltype(lambda1))
         lambda1[end, :, element] .= zero(eltype(lambda1))
         lambda2[:, 1, element] .= zero(eltype(lambda2))
