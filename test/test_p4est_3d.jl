@@ -482,7 +482,7 @@ end
                                                             alpha_smooth = false,
                                                             variable = density_pressure),
                         max_iterations_newton=30,
-                        l2=[ # TODO
+                        l2=[
                             0.16504565347921088,
                             0.0646138412002418,
                             0.06461384120034255,
@@ -501,9 +501,11 @@ end
     @test all(isfinite, limiter.indicator.cache.alpha)
     @test maximum(limiter.indicator.cache.alpha) > 0
 
+    # When using a smoothness indicator, the bounds check is skipped since the deviations
+    # would be computed with respect to the local bounds only and would therefore not be
+    # meaningful. Consequently, no deviations are computed.
     deviations = collect(values(limiter.cache.idp_bounds_delta_global))
-    @test all(isfinite, deviations)
-    @test maximum(deviations) > 0
+    @test all(iszero, deviations)
 
     # Ensure that we do not have excessive memory allocations
     # (e.g., from type instabilities)
@@ -811,9 +813,14 @@ end
                         ],
                         tspan=(0.0, 0.1),)
     limiter = semi.solver.volume_integral.limiter
+    @test all(isfinite, limiter.indicator.cache.alpha)
+    @test maximum(limiter.indicator.cache.alpha) > 0
+
+    # When using a smoothness indicator, the bounds check is skipped since the deviations
+    # would be computed with respect to the local bounds only and would therefore not be
+    # meaningful. Consequently, no deviations are computed.
     deviations = collect(values(limiter.cache.idp_bounds_delta_global))
-    @test all(isfinite, deviations)
-    @test maximum(deviations) > 0
+    @test all(iszero, deviations)
 
     # Ensure that we do not have excessive memory allocations
     # (e.g., from type instabilities)
