@@ -728,6 +728,7 @@ end
 
     @threaded for element in eachelement(dg, cache)
         # Reset interface values since mortar contributions are accumulated.
+        lambda1[1, :, :, element] .= zero(eltype(lambda1))
         lambda1[end, :, :, element] .= zero(eltype(lambda1))
         lambda2[:, 1, :, element] .= zero(eltype(lambda2))
         lambda2[:, end, :, element] .= zero(eltype(lambda2))
