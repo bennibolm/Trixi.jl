@@ -788,8 +788,8 @@ end
             i_small = i_small_start
             j_small = j_small_start
             k_small = k_small_start
-            for j_small_node in eachnode(dg)
-                for i_small_node in eachnode(dg)
+            for j in eachnode(dg)
+                for i in eachnode(dg)
                     u_small = get_node_vars(u, equations, dg, i_small, j_small,
                                             k_small, small_element)
                     normal_direction = get_normal_direction(small_direction,
@@ -800,15 +800,13 @@ end
                     i_large = i_large_start
                     j_large = j_large_start
                     k_large = k_large_start
-                    for j_large_node in eachnode(dg)
-                        for i_large_node in eachnode(dg)
+                    for l in eachnode(dg)
+                        for k in eachnode(dg)
                             # `mortar_weights` is defined in mortar reference coordinates, so it
                             # has to be indexed with the traversal counters. Using the element-local
                             # face indices instead would pair mirror-image subcells whenever the large
                             # side is traversed backwards, i.e., for `:i_backward in large_indices`.
-                            weight = mortar_weights[i_large_node, j_large_node,
-                                                    i_small_node, j_small_node,
-                                                    small_element_index]
+                            weight = mortar_weights[k, l, i, j, small_element_index]
                             if iszero(weight)
                                 i_large += i_large_step_i
                                 j_large += j_large_step_i
@@ -822,8 +820,7 @@ end
                                                          normal_direction, equations)
 
                             lambda_small_factor = weight /
-                                                  mortar_weights_sums[i_small_node,
-                                                                      j_small_node, 1]
+                                                  mortar_weights_sums[i, j, 1]
 
                             if small_direction == 1
                                 lambda1[i_small, j_small, k_small, small_element] += lambda_small_factor *
@@ -846,8 +843,7 @@ end
                             end
 
                             lambda_large_factor = weight /
-                                                  mortar_weights_sums[i_large_node,
-                                                                      j_large_node, 2]
+                                                  mortar_weights_sums[k, l, 2]
                             if large_direction == 1
                                 lambda1[i_large, j_large, k_large, large_element] += lambda_large_factor *
                                                                                      lambda
@@ -1111,15 +1107,14 @@ function calc_mortar_flux_low_order!(surface_flux_values,
         i_small = i_small_start
         j_small = j_small_start
         k_small = k_small_start
-        for j_small_node in eachnode(dg)
-            for i_small_node in eachnode(dg)
+        for j in eachnode(dg)
+            for i in eachnode(dg)
                 for small_element_index in 1:4
                     small_element = neighbor_ids[small_element_index, mortar]
 
                     u_small_local, _ = get_surface_node_vars(mortars.u, equations, dg,
                                                              small_element_index,
-                                                             i_small_node,
-                                                             j_small_node, mortar)
+                                                             i, j, mortar)
 
                     # Get the normal direction on the small element.
                     # Note, contravariant vectors at interfaces in negative coordinate direction
@@ -1133,8 +1128,8 @@ function calc_mortar_flux_low_order!(surface_flux_values,
                     i_large = i_large_start
                     j_large = j_large_start
                     k_large = k_large_start
-                    for j_large_node in eachnode(dg)
-                        for i_large_node in eachnode(dg)
+                    for l in eachnode(dg)
+                        for k in eachnode(dg)
                             # Index of the large-element face node. Needed because the large side may
                             # be traversed backwards, unlike `mortar_weights`, which is defined in
                             # mortar reference coordinates and indexed with the traversal counters.
@@ -1143,13 +1138,10 @@ function calc_mortar_flux_low_order!(surface_flux_values,
                                                                              j_large,
                                                                              k_large)
 
-                            factor = mortar_weights[i_large_node, j_large_node,
-                                                    i_small_node, j_small_node,
-                                                    small_element_index]
+                            factor = mortar_weights[k, l, i, j, small_element_index]
                             if !isapprox(factor, zero(typeof(factor)))
                                 u_large_local = get_node_vars(u_large, equations, dg,
-                                                              i_large_node,
-                                                              j_large_node, mortar)
+                                                              k, l, mortar)
                                 # TODO: Use normal vector of large element for actual curved elements
                                 # normal_direction_large = get_normal_direction(large_direction,
                                 #                                               contravariant_vectors,
@@ -1164,12 +1156,9 @@ function calc_mortar_flux_low_order!(surface_flux_values,
                                 # Add flux to small element
                                 multiply_add_to_node_vars!(surface_flux_values,
                                                            factor /
-                                                           mortar_weights_sums[i_small_node,
-                                                                               j_small_node,
-                                                                               1],
+                                                           mortar_weights_sums[i, j, 1],
                                                            flux, equations, dg,
-                                                           i_small_node, j_small_node,
-                                                           small_direction,
+                                                           i, j, small_direction,
                                                            small_element)
 
                                 # Add flux to large element
@@ -1182,9 +1171,7 @@ function calc_mortar_flux_low_order!(surface_flux_values,
                                 # to be scaled by a factor of 4 to obtain the flux of the large element.
                                 multiply_add_to_node_vars!(surface_flux_values,
                                                            -4 * factor /
-                                                           mortar_weights_sums[i_large_node,
-                                                                               j_large_node,
-                                                                               2],
+                                                           mortar_weights_sums[k, l, 2],
                                                            flux, equations, dg,
                                                            i_mortar_l, j_mortar_l,
                                                            large_direction,

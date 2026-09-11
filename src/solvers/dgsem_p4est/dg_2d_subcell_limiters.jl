@@ -186,7 +186,7 @@ end
 
         i_small = i_small_start - i_small_step
         j_small = j_small_start - j_small_step
-        for node_small in eachnode(dg)
+        for i in eachnode(dg)
             i_small += i_small_step
             j_small += j_small_step
 
@@ -201,7 +201,7 @@ end
 
                 i_large = i_large_start - i_large_step
                 j_large = j_large_start - j_large_step
-                for node_large in eachnode(dg)
+                for j in eachnode(dg)
                     i_large += i_large_step
                     j_large += j_large_step
 
@@ -209,8 +209,7 @@ end
                     # has to be indexed with the traversal counters. Using the element-local
                     # face indices instead would pair mirror-image subcells whenever the large
                     # side is traversed backwards, i.e., for `:i_backward in large_indices`.
-                    weight = mortar_weights[node_large, node_small,
-                                            small_element_index]
+                    weight = mortar_weights[j, i, small_element_index]
                     !iszero(weight) || continue
 
                     u_large = get_node_vars(u, equations, dg, i_large, j_large,
@@ -219,7 +218,7 @@ end
                     lambda = max_abs_speed_naive(u_small, u_large,
                                                  normal_direction_small,
                                                  equations)
-                    lambda_small = weight * lambda / mortar_weights_sums[node_small, 1]
+                    lambda_small = weight * lambda / mortar_weights_sums[i, 1]
                     if small_direction == 1
                         lambda1[i_small, j_small, small_element] += lambda_small
                     elseif small_direction == 2
@@ -230,7 +229,7 @@ end
                         lambda2[i_small, j_small + 1, small_element] += lambda_small
                     end
 
-                    lambda_large = weight * lambda / mortar_weights_sums[node_large, 2]
+                    lambda_large = weight * lambda / mortar_weights_sums[j, 2]
                     if large_direction == 1
                         lambda1[i_large, j_large, large_element] += lambda_large
                     elseif large_direction == 2
@@ -252,28 +251,28 @@ end
                         for v in eachvariable(equations)
                             bar_states1[v, i_small, j_small, small_element] += weight *
                                                                                bar_state[v] /
-                                                                               mortar_weights_sums[node_small,
+                                                                               mortar_weights_sums[i,
                                                                                                    1]
                         end
                     elseif small_direction == 2
                         for v in eachvariable(equations)
                             bar_states1[v, i_small + 1, j_small, small_element] += weight *
                                                                                    bar_state[v] /
-                                                                                   mortar_weights_sums[node_small,
+                                                                                   mortar_weights_sums[i,
                                                                                                        1]
                         end
                     elseif small_direction == 3
                         for v in eachvariable(equations)
                             bar_states2[v, i_small, j_small, small_element] += weight *
                                                                                bar_state[v] /
-                                                                               mortar_weights_sums[node_small,
+                                                                               mortar_weights_sums[i,
                                                                                                    1]
                         end
                     else # small_direction == 4
                         for v in eachvariable(equations)
                             bar_states2[v, i_small, j_small + 1, small_element] += weight *
                                                                                    bar_state[v] /
-                                                                                   mortar_weights_sums[node_small,
+                                                                                   mortar_weights_sums[i,
                                                                                                        1]
                         end
                     end
@@ -282,28 +281,28 @@ end
                         for v in eachvariable(equations)
                             bar_states1[v, i_large, j_large, large_element] += weight *
                                                                                bar_state[v] /
-                                                                               mortar_weights_sums[node_large,
+                                                                               mortar_weights_sums[j,
                                                                                                    2]
                         end
                     elseif large_direction == 2
                         for v in eachvariable(equations)
                             bar_states1[v, i_large + 1, j_large, large_element] += weight *
                                                                                    bar_state[v] /
-                                                                                   mortar_weights_sums[node_large,
+                                                                                   mortar_weights_sums[j,
                                                                                                        2]
                         end
                     elseif large_direction == 3
                         for v in eachvariable(equations)
                             bar_states2[v, i_large, j_large, large_element] += weight *
                                                                                bar_state[v] /
-                                                                               mortar_weights_sums[node_large,
+                                                                               mortar_weights_sums[j,
                                                                                                    2]
                         end
                     else # large_direction == 4
                         for v in eachvariable(equations)
                             bar_states2[v, i_large, j_large + 1, large_element] += weight *
                                                                                    bar_state[v] /
-                                                                                   mortar_weights_sums[node_large,
+                                                                                   mortar_weights_sums[j,
                                                                                                        2]
                         end
                     end
