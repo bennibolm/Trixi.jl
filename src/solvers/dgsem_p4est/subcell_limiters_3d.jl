@@ -113,6 +113,7 @@ end
     _, _, dg, cache = mesh_equations_solver_cache(semi)
 
     (; neighbor_ids, node_indices) = cache.mortars
+    mortar_weights = get_mortar_weights(dg.mortar)
     index_range = eachnode(dg)
 
     # `mortar_weights` is defined in mortar reference coordinates, so it has to be
@@ -174,8 +175,7 @@ end
                                                          mortar]
                             # from large to small element
                             if l2_mortars ||
-                               dg.mortar.mortar_weights[i, j, k, l,
-                                                        small_element_index] > 0
+                               mortar_weights[i, j, k, l, small_element_index] > 0
                                 var_min[i_small_inner, j_small_inner, k_small_inner,
                                 small_element] = min(var_min[i_small_inner,
                                                              j_small_inner,
@@ -191,8 +191,7 @@ end
                             end
                             # from small to large element
                             if l2_mortars ||
-                               dg.mortar.mortar_weights[k, l, i, j,
-                                                        small_element_index] > 0
+                               mortar_weights[k, l, i, j, small_element_index] > 0
                                 var_min[i_large_inner, j_large_inner, k_large_inner,
                                 large_element] = min(var_min[i_large_inner,
                                                              j_large_inner,
@@ -402,6 +401,7 @@ end
     _, equations, dg, cache = mesh_equations_solver_cache(semi)
 
     (; neighbor_ids, node_indices) = cache.mortars
+    mortar_weights = get_mortar_weights(dg.mortar)
     index_range = eachnode(dg)
 
     # `mortar_weights` is defined in mortar reference coordinates, so it has to be
@@ -468,8 +468,7 @@ end
                             small_element = neighbor_ids[small_element_index, mortar]
                             # values of large element to small elements
                             if l2_mortars ||
-                               dg.mortar.mortar_weights[i, j, k, l,
-                                                        small_element_index] > 0
+                               mortar_weights[i, j, k, l, small_element_index] > 0
                                 var_minmax[i_small_inner, j_small_inner, k_small_inner,
                                 small_element] = minmax(var_minmax[i_small_inner,
                                                                    j_small_inner,
@@ -479,8 +478,7 @@ end
                             end
                             # values of small elements to large element
                             if l2_mortars ||
-                               dg.mortar.mortar_weights[k, l, i, j,
-                                                        small_element_index] > 0
+                               mortar_weights[k, l, i, j, small_element_index] > 0
                                 var_minmax[i_large_inner, j_large_inner, k_large_inner,
                                 large_element] = minmax(var_minmax[i_large_inner,
                                                                    j_large_inner,

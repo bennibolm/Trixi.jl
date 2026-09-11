@@ -317,6 +317,14 @@ end
 
 @inline polydeg(mortar::LobattoLegendreMortarIDP) = nnodes(mortar) - 1
 
+# The subcell limiting routines that compute bounds at mortars run for both mortar types.
+# Only `LobattoLegendreMortarIDP` carries the local mortar weights. For
+# `LobattoLegendreMortarL2` all neighboring values are included instead, so no weights are
+# needed and `nothing` is returned. Note that `dg.mortar.mortar_weights` must not be accessed
+# unconditionally, since `LobattoLegendreMortarL2` has no such field.
+@inline get_mortar_weights(mortar::LobattoLegendreMortarIDP) = mortar.mortar_weights
+@inline get_mortar_weights(mortar::AbstractMortar) = nothing
+
 # TODO: We can create EC mortars along the lines of the following implementation.
 # abstract type AbstractMortarEC{RealT} <: AbstractMortar{RealT} end
 
