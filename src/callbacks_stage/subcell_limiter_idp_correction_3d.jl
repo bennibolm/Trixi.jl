@@ -230,6 +230,11 @@ function perform_idp_mortar_correction(u, dt, mesh::P4estMesh{3}, equations, dg,
     # This sign switch is directly applied to the boundary interpolation factors here.
     factor = -inverse_weights[1] # For LGL basis: Identical to weighted boundary interpolation at x = ±1
 
+    # `surface_flux_values` and `surface_flux_values_high_order` are defined with element-local
+    # indices. For the large element, we need to map the mortar node to the large-element face
+    # (using `get_mortar_index`) since its orientation may be flipped. Since the small elements are
+    # always traversed forward, the element-local indices are the same as the loop counters.
+
     for mortar in eachmortar(dg, cache)
         if isapprox(limiting_factor[mortar], one(eltype(limiting_factor)))
             continue
@@ -266,6 +271,10 @@ function perform_idp_mortar_correction(u, dt, mesh::P4estMesh{3}, equations, dg,
         for j in eachnode(dg)
             for i in eachnode(dg)
                 # large element
+                # Map the mortar node to the large-element face since its orientation may be flipped.
+                # The small-element face needs no mapping because it is always traversed forward.
+                large_node_i, large_node_j = get_mortar_index(large_indices, i_large,
+                                                              j_large, k_large)
                 inverse_jacobian_large = get_inverse_jacobian(cache.elements.inverse_jacobian,
                                                               mesh,
                                                               i_large, j_large, k_large,
@@ -273,11 +282,13 @@ function perform_idp_mortar_correction(u, dt, mesh::P4estMesh{3}, equations, dg,
 
                 flux_large_high_order = get_node_vars(surface_flux_values_high_order,
                                                       equations, dg,
-                                                      i, j, large_direction,
+                                                      large_node_i, large_node_j,
+                                                      large_direction,
                                                       large_element)
                 flux_large_low_order = get_node_vars(surface_flux_values, equations,
                                                      dg,
-                                                     i, j, large_direction,
+                                                     large_node_i, large_node_j,
+                                                     large_direction,
                                                      large_element)
                 flux_difference_large = factor *
                                         (flux_large_high_order .- flux_large_low_order)

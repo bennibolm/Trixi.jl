@@ -122,6 +122,11 @@ end
     (; neighbor_ids, node_indices) = cache.mortars
     index_range = eachnode(dg)
 
+    # `mortar_weights` is defined in mortar reference coordinates, so it has to be
+    # indexed with the loop counters (i and j). Using the element-local face indices instead
+    # would pair mirror-image subcells whenever the large side is traversed backwards,
+    # i.e., for `:i_backward in large_indices`.
+
     # See comment above TreeMesh version
     l2_mortars = dg.mortar isa LobattoLegendreMortarL2
     for mortar in eachmortar(dg, cache)
@@ -153,11 +158,6 @@ end
         k_large = k_large_start
         for j in eachnode(dg)
             for i in eachnode(dg)
-                i_mortar_s, j_mortar_s = get_mortar_index(small_indices,
-                                                          i_small, j_small, k_small)
-                i_mortar_l, j_mortar_l = get_mortar_index(large_indices,
-                                                          i_large, j_large, k_large)
-
                 var_small = (u[variable, i_small, j_small, k_small,
                                neighbor_ids[1, mortar]],
                              u[variable, i_small, j_small, k_small,
@@ -176,23 +176,12 @@ end
                 k_large_inner = k_large_start
                 for l in eachnode(dg)
                     for k in eachnode(dg)
-                        i_mortar_s_inner, j_mortar_s_inner = get_mortar_index(small_indices,
-                                                                              i_small_inner,
-                                                                              j_small_inner,
-                                                                              k_small_inner)
-                        i_mortar_l_inner, j_mortar_l_inner = get_mortar_index(large_indices,
-                                                                              i_large_inner,
-                                                                              j_large_inner,
-                                                                              k_large_inner)
-
                         for small_element_index in 1:4
                             small_element = neighbor_ids[small_element_index,
                                                          mortar]
                             # from large to small element
                             if l2_mortars ||
-                               dg.mortar.mortar_weights[i_mortar_l, j_mortar_l,
-                                                        i_mortar_s_inner,
-                                                        j_mortar_s_inner,
+                               dg.mortar.mortar_weights[i, j, k, l,
                                                         small_element_index] > 0
                                 var_min[i_small_inner, j_small_inner, k_small_inner,
                                 small_element] = min(var_min[i_small_inner,
@@ -209,9 +198,7 @@ end
                             end
                             # from small to large element
                             if l2_mortars ||
-                               dg.mortar.mortar_weights[i_mortar_l_inner,
-                                                        j_mortar_l_inner,
-                                                        i_mortar_s, j_mortar_s,
+                               dg.mortar.mortar_weights[k, l, i, j,
                                                         small_element_index] > 0
                                 var_min[i_large_inner, j_large_inner, k_large_inner,
                                 large_element] = min(var_min[i_large_inner,
@@ -424,6 +411,11 @@ end
     (; neighbor_ids, node_indices) = cache.mortars
     index_range = eachnode(dg)
 
+    # `mortar_weights` is defined in mortar reference coordinates, so it has to be
+    # indexed with the loop counters (i and j). Using the element-local face indices instead
+    # would pair mirror-image subcells whenever the large side is traversed backwards,
+    # i.e., for `:i_backward in large_indices`.
+
     # See comment above TreeMesh version
     l2_mortars = dg.mortar isa LobattoLegendreMortarL2
     for mortar in eachmortar(dg, cache)
@@ -455,11 +447,6 @@ end
         k_large = k_large_start
         for j in eachnode(dg)
             for i in eachnode(dg)
-                i_mortar_s, j_mortar_s = get_mortar_index(small_indices,
-                                                          i_small, j_small, k_small)
-                i_mortar_l, j_mortar_l = get_mortar_index(large_indices,
-                                                          i_large, j_large, k_large)
-
                 u_small = (get_node_vars(u, equations, dg, i_small, j_small, k_small,
                                          neighbor_ids[1, mortar]),
                            get_node_vars(u, equations, dg, i_small, j_small, k_small,
@@ -484,22 +471,11 @@ end
                 k_large_inner = k_large_start
                 for l in eachnode(dg)
                     for k in eachnode(dg)
-                        i_mortar_s_inner, j_mortar_s_inner = get_mortar_index(small_indices,
-                                                                              i_small_inner,
-                                                                              j_small_inner,
-                                                                              k_small_inner)
-                        i_mortar_l_inner, j_mortar_l_inner = get_mortar_index(large_indices,
-                                                                              i_large_inner,
-                                                                              j_large_inner,
-                                                                              k_large_inner)
-
                         for small_element_index in 1:4
                             small_element = neighbor_ids[small_element_index, mortar]
                             # values of large element to small elements
                             if l2_mortars ||
-                               dg.mortar.mortar_weights[i_mortar_l, j_mortar_l,
-                                                        i_mortar_s_inner,
-                                                        j_mortar_s_inner,
+                               dg.mortar.mortar_weights[i, j, k, l,
                                                         small_element_index] > 0
                                 var_minmax[i_small_inner, j_small_inner, k_small_inner,
                                 small_element] = minmax(var_minmax[i_small_inner,
@@ -510,9 +486,7 @@ end
                             end
                             # values of small elements to large element
                             if l2_mortars ||
-                               dg.mortar.mortar_weights[i_mortar_l_inner,
-                                                        j_mortar_l_inner,
-                                                        i_mortar_s, j_mortar_s,
+                               dg.mortar.mortar_weights[k, l, i, j,
                                                         small_element_index] > 0
                                 var_minmax[i_large_inner, j_large_inner, k_large_inner,
                                 large_element] = minmax(var_minmax[i_large_inner,
@@ -637,7 +611,7 @@ end
         return nothing
     end
 
-    (; n_mortars_per_node) = volume_integral.limiter.cache.subcell_limiter_coefficients
+    (; n_mortars_per_node) = subcell_limiter_coefficients(volume_integral)
     (; neighbor_ids, node_indices) = cache.mortars
     index_range = eachnode(dg)
 
@@ -716,7 +690,7 @@ end
     # This sign switch is directly applied to the boundary interpolation factors here.
     factor = -inverse_weights[1] # For LGL basis: Identical to weighted boundary interpolation at x = ±1
 
-    (; variable_bounds, n_mortars_per_node) = dg.volume_integral.limiter.cache.subcell_limiter_coefficients
+    (; variable_bounds, n_mortars_per_node) = subcell_limiter_coefficients(dg.volume_integral)
     variable_string = string(var_index)
     var_min = variable_bounds[Symbol(variable_string, "_min")]
     var_max = variable_bounds[Symbol(variable_string, "_max")]
@@ -726,21 +700,7 @@ end
     @threaded for mortar in eachmortar(dg, cache)
         isone(limiting_factor[mortar]) && continue # Skip if alpha is already 1
 
-        small_element_1 = neighbor_ids[1, mortar]
-        small_element_2 = neighbor_ids[2, mortar]
-        small_element_3 = neighbor_ids[3, mortar]
-        small_element_4 = neighbor_ids[4, mortar]
         large_element = neighbor_ids[5, mortar]
-        if perform_subcell_limiting(dg.volume_integral, large_element) ||
-           perform_subcell_limiting(dg.volume_integral, small_element_1) ||
-           perform_subcell_limiting(dg.volume_integral, small_element_2) ||
-           perform_subcell_limiting(dg.volume_integral, small_element_3) ||
-           perform_subcell_limiting(dg.volume_integral, small_element_4)
-            # Subcell limiting is necessary for at least one of the elements => Calculate bounds at this mortar
-        else
-            # Subcell limiting is not necessary for all elements => Skip this mortar
-            continue
-        end
 
         # Get index information on the elements
         small_indices = node_indices[1, mortar]
@@ -928,21 +888,7 @@ end
     @threaded for mortar in eachmortar(dg, cache)
         isone(limiting_factor[mortar]) && continue # Skip if alpha is already 1
 
-        small_element_1 = neighbor_ids[1, mortar]
-        small_element_2 = neighbor_ids[2, mortar]
-        small_element_3 = neighbor_ids[3, mortar]
-        small_element_4 = neighbor_ids[4, mortar]
         large_element = neighbor_ids[5, mortar]
-        if perform_subcell_limiting(dg.volume_integral, large_element) ||
-           perform_subcell_limiting(dg.volume_integral, small_element_1) ||
-           perform_subcell_limiting(dg.volume_integral, small_element_2) ||
-           perform_subcell_limiting(dg.volume_integral, small_element_3) ||
-           perform_subcell_limiting(dg.volume_integral, small_element_4)
-            # Subcell limiting is necessary for at least one of the elements => Calculate bounds at this mortar
-        else
-            # Subcell limiting is not necessary for all elements => Skip this mortar
-            continue
-        end
 
         # Get index information on the small elements
         small_indices = node_indices[1, mortar]
@@ -1084,7 +1030,7 @@ end
     # This sign switch is directly applied to the boundary interpolation factors here.
     factor = -inverse_weights[1] # For LGL basis: Identical to weighted boundary interpolation at x = ±1
 
-    (; variable_bounds, n_mortars_per_node) = dg.volume_integral.limiter.cache.subcell_limiter_coefficients
+    (; variable_bounds, n_mortars_per_node) = subcell_limiter_coefficients(dg.volume_integral)
     var_min = variable_bounds[Symbol(string(var_index), "_min")]
 
     index_range = eachnode(dg)
@@ -1092,21 +1038,7 @@ end
     @threaded for mortar in eachmortar(dg, cache)
         isone(limiting_factor[mortar]) && continue # Skip if alpha is already 1
 
-        small_element_1 = neighbor_ids[1, mortar]
-        small_element_2 = neighbor_ids[2, mortar]
-        small_element_3 = neighbor_ids[3, mortar]
-        small_element_4 = neighbor_ids[4, mortar]
         large_element = neighbor_ids[5, mortar]
-        if perform_subcell_limiting(dg.volume_integral, large_element) ||
-           perform_subcell_limiting(dg.volume_integral, small_element_1) ||
-           perform_subcell_limiting(dg.volume_integral, small_element_2) ||
-           perform_subcell_limiting(dg.volume_integral, small_element_3) ||
-           perform_subcell_limiting(dg.volume_integral, small_element_4)
-            # Subcell limiting is necessary for at least one of the elements => Calculate bounds at this mortar
-        else
-            # Subcell limiting is not necessary for all elements => Skip this mortar
-            continue
-        end
 
         # Get index information on the small elements
         small_indices = node_indices[1, mortar]
@@ -1280,21 +1212,7 @@ end
     @threaded for mortar in eachmortar(dg, cache)
         isone(limiting_factor[mortar]) && continue # Skip if alpha is already 1
 
-        small_element_1 = neighbor_ids[1, mortar]
-        small_element_2 = neighbor_ids[2, mortar]
-        small_element_3 = neighbor_ids[3, mortar]
-        small_element_4 = neighbor_ids[4, mortar]
         large_element = neighbor_ids[5, mortar]
-        if perform_subcell_limiting(dg.volume_integral, large_element) ||
-           perform_subcell_limiting(dg.volume_integral, small_element_1) ||
-           perform_subcell_limiting(dg.volume_integral, small_element_2) ||
-           perform_subcell_limiting(dg.volume_integral, small_element_3) ||
-           perform_subcell_limiting(dg.volume_integral, small_element_4)
-            # Subcell limiting is necessary for at least one of the elements => Calculate bounds at this mortar
-        else
-            # Subcell limiting is not necessary for all elements => Skip this mortar
-            continue
-        end
 
         # Get index information on the small elements
         small_indices = node_indices[1, mortar]

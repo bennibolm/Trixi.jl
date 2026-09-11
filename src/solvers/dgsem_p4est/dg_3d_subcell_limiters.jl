@@ -790,9 +790,6 @@ end
             k_small = k_small_start
             for j_small_node in eachnode(dg)
                 for i_small_node in eachnode(dg)
-                    i_mortar_s, j_mortar_s = get_mortar_index(small_indices,
-                                                              i_small, j_small, k_small)
-
                     u_small = get_node_vars(u, equations, dg, i_small, j_small,
                                             k_small, small_element)
                     normal_direction = get_normal_direction(small_direction,
@@ -805,13 +802,12 @@ end
                     k_large = k_large_start
                     for j_large_node in eachnode(dg)
                         for i_large_node in eachnode(dg)
-                            i_mortar_l, j_mortar_l = get_mortar_index(large_indices,
-                                                                      i_large,
-                                                                      j_large,
-                                                                      k_large)
-
-                            weight = mortar_weights[i_mortar_l, j_mortar_l,
-                                                    i_mortar_s, j_mortar_s,
+                            # `mortar_weights` is defined in mortar reference coordinates, so it
+                            # has to be indexed with the traversal counters. Using the element-local
+                            # face indices instead would pair mirror-image subcells whenever the large
+                            # side is traversed backwards, i.e., for `:i_backward in large_indices`.
+                            weight = mortar_weights[i_large_node, j_large_node,
+                                                    i_small_node, j_small_node,
                                                     small_element_index]
                             if iszero(weight)
                                 i_large += i_large_step_i
@@ -826,11 +822,8 @@ end
                                                          normal_direction, equations)
 
                             lambda_small_factor = weight /
-                                                  mortar_weights_sums[i_mortar_s,
-                                                                      j_mortar_s, 1]
-                            lambda_large_factor = weight /
-                                                  mortar_weights_sums[i_mortar_l,
-                                                                      j_mortar_l, 2]
+                                                  mortar_weights_sums[i_small_node,
+                                                                      j_small_node, 1]
 
                             if small_direction == 1
                                 lambda1[i_small, j_small, k_small, small_element] += lambda_small_factor *
@@ -852,6 +845,9 @@ end
                                                                                          lambda
                             end
 
+                            lambda_large_factor = weight /
+                                                  mortar_weights_sums[i_large_node,
+                                                                      j_large_node, 2]
                             if large_direction == 1
                                 lambda1[i_large, j_large, k_large, large_element] += lambda_large_factor *
                                                                                      lambda
@@ -1080,6 +1076,11 @@ function calc_mortar_flux_low_order!(surface_flux_values,
     (; mortar_weights, mortar_weights_sums) = mortar_idp
     index_range = eachnode(dg)
 
+    # `surface_flux_values` is defined with element-local indices. For the large element, we need
+    # to map the mortar node to the large-element face (using `get_mortar_index`) since its orientation
+    # may be flipped. Since the small elements are always traversed forward, the element-local
+    # indices are the same as the loop counters.
+
     @threaded for mortar in eachmortar(dg, cache)
         # Get index information on the small elements
         small_indices = node_indices[1, mortar]
@@ -1112,9 +1113,6 @@ function calc_mortar_flux_low_order!(surface_flux_values,
         k_small = k_small_start
         for j_small_node in eachnode(dg)
             for i_small_node in eachnode(dg)
-                i_mortar_s, j_mortar_s = get_mortar_index(small_indices,
-                                                          i_small, j_small, k_small)
-
                 for small_element_index in 1:4
                     small_element = neighbor_ids[small_element_index, mortar]
 
@@ -1137,13 +1135,16 @@ function calc_mortar_flux_low_order!(surface_flux_values,
                     k_large = k_large_start
                     for j_large_node in eachnode(dg)
                         for i_large_node in eachnode(dg)
+                            # Index of the large-element face node. Needed because the large side may
+                            # be traversed backwards, unlike `mortar_weights`, which is defined in
+                            # mortar reference coordinates and indexed with the traversal counters.
                             i_mortar_l, j_mortar_l = get_mortar_index(large_indices,
                                                                       i_large,
                                                                       j_large,
                                                                       k_large)
 
-                            factor = mortar_weights[i_mortar_l, j_mortar_l,
-                                                    i_mortar_s, j_mortar_s,
+                            factor = mortar_weights[i_large_node, j_large_node,
+                                                    i_small_node, j_small_node,
                                                     small_element_index]
                             if !isapprox(factor, zero(typeof(factor)))
                                 u_large_local = get_node_vars(u_large, equations, dg,
@@ -1163,8 +1164,8 @@ function calc_mortar_flux_low_order!(surface_flux_values,
                                 # Add flux to small element
                                 multiply_add_to_node_vars!(surface_flux_values,
                                                            factor /
-                                                           mortar_weights_sums[i_mortar_s,
-                                                                               j_mortar_s,
+                                                           mortar_weights_sums[i_small_node,
+                                                                               j_small_node,
                                                                                1],
                                                            flux, equations, dg,
                                                            i_small_node, j_small_node,
@@ -1181,11 +1182,11 @@ function calc_mortar_flux_low_order!(surface_flux_values,
                                 # to be scaled by a factor of 4 to obtain the flux of the large element.
                                 multiply_add_to_node_vars!(surface_flux_values,
                                                            -4 * factor /
-                                                           mortar_weights_sums[i_mortar_l,
-                                                                               j_mortar_l,
+                                                           mortar_weights_sums[i_large_node,
+                                                                               j_large_node,
                                                                                2],
                                                            flux, equations, dg,
-                                                           i_large_node, j_large_node,
+                                                           i_mortar_l, j_mortar_l,
                                                            large_direction,
                                                            large_element)
                             end
