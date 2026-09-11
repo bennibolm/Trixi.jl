@@ -1125,7 +1125,7 @@ end
     limiter = semi.solver.volume_integral.limiter
     deviations = collect(values(limiter.cache.idp_bounds_delta_global))
     @test all(isfinite, deviations)
-    # The bar state should consider the source terms. This is currecntly not implemented.
+    # TODO: The bar state should consider the source terms. This is currecntly not implemented.
     # Therefore, this test is broken.
     @test_broken maximum(deviations) <= 1.0e-13
 
