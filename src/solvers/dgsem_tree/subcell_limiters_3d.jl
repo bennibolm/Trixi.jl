@@ -1473,7 +1473,7 @@ end
 # Global positivity limiting of nonlinear variables
 @inline function limiting_positivity_nonlinear!(limiting_factor, u, dt, semi,
                                                 mesh::TreeMesh{3}, variable)
-    mesh, equations, dg, cache = mesh_equations_solver_cache(semi)
+    _, equations, dg, cache = mesh_equations_solver_cache(semi)
 
     (; orientations, large_sides, neighbor_ids) = cache.mortars
     (; surface_flux_values, inverse_jacobian) = cache.elements

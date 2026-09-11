@@ -54,7 +54,7 @@ end
     total_weight = zero(avg_type)
     n_nodes = nnodes(dg)
 
-    for mortar in eachindex(limiting_factor)
+    for mortar in eachmortar(dg, cache)
         large_element = neighbor_ids[5, mortar]
 
         if large_sides[mortar] == 1 # small elements on right side
@@ -68,23 +68,23 @@ end
                  node_coordinates[2, index, 1, 1, large_element]
             dz = node_coordinates[3, index, end, end, large_element] -
                  node_coordinates[3, index, 1, 1, large_element]
-            size = abs(dy * dz)
+            size_ = abs(dy * dz)
         elseif orientations[mortar] == 2
             dx = node_coordinates[1, end, index, end, large_element] -
                  node_coordinates[1, 1, index, 1, large_element]
             dz = node_coordinates[3, end, index, end, large_element] -
                  node_coordinates[3, 1, index, 1, large_element]
-            size = abs(dx * dz)
+            size_ = abs(dx * dz)
         else # orientations[mortar] == 3
             dx = node_coordinates[1, end, end, index, large_element] -
                  node_coordinates[1, 1, 1, index, large_element]
             dy = node_coordinates[2, end, end, index, large_element] -
                  node_coordinates[2, 1, 1, index, large_element]
-            size = abs(dx * dy)
+            size_ = abs(dx * dy)
         end
 
-        weighted_sum += limiting_factor[mortar] * size
-        total_weight += size
+        weighted_sum += limiting_factor[mortar] * size_
+        total_weight += size_
     end
 
     return weighted_sum / total_weight

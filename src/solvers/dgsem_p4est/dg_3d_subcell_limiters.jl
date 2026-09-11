@@ -1139,7 +1139,7 @@ function calc_mortar_flux_low_order!(surface_flux_values,
                                                                                  k_large)
 
                             factor = mortar_weights[k, l, i, j, small_element_index]
-                            if !isapprox(factor, zero(typeof(factor)))
+                            if !iszero(factor)
                                 u_large_local = get_node_vars(u_large, equations, dg,
                                                               k, l, mortar)
                                 # TODO: Use normal vector of large element for actual curved elements

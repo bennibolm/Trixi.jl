@@ -585,7 +585,7 @@ function calc_mortar_flux_low_order!(surface_flux_values,
                                                        i, j, mortar)[small_side]
             for l in eachnode(dg), k in eachnode(dg)
                 factor = mortar_weights[k, l, i, j, 1]
-                if isapprox(factor, zero(typeof(factor)))
+                if iszero(factor)
                     continue
                 end
                 u_large_local = get_node_vars(u_large, equations, dg, k, l, mortar)
@@ -618,7 +618,7 @@ function calc_mortar_flux_low_order!(surface_flux_values,
                                                         i, j, mortar)[small_side]
             for l in eachnode(dg), k in eachnode(dg)
                 factor = mortar_weights[k, l, i, j, 2]
-                if isapprox(factor, zero(typeof(factor)))
+                if iszero(factor)
                     continue
                 end
                 u_large_local = get_node_vars(u_large, equations, dg, k, l, mortar)
@@ -651,7 +651,7 @@ function calc_mortar_flux_low_order!(surface_flux_values,
                                                        i, j, mortar)[small_side]
             for l in eachnode(dg), k in eachnode(dg)
                 factor = mortar_weights[k, l, i, j, 3]
-                if isapprox(factor, zero(typeof(factor)))
+                if iszero(factor)
                     continue
                 end
                 u_large_local = get_node_vars(u_large, equations, dg, k, l, mortar)
@@ -684,7 +684,7 @@ function calc_mortar_flux_low_order!(surface_flux_values,
                                                         i, j, mortar)[small_side]
             for l in eachnode(dg), k in eachnode(dg)
                 factor = mortar_weights[k, l, i, j, 4]
-                if isapprox(factor, zero(typeof(factor)))
+                if iszero(factor)
                     continue
                 end
                 u_large_local = get_node_vars(u_large, equations, dg, k, l, mortar)
