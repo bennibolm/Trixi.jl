@@ -117,6 +117,14 @@ function SubcellLimiterIDP(equations::AbstractEquations, basis;
     positivity = (length(positivity_variables_cons) +
                   length(positivity_variables_nonlinear) > 0)
 
+    # The MPI-parallel `rhs!` implementations do not call the `calc_volume_integral!` method
+    # specialized on `VolumeIntegralSubcellLimiting`, so neither the bar states nor the local
+    # bounds would be computed. Additionally, the mortar limiting factors are not communicated
+    # between ranks. Bail out here instead of silently computing a wrong solution.
+    if mpi_isparallel()
+        error("Subcell limiting is not supported with MPI.")
+    end
+
     # When passing `min` or `max` in the elixir, the specific function of Base is used.
     # To speed up the simulation, we replace it with `Trixi.min` and `Trixi.max` respectively.
     local_onesided_variables_nonlinear_ = Tuple{Function, Function}[]
@@ -392,13 +400,12 @@ function (limiter::SubcellLimiterIDP)(u, semi, equations, dg::DGSEM,
     @unpack alpha, alpha_local = limiter.cache.subcell_limiter_coefficients
     @trixi_timeit timer() "reset alpha" set_zero!(alpha, dg, semi.cache)
 
-    # positivity
-    if limiter.positivity
-        @trixi_timeit timer() "positivity" idp_positivity!(alpha, limiter, u, dt, semi)
-    end
-
-    # local
-    alpha_local .= alpha
+    # Local limiting comes first, even though only a fraction `alpha_indicator` of it enters
+    # the merged blending factor below. The local limiters are the ones computing (or, for
+    # `bar_states=true`, consuming) the local bounds in `variable_bounds`. Running the
+    # positivity limiting first would overwrite those bounds before they are used, both here
+    # and in the subsequent mortar limiting, which only reads them.
+    @trixi_timeit timer() "reset alpha local" set_zero!(alpha_local, dg, semi.cache)
     if limiter.local_twosided
         @trixi_timeit timer() "local twosided" idp_local_twosided!(alpha_local,
                                                                    limiter,
@@ -408,6 +415,11 @@ function (limiter::SubcellLimiterIDP)(u, semi, equations, dg::DGSEM,
         @trixi_timeit timer() "local onesided" idp_local_onesided!(alpha_local,
                                                                    limiter,
                                                                    u, t, dt, semi)
+    end
+
+    # positivity
+    if limiter.positivity
+        @trixi_timeit timer() "positivity" idp_positivity!(alpha, limiter, u, dt, semi)
     end
 
     merge_alphas!(alpha, alpha_local, alpha_indicator, dg, semi.cache)
