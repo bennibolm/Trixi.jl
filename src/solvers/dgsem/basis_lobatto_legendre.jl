@@ -271,7 +271,9 @@ nonconforming interfaces. This is mainly useful for debugging and comparisons.
 """
 function MortarIDP(equations, basis::LobattoLegendreBasis, limiter;
                    pure_low_order = false)
-    @assert limiter isa SubcellLimiterIDP
+    if !(limiter isa SubcellLimiterIDP)
+        throw(ArgumentError("`MortarIDP` requires a `SubcellLimiterIDP`, got a `$(typeof(limiter))`."))
+    end
     RealT = real(basis)
     n_dims = ndims(equations)
     nnodes_ = nnodes(basis)
