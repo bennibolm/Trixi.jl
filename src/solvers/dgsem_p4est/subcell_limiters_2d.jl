@@ -5,11 +5,13 @@
 @muladd begin
 #! format: noindent
 
-@inline function get_mortar_index(indices, i, j)
-    if indices[1] === :i_forward || indices[1] === :i_backward
-        return i
-    else # indices[2] === :i_forward || indices[2] === :i_backward
+@inline function get_large_surface_index(indices, i, j)
+    # Return the face-tangential element index, matching the layout of `surface_flux_values`
+    # (cf. `surface_indices` and `mortar_fluxes_to_elements!`).
+    if indices[1] === :begin || indices[1] === :end
         return j
+    else # indices[2] === :begin || indices[2] === :end
+        return i
     end
 end
 
@@ -551,7 +553,7 @@ end
             # Large element
             # Map the mortar node to the large-element face since its orientation may be flipped.
             # The small-element face needs no mapping because it is always traversed forward.
-            large_node = get_mortar_index(large_indices, i_large, j_large)
+            large_node = get_large_surface_index(large_indices, i_large, j_large)
             var_large = u[var_index, i_large, j_large, large_element]
 
             # Two-sided local bounds
@@ -750,7 +752,7 @@ end
             # Large element
             # Map the mortar node to the large-element face since its orientation may be flipped.
             # The small-element face needs no mapping because it is always traversed forward.
-            large_node = get_mortar_index(large_indices, i_large, j_large)
+            large_node = get_large_surface_index(large_indices, i_large, j_large)
             u_large = get_node_vars(u, equations, dg, i_large, j_large, large_element)
             bound_large = var_minmax[i_large, j_large, large_element]
 
@@ -838,7 +840,7 @@ end
             # Large element
             # Map the mortar node to the large-element face since its orientation may be flipped.
             # The small-element face needs no mapping because it is always traversed forward.
-            large_node = get_mortar_index(large_indices, i_large, j_large)
+            large_node = get_large_surface_index(large_indices, i_large, j_large)
             var_large = u[var_index, i_large, j_large, large_element]
 
             # Calculate Pm
@@ -1023,7 +1025,7 @@ end
             # Large element
             # Map the mortar node to the large-element face since its orientation may be flipped.
             # The small-element face needs no mapping because it is always traversed forward.
-            large_node = get_mortar_index(large_indices, i_large, j_large)
+            large_node = get_large_surface_index(large_indices, i_large, j_large)
             u_large = get_node_vars(u, equations, dg, i_large, j_large, large_element)
 
             # Minimum bound

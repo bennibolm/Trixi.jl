@@ -5,23 +5,16 @@
 @muladd begin
 #! format: noindent
 
-# TODO: Check if this works for actual 3d problems with crazy meshes
-@inline function get_mortar_index(indices, i, j, k)
-    if indices[1] == :i_forward || indices[1] == :i_backward
-        index_i = i
-    elseif indices[2] == :i_forward || indices[2] == :i_backward
-        index_i = j
-    else # indices[3] == :i_forward || indices[3] == :i_backward
-        index_i = k
+@inline function get_large_surface_index(indices, i, j, k)
+    # Return the two face-tangential element indices in element-axis order, matching the
+    # layout of `surface_flux_values` (cf. `surface_indices` and `mortar_fluxes_to_elements!`).
+    if indices[1] === :begin || indices[1] === :end
+        return j, k
+    elseif indices[2] === :begin || indices[2] === :end
+        return i, k
+    else # indices[3] === :begin || indices[3] === :end
+        return i, j
     end
-    if indices[1] == :j_forward || indices[1] == :j_backward
-        index_j = i
-    elseif indices[2] == :j_forward || indices[2] == :j_backward
-        index_j = j
-    else # indices[3] == :j_forward || indices[3] == :j_backward
-        index_j = k
-    end
-    return index_i, index_j
 end
 
 function calc_bounds_twosided_interface!(var_min, var_max, variable, u,
@@ -751,8 +744,8 @@ end
                 # Map the mortar node to the large-element face since its orientation may be
                 # flipped or transposed. The small-element face needs no mapping because it is
                 # always traversed forward.
-                i_mortar_l, j_mortar_l = get_mortar_index(large_indices,
-                                                          i_large, j_large, k_large)
+                i_mortar_l, j_mortar_l = get_large_surface_index(large_indices,
+                                                                 i_large, j_large, k_large)
                 flux_large_high_order = surface_flux_values_high_order[var_index,
                                                                        i_mortar_l,
                                                                        j_mortar_l,
@@ -930,8 +923,8 @@ end
                 # Large element
                 # Map the mortar node to the large-element face since its orientation may be flipped.
                 # The small-element face needs no mapping because it is always traversed forward.
-                i_mortar_l, j_mortar_l = get_mortar_index(large_indices,
-                                                          i_large, j_large, k_large)
+                i_mortar_l, j_mortar_l = get_large_surface_index(large_indices,
+                                                                 i_large, j_large, k_large)
                 u_large = get_node_vars(u, equations, dg,
                                         i_large, j_large, k_large,
                                         large_element)
@@ -1089,8 +1082,8 @@ end
                 # Map the mortar node to the large-element face since its orientation may be
                 # flipped or transposed. The small-element face needs no mapping because it is
                 # always traversed forward.
-                i_mortar_l, j_mortar_l = get_mortar_index(large_indices,
-                                                          i_large, j_large, k_large)
+                i_mortar_l, j_mortar_l = get_large_surface_index(large_indices,
+                                                                 i_large, j_large, k_large)
                 var_large = u[var_index, i_large, j_large, k_large, large_element]
 
                 # Calculate Pm
@@ -1270,8 +1263,8 @@ end
                 # Map the mortar node to the large-element face since its orientation may be
                 # flipped or transposed. The small-element face needs no mapping because it is
                 # always traversed forward.
-                i_mortar_l, j_mortar_l = get_mortar_index(large_indices,
-                                                          i_large, j_large, k_large)
+                i_mortar_l, j_mortar_l = get_large_surface_index(large_indices,
+                                                                 i_large, j_large, k_large)
                 u_large = get_node_vars(u, equations, dg,
                                         i_large, j_large, k_large,
                                         large_element)

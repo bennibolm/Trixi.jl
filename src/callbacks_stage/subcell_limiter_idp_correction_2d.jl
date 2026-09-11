@@ -199,7 +199,7 @@ function perform_idp_mortar_correction(u, dt, mesh::P4estMesh{2}, equations, dg,
 
     # `surface_flux_values` and `surface_flux_values_high_order` are defined with element-local
     # indices. For the large element, we need to map the mortar node to the large-element face
-    # (using `get_mortar_index`) since its orientation may be flipped. Since the small elements are
+    # (using `get_large_surface_index`) since its orientation may be flipped. Since the small elements are
     # always traversed forward, the element-local indices are the same as the loop counters.
 
     for mortar in eachmortar(dg, cache)
@@ -233,7 +233,7 @@ function perform_idp_mortar_correction(u, dt, mesh::P4estMesh{2}, equations, dg,
             # large element
             # Map the mortar node to the large-element face since its orientation may be flipped.
             # The small-element face needs no mapping because it is always traversed forward.
-            large_node = get_mortar_index(large_indices, i_large, j_large)
+            large_node = get_large_surface_index(large_indices, i_large, j_large)
             inverse_jacobian_large = get_inverse_jacobian(cache.elements.inverse_jacobian,
                                                           mesh, i_large, j_large,
                                                           large_element)
