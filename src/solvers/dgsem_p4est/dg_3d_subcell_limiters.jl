@@ -1133,10 +1133,10 @@ function calc_mortar_flux_low_order!(surface_flux_values,
                             # Index of the large-element face node. Needed because the large side may
                             # be traversed backwards, unlike `mortar_weights`, which is defined in
                             # mortar reference coordinates and indexed with the traversal counters.
-                            i_mortar_l, j_mortar_l = get_large_surface_index(large_indices,
-                                                                             i_large,
-                                                                             j_large,
-                                                                             k_large)
+                            large_node_i, large_node_j = get_large_surface_index(large_indices,
+                                                                                 i_large,
+                                                                                 j_large,
+                                                                                 k_large)
 
                             factor = mortar_weights[k, l, i, j, small_element_index]
                             if !isapprox(factor, zero(typeof(factor)))
@@ -1173,7 +1173,7 @@ function calc_mortar_flux_low_order!(surface_flux_values,
                                                            -4 * factor /
                                                            mortar_weights_sums[k, l, 2],
                                                            flux, equations, dg,
-                                                           i_mortar_l, j_mortar_l,
+                                                           large_node_i, large_node_j,
                                                            large_direction,
                                                            large_element)
                             end
