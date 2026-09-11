@@ -624,6 +624,7 @@ end
     Setup,
     TreeMesh2DEuler
 ] tags=[:tree_part2] begin
+    rm(joinpath("out", "mortar_limiting_factor.txt"), force = true)
     @test_trixi_include(joinpath(EXAMPLES_DIR,
                                  "elixir_euler_blast_wave_nonconforming_sc_subcell.jl"),
                         local_twosided_variables_cons=["rho"],
@@ -642,6 +643,11 @@ end
                             2.9727088721825745
                         ],
                         tspan=(0.0, 1.0))
+    # Check the output of the `LimitingAnalysisCallback` at the mortars
+    lines = readlines(joinpath("out", "mortar_limiting_factor.txt"))
+    @test lines[1] == "# iter, simu_time, limiting_factor_max, limiting_factor_avg"
+    @test startswith(lines[end], "183")
+
     # Ensure that we do not have excessive memory allocations
     # (e.g., from type instabilities)
     # Larger values for allowed allocations due to usage of custom

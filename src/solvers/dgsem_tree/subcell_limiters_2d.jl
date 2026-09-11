@@ -134,6 +134,7 @@ end
     _, _, dg, cache = mesh_equations_solver_cache(semi)
 
     (; neighbor_ids, orientations, large_sides) = cache.mortars
+    mortar_weights = get_mortar_weights(dg.mortar)
 
     # - For LobattoLegendreMortarIDP: include only values of nodes with nonnegative local weights
     # - For LobattoLegendreMortarL2: include all neighboring values
@@ -187,7 +188,7 @@ end
                     small_element = neighbor_ids[small_element_index, mortar]
                     # from large to small element
                     if l2_mortars ||
-                       dg.mortar.mortar_weights[i, j, small_element_index] > 0
+                       mortar_weights[i, j, small_element_index] > 0
                         var_min[indices_small_inner..., small_element] = min(var_min[indices_small_inner...,
                                                                                      small_element],
                                                                              var_large)
@@ -197,7 +198,7 @@ end
                     end
                     # from small to large element
                     if l2_mortars ||
-                       dg.mortar.mortar_weights[j, i, small_element_index] > 0
+                       mortar_weights[j, i, small_element_index] > 0
                         var_min[indices_large_inner..., large_element] = min(var_min[indices_large_inner...,
                                                                                      large_element],
                                                                              var_small[small_element_index])
@@ -384,6 +385,7 @@ end
     _, equations, dg, cache = mesh_equations_solver_cache(semi)
 
     (; neighbor_ids, orientations, large_sides) = cache.mortars
+    mortar_weights = get_mortar_weights(dg.mortar)
 
     # See comment above two-sided version
     l2_mortars = dg.mortar isa LobattoLegendreMortarL2
@@ -430,25 +432,25 @@ end
                 end
 
                 # values of large element to lower element
-                if l2_mortars || dg.mortar.mortar_weights[i, j, 1] > 0
+                if l2_mortars || mortar_weights[i, j, 1] > 0
                     var_minmax[indices_small_inner..., lower_element] = min_or_max(var_minmax[indices_small_inner...,
                                                                                               lower_element],
                                                                                    var_large)
                 end
                 # values of lower element to large element
-                if l2_mortars || dg.mortar.mortar_weights[j, i, 1] > 0
+                if l2_mortars || mortar_weights[j, i, 1] > 0
                     var_minmax[indices_large_inner..., large_element] = min_or_max(var_minmax[indices_large_inner...,
                                                                                               large_element],
                                                                                    var_lower)
                 end
                 # values of large element to upper element
-                if l2_mortars || dg.mortar.mortar_weights[i, j, 2] > 0
+                if l2_mortars || mortar_weights[i, j, 2] > 0
                     var_minmax[indices_small_inner..., upper_element] = min_or_max(var_minmax[indices_small_inner...,
                                                                                               upper_element],
                                                                                    var_large)
                 end
                 # values of upper element to large element
-                if l2_mortars || dg.mortar.mortar_weights[j, i, 2] > 0
+                if l2_mortars || mortar_weights[j, i, 2] > 0
                     var_minmax[indices_large_inner..., large_element] = min_or_max(var_minmax[indices_large_inner...,
                                                                                               large_element],
                                                                                    var_upper)
@@ -675,8 +677,7 @@ end
             # Compute bound
             bound = positivity_correction_factor * var
             if was_limited_locally
-                if isnothing(limiter.indicator) &&
-                   (var_min[i, j, element] >= bound)
+                if isnothing(limiter.indicator) && (var_min[i, j, element] >= bound)
                     # Local limiting is more restrictive that positivity limiting and is
                     # enforced completely (no smoothness indicator)
                     # => Skip positivity limiting for this node

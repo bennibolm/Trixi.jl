@@ -23,6 +23,7 @@ end
                       positivity_variables_nonlinear = [],
                       positivity_correction_factor = 0.1,
                       local_onesided_variables_nonlinear = [],
+                      indicator = nothing,
                       bar_states = false,
                       max_iterations_newton = 10,
                       newton_tolerances = (1.0e-12, 1.0e-14),
@@ -53,15 +54,20 @@ Local and global limiting of nonlinear variables uses a Newton-bisection method 
 and a provisional update constant `gamma_constant_newton` (`gamma_constant_newton>=2*d`,
 where `d = #dimensions`). See equation (20) of Pazner (2020) and equation (30) of Rueda-Ramírez et al. (2022).
 
+Optionally, a smoothness `indicator` such as [`IndicatorHennemannGassner`](@ref) can be passed to
+restrict the local limiting to non-smooth regions. In that case, two blending factors are computed
+for every subcell interface: one using positivity limiting only and one using positivity *and*
+local limiting. Both are combined element-wise using the indicator value `alpha_ind` in `[0, 1]` as
+`alpha = (1 - alpha_ind) * alpha_positivity + alpha_ind * alpha_local`.
+Thus, local limiting acts with full strength only where the indicator marks an element as
+non-smooth, while the scheme falls back to pure positivity limiting in smooth regions. At mortars,
+the maximum indicator value of all adjacent elements is used.
+Note that with an `indicator` the local bounds are not enforced exactly anymore. Therefore, the
+computation of the deviations by [`BoundsCheckCallback`](@ref) are skipped.
+
 !!! note
     This limiter and the correction callback [`SubcellLimiterIDPCorrection`](@ref) only work together.
     Without the callback, no correction takes place, leading to a standard low-order FV scheme.
-
-Implementation in 3D:
-In 3D, only the positivity limiter for conservative variables using
-(`positivity_variables_cons`) is implemented and merged for `P4estMesh`.
-`BoundsCheckCallback` is not supported in 3D yet.
-More features will follow soon.
 
 ## References
 
@@ -110,10 +116,6 @@ function SubcellLimiterIDP(equations::AbstractEquations, basis;
     local_onesided = (length(local_onesided_variables_nonlinear) > 0)
     positivity = (length(positivity_variables_cons) +
                   length(positivity_variables_nonlinear) > 0)
-
-    if !isnothing(indicator) && ndims(equations) != 2
-        error("The smoothness indicator is only implemented in 2D.")
-    end
 
     # The MPI-parallel `rhs!` implementations do not call the `calc_volume_integral!` method
     # specialized on `VolumeIntegralSubcellLimiting`, so neither the bar states nor the local
@@ -307,6 +309,21 @@ function create_cache(limiter::Type{SubcellLimiterIDP},
     cache = create_cache(limiter, equations, basis, bound_keys, False(),
                          cache_variable_values, cache_alpha_local)
     container_bar_states = Trixi.ContainerBarStates2D{real(basis)}(0,
+                                                                   nvariables(equations),
+                                                                   nnodes(basis))
+
+    return (; container_bar_states, cache...)
+end
+
+function create_cache(limiter::Type{SubcellLimiterIDP},
+                      equations::AbstractEquations{3},
+                      basis::LobattoLegendreBasis, bound_keys,
+                      ::True,
+                      cache_variable_values,
+                      cache_alpha_local)
+    cache = create_cache(limiter, equations, basis, bound_keys, False(),
+                         cache_variable_values, cache_alpha_local)
+    container_bar_states = Trixi.ContainerBarStates3D{real(basis)}(0,
                                                                    nvariables(equations),
                                                                    nnodes(basis))
 
