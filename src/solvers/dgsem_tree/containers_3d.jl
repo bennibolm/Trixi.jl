@@ -646,7 +646,7 @@ end
 # Left and right are used *both* for the numbering of the mortar faces *and* for the position of the
 # elements with respect to the axis orthogonal to the mortar.
 
-mutable struct IDPMortarContainer3D{uEltype <: Real} <: AbstractContainer
+mutable struct IDPMortarContainer3D{uEltype <: Real} <: AbstractTreeL2MortarContainer
     u_upper_left::Array{uEltype, 5}  # [leftright, variables, i, j, mortars]
     u_upper_right::Array{uEltype, 5} # [leftright, variables, i, j, mortars]
     u_lower_left::Array{uEltype, 5}  # [leftright, variables, i, j, mortars]
@@ -761,9 +761,6 @@ function IDPMortarContainer3D{uEltype}(capacity::Integer, n_variables,
                                          _u_lower_left, _u_lower_right,
                                          _u_large, _neighbor_ids)
 end
-
-# Return number of IDP mortars
-@inline nmortars(l2mortars::IDPMortarContainer3D) = length(l2mortars.orientations)
 
 # Allow printing container contents
 function Base.show(io::IO, ::MIME"text/plain", c::IDPMortarContainer3D)
