@@ -737,10 +737,6 @@ function IDPMortarContainer3D{uEltype}(capacity::Integer, n_variables,
     u_large = unsafe_wrap(Array, pointer(_u_large),
                           (n_variables, n_nodes, n_nodes, capacity))
 
-    _u_large = fill(nan, n_variables * n_nodes * n_nodes * capacity)
-    u_large = unsafe_wrap(Array, pointer(_u_large),
-                          (n_variables, n_nodes, n_nodes, capacity))
-
     _neighbor_ids = fill(typemin(Int), 5 * capacity)
     neighbor_ids = unsafe_wrap(Array, pointer(_neighbor_ids),
                                (5, capacity))
