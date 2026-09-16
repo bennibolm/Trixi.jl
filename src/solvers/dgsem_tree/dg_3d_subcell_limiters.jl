@@ -1228,8 +1228,8 @@ end
     (; variable_bounds) = limiter.cache.subcell_limiter_coefficients
     (; bar_states1, bar_states2, bar_states3) = limiter.cache.container_bar_states
 
-    (; small_stencil) = limiter
-    @assert small_stencil "small_stencil == false is not yet implemented for 3D subcell limiting"
+    # Note: Only the small stencil is implemented here. This is checked in the constructor
+    # of `SubcellLimiterIDP`.
 
     # Local two-sided limiting for conservative variables
     if limiter.local_twosided

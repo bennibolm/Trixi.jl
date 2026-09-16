@@ -126,6 +126,11 @@ function SubcellLimiterIDP(equations::AbstractEquations, basis;
         error("Subcell limiting is not supported with MPI.")
     end
 
+    # Only the small stencil is implemented for the computation of the local bounds in 3D.
+    if ndims(equations) == 3 && !small_stencil
+        error("`small_stencil = false` is not implemented for 3D subcell limiting.")
+    end
+
     # When passing `min` or `max` in the elixir, the specific function of Base is used.
     # To speed up the simulation, we replace it with `Trixi.min` and `Trixi.max` respectively.
     local_onesided_variables_nonlinear_ = Tuple{Function, Function}[]
