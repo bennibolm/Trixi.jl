@@ -983,7 +983,7 @@ end
                 end
 
                 # Calculate limiting factor
-                limiting_factor[mortar] = max(limiting_factor[mortar], 1 - Qm)
+                limiting_factor[mortar] = max(limiting_factor[mortar], 1 - Q)
 
                 i_small += i_small_step_i
                 j_small += j_small_step_i
