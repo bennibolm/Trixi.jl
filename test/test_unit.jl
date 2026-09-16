@@ -674,7 +674,7 @@ function initial_condition_bar_states_test(x, t,
     return SVector(rho, rho * v1, rho * v2, rho * v3, rho_e)
 end
 
-@timed_testset "3D periodic bar states" begin
+@testitem "Unit: 3D periodic bar states" setup=[Setup, UnitTests] tags=[:misc_part1] begin
     equations = CompressibleEulerEquations3D(1.4)
 
     basis = LobattoLegendreBasis(2)
@@ -716,7 +716,7 @@ end
                                                 calc_bar_states = false)
 end
 
-@timed_testset "3D boundary bar states" begin
+@testitem "Unit: 3D boundary bar states" setup=[Setup, UnitTests] tags=[:misc_part1] begin
     equations = CompressibleEulerEquations3D(1.4)
 
     basis = LobattoLegendreBasis(2)
