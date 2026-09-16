@@ -109,6 +109,12 @@ end
                             1.6530653472068835e-5,
                             5.124340147499851e-5
                         ])
+    # Check the maximum deviations
+    limiter = semi.solver.volume_integral.limiter
+    deviations = collect(values(limiter.cache.idp_bounds_delta_global))
+    @test all(isfinite, deviations)
+    @test maximum(deviations) <= 1.0e-13
+
     # Ensure that we do not have excessive memory allocations
     # (e.g., from type instabilities)
     # Larger values for allowed allocations due to usage of custom
@@ -181,6 +187,42 @@ end
                             0.006002745651763064
                         ],
                         tspan=(0.0, 0.5))
+    # Ensure that we do not have excessive memory allocations
+    # (e.g., from type instabilities)
+    # Larger values for allowed allocations due to usage of custom
+    # integrator which are not *recorded* for the methods from
+    # OrdinaryDiffEq.jl
+    # Corresponding issue: https://github.com/trixi-framework/Trixi.jl/issues/1877
+    @test_allocations(Trixi.rhs_hyperbolic!, semi, sol, 15_000)
+end
+
+@testitem "TreeMesh2D Euler: elixir_euler_density_wave_isentropic_flow_nonconforming_idp_mortars.jl" setup=[
+    Setup,
+    TreeMesh2DEuler
+] tags=[:tree_part2] begin
+    @test_trixi_include(joinpath(EXAMPLES_DIR,
+                                 "elixir_euler_density_wave_isentropic_flow_nonconforming_idp_mortars.jl"),
+                        l2=[
+                            0.0005121701087787252,
+                            0.0005296935844600892,
+                            0.0005273442464117259,
+                            0.0007054111755637014
+                        ],
+                        linf=[
+                            0.013863314342036664,
+                            0.007543930367019967,
+                            0.006804171429210526,
+                            0.010804154321971349
+                        ])
+    # Ensure that the IDP mortars are actually exercised by this setup
+    @test Trixi.nmortars(semi.cache.mortars) > 0
+
+    # Check the maximum deviations
+    limiter = semi.solver.volume_integral.limiter
+    deviations = collect(values(limiter.cache.idp_bounds_delta_global))
+    @test all(isfinite, deviations)
+    @test maximum(deviations) <= 1.0e-13
+
     # Ensure that we do not have excessive memory allocations
     # (e.g., from type instabilities)
     # Larger values for allowed allocations due to usage of custom
@@ -611,6 +653,12 @@ end
                             3.056308177579416
                         ],
                         tspan=(0.0, 1.0))
+    # Check the maximum deviations
+    limiter = semi.solver.volume_integral.limiter
+    deviations = collect(values(limiter.cache.idp_bounds_delta_global))
+    @test all(isfinite, deviations)
+    @test maximum(deviations) <= 1.0e-13
+
     # Ensure that we do not have excessive memory allocations
     # (e.g., from type instabilities)
     # Larger values for allowed allocations due to usage of custom
@@ -631,22 +679,28 @@ end
                         local_onesided_variables_nonlinear=[(entropy_math,
                                                              max)],
                         l2=[
-                            0.5717150491222391,
-                            0.23595708288882156,
-                            0.2362166488652332,
-                            0.7047756443315366
+                            0.35685708971444213,
+                            0.194528362139944,
+                            0.19459032812067883,
+                            0.6206629806655617
                         ],
                         linf=[
-                            2.310512220348682,
-                            1.2243218701752296,
-                            1.2282956020880327,
-                            2.9727088721825745
+                            1.9180137755861124,
+                            1.5038073603048907,
+                            1.4890037729589816,
+                            2.4681079132281054
                         ],
-                        tspan=(0.0, 1.0))
+                        tspan=(0.0, 0.5))
+    # Check the maximum deviations
+    limiter = semi.solver.volume_integral.limiter
+    deviations = collect(values(limiter.cache.idp_bounds_delta_global))
+    @test all(isfinite, deviations)
+    @test maximum(deviations) <= 1.0e-12
+
     # Check the output of the `LimitingAnalysisCallback` at the mortars
     lines = readlines(joinpath("out", "mortar_limiting_factor.txt"))
     @test lines[1] == "# iter, simu_time, limiting_factor_max, limiting_factor_avg"
-    @test startswith(lines[end], "183")
+    @test startswith(lines[end], "100")
 
     # Ensure that we do not have excessive memory allocations
     # (e.g., from type instabilities)
@@ -669,18 +723,24 @@ end
                         bar_states=true,
                         cfl=0.9,
                         l2=[
-                            0.6364461616824874,
-                            0.26804559150644064,
-                            0.267256297977344,
-                            0.7159364746399521
+                            0.42165810362592415,
+                            0.22952042908500617,
+                            0.22945139277182436,
+                            0.6359523435845678
                         ],
                         linf=[
-                            3.8018024908283623,
-                            1.9847557585967035,
-                            1.965677360731519,
-                            3.009711769469177
+                            3.6770705281208853,
+                            2.825191002153587,
+                            2.95875529420768,
+                            2.492293731313808
                         ],
-                        tspan=(0.0, 1.0))
+                        tspan=(0.0, 0.5))
+    # Check the maximum deviations
+    limiter = semi.solver.volume_integral.limiter
+    deviations = collect(values(limiter.cache.idp_bounds_delta_global))
+    @test all(isfinite, deviations)
+    @test maximum(deviations) <= 1.0e-13
+
     # Ensure that we do not have excessive memory allocations
     # (e.g., from type instabilities)
     # Larger values for allowed allocations due to usage of custom
@@ -872,20 +932,26 @@ end
     @test_trixi_include(joinpath(EXAMPLES_DIR,
                                  "elixir_euler_sedov_blast_wave_amr_sc_subcell.jl"),
                         l2=[
-                            0.4788115539142968,
-                            0.16272134841168487,
-                            0.1627213487866434,
-                            0.6172026575507662
+                            0.31892059838639797,
+                            0.15499651708871337,
+                            0.1549965175269283,
+                            0.6138774598700579
                         ],
                         linf=[
-                            2.350292553585204,
-                            1.1367236769922584,
-                            1.136723672147965,
-                            6.462700955857644
+                            1.939701593146248,
+                            1.4355891702232528,
+                            1.4355903735741382,
+                            6.257529335759882
                         ],
-                        tspan=(0.0, 1.0),
+                        tspan=(0.0, 0.5),
                         initial_refinement_level=5,
                         max_level=5)
+    # Check the maximum deviations
+    limiter = semi.solver.volume_integral.limiter
+    deviations = collect(values(limiter.cache.idp_bounds_delta_global))
+    @test all(isfinite, deviations)
+    @test maximum(deviations) <= 3.0e-13
+
     # Ensure that we do not have excessive memory allocations
     # (e.g., from type instabilities)
     # Larger values for allowed allocations due to usage of custom
@@ -902,22 +968,28 @@ end
     @test_trixi_include(joinpath(EXAMPLES_DIR,
                                  "elixir_euler_sedov_blast_wave_amr_sc_subcell.jl"),
                         l2=[
-                            0.5272064007313454,
-                            0.17964172962127506,
-                            0.1796417296234891,
-                            0.6199822533716246
+                            0.35695133415564906,
+                            0.17400342939599625,
+                            0.1740034293957092,
+                            0.6117292297676393
                         ],
                         linf=[
-                            3.6903439366068307,
-                            1.7100359172581063,
-                            1.7100359171012502,
-                            6.479880391554932
+                            2.912214684599205,
+                            2.0113866214025133,
+                            2.0113866211230267,
+                            6.211330481159235
                         ],
-                        tspan=(0.0, 1.0),
+                        tspan=(0.0, 0.5),
                         initial_refinement_level=5,
                         max_level=5,
                         bar_states=true,
                         cfl=0.9)
+    # Check the maximum deviations
+    limiter = semi.solver.volume_integral.limiter
+    deviations = collect(values(limiter.cache.idp_bounds_delta_global))
+    @test all(isfinite, deviations)
+    @test maximum(deviations) <= 1.0e-13
+
     # Ensure that we do not have excessive memory allocations
     # (e.g., from type instabilities)
     # Larger values for allowed allocations due to usage of custom
@@ -1268,16 +1340,16 @@ end
                         local_twosided_variables_cons=["rho"],
                         cfl=0.5,
                         l2=[
-                            0.055714326705681654,
-                            0.032895044953767084,
-                            0.05112126635792253,
-                            0.07890178487713327
+                            0.05572196414630505,
+                            0.03289661564725261,
+                            0.051099550642823864,
+                            0.07890784597772313
                         ],
                         linf=[
-                            0.24093270305756276,
-                            0.16626998830196316,
-                            0.16533320802015902,
-                            0.2698480335314488
+                            0.24096038491853977,
+                            0.1663204253298569,
+                            0.16544027163119154,
+                            0.2695972189086664
                         ],
                         tspan=(0.0, 0.2),
                         save_errors=true)
@@ -1285,6 +1357,13 @@ end
     @test lines[1] == "# iter, simu_time, rho_min, rho_max, pressure_min"
     # Run takes 99 time steps
     @test startswith(lines[end], "99")
+
+    # Check the maximum deviations
+    limiter = semi.solver.volume_integral.limiter
+    deviations = collect(values(limiter.cache.idp_bounds_delta_global))
+    @test all(isfinite, deviations)
+    @test maximum(deviations) <= 1.0e-13
+
     # Ensure that we do not have excessive memory allocations
     # (e.g., from type instabilities)
     # Larger values for allowed allocations due to usage of custom
@@ -1309,18 +1388,24 @@ end
                         bar_states=true,
                         cfl=0.9,
                         l2=[
-                            0.05967335640536129,
-                            0.03753016076395211,
-                            0.05006155812292847,
-                            0.07794073225712865
+                            0.05967273218703985,
+                            0.037530108600949845,
+                            0.05006049164458818,
+                            0.07793990967530488
                         ],
                         linf=[
-                            0.3572716216284262,
-                            0.28320720944563194,
-                            0.1328177262924226,
-                            0.27333417871543686
+                            0.3572628612777988,
+                            0.28320191318806515,
+                            0.13281894743678443,
+                            0.27332173646121527
                         ],
                         tspan=(0.0, 0.2))
+    # Check the maximum deviations
+    limiter = semi.solver.volume_integral.limiter
+    deviations = collect(values(limiter.cache.idp_bounds_delta_global))
+    @test all(isfinite, deviations)
+    @test maximum(deviations) <= 1.0e-13
+
     # Ensure that we do not have excessive memory allocations
     # (e.g., from type instabilities)
     # Larger values for allowed allocations due to usage of custom
@@ -1429,18 +1514,24 @@ end
     @test_trixi_include(joinpath(EXAMPLES_DIR,
                                  "elixir_euler_colliding_flow_amr_sc_subcell.jl"),
                         l2=[
-                            0.08993870524022221,
-                            0.15379811529961135,
-                            4.097892409049973e-5,
-                            11.924661463688675
+                            1.390804043730207e-5,
+                            0.010076078236994163,
+                            2.2707785607642615e-11,
+                            0.04847551250732195
                         ],
                         linf=[
-                            2.7123770701280456,
-                            2.4953827392656915,
-                            0.005527716062691499,
-                            356.8409617047616
+                            0.00012695366726687626,
+                            0.055828034421853884,
+                            2.405250355961728e-10,
+                            0.24952551361346398
                         ],
-                        tspan=(0.0, 1.0))
+                        tspan=(0.0, 0.0005))
+    # Check the maximum deviations
+    limiter = semi.solver.volume_integral.limiter
+    deviations = collect(values(limiter.cache.idp_bounds_delta_global))
+    @test all(isfinite, deviations)
+    @test maximum(deviations) <= 1.0e-13
+
     # Ensure that we do not have excessive memory allocations
     # (e.g., from type instabilities)
     # Larger values for allowed allocations due to usage of custom
@@ -1502,15 +1593,21 @@ end
                             1.4554603146570804,
                             1153.4608412500927,
                             83.4467980434706,
-                            446275.4834756419
+                            446275.4927831537
                         ],
                         linf=[
-                            14.960912465106105,
-                            10419.578166611158,
-                            776.33668281734,
-                            3.8386402873687297e6
+                            14.960915159451211,
+                            10419.579671217522,
+                            776.3367747480734,
+                            3.8386408895078185e6
                         ],
                         refinement_level=5)
+    # Check the maximum deviations
+    limiter = semi.solver.volume_integral.limiter
+    deviations = collect(values(limiter.cache.idp_bounds_delta_global))
+    # deviations wrt positivity bounds due to use of smoothness indicator
+    @test maximum(deviations) <= 1.0e-13
+
     # Ensure that we do not have excessive memory allocations
     # (e.g., from type instabilities)
     # Larger values for allowed allocations due to usage of custom

@@ -36,14 +36,6 @@ end
 function (callback::BoundsCheckCallback)(u_ode, integrator, stage)
     mesh, equations, solver, cache = mesh_equations_solver_cache(integrator.p)
 
-    if solver.volume_integral isa VolumeIntegralSubcellLimiting &&
-       !isnothing(solver.volume_integral.limiter.indicator)
-        # When using a smoothness indicator, a convex combination of the limiting factors from
-        # local and positivity limiting are used. However, the deviations are computed solely with
-        # respect to the local bounds. Consequently, the resulting deviation statistics would not
-        # reflect the actual deviations accurately. Skip the computation.
-        return nothing
-    end
     (; t, iter, alg) = integrator
     u = wrap_array(u_ode, mesh, equations, solver, cache)
 
@@ -108,23 +100,26 @@ function init_callback(callback::BoundsCheckCallback, semi, limiter::SubcellLimi
     (; output_directory) = callback
     variables = varnames(cons2cons, semi.equations)
 
+    enabled_indicator = !isnothing(limiter.indicator)
+
     mkpath(output_directory)
     open("$output_directory/deviations.txt", "a") do f
         print(f, "# iter, simu_time")
-        if local_twosided
+        if local_twosided && !enabled_indicator
             for v in limiter.local_twosided_variables_cons
                 variable_string = string(variables[v])
                 print(f, ", " * variable_string * "_min, " * variable_string * "_max")
             end
         end
-        if local_onesided
+        if local_onesided && !enabled_indicator
             for (variable, min_or_max) in limiter.local_onesided_variables_nonlinear
                 print(f, ", " * string(variable) * "_" * string(min_or_max))
             end
         end
         if positivity
             for v in limiter.positivity_variables_cons
-                if v in limiter.local_twosided_variables_cons
+                if (v in limiter.local_twosided_variables_cons) &&
+                   !enabled_indicator
                     continue
                 end
                 print(f, ", " * string(variables[v]) * "_min")
@@ -160,6 +155,8 @@ end
     (; idp_bounds_delta_global, idp_newton_converged) = limiter.cache
     variables = varnames(cons2cons, semi.equations)
 
+    enabled_indicator = !isnothing(limiter.indicator)
+
     println("─"^100)
     println("Maximum deviation from bounds:")
     println("─"^100)
@@ -167,22 +164,15 @@ end
         println("Note: The following deviations are only computed in elements where subcell limiting is active.")
         println("In other elements, the solution is not checked for bounds violations.")
     end
+    if enabled_indicator
+        println("Note: Due to the use of a smoothness indicator, the local bounds are enforced only fractionally,")
+        println("while the positivity bounds are enforced completely. Therefore, the deviations below are only")
+        println("computed with respect to the positivity bounds.")
+    end
     if !idp_newton_converged[]
         println("Note: Newton-bisection method reached the maximum number of iterations at least once.")
     end
-    if semi.solver.volume_integral isa VolumeIntegralSubcellLimiting &&
-       !isnothing(limiter.indicator)
-        println("Due to the use of a smoothness indicator, a convex combination of the limiting factors of local and")
-        println("positivity limiting was employed. However, the deviations are computed solely with respect to the local")
-        println("bounds. Consequently, the resulting deviation statistics may not be meaningful and can exceed zero.")
-        println("─"^100 * "\n")
-        # Note also that `variable_bounds` holds the maximum of the local and the positivity bound
-        # for variables that are limited by both. Only the positivity part of it is enforced
-        # completely; the local part is applied with the factor `alpha_indicator`. To compute
-        # meaningful deviations again, the bounds of both limiters have to be stored separately.
-        return nothing
-    end
-    if local_twosided
+    if local_twosided && !enabled_indicator
         for v in limiter.local_twosided_variables_cons
             v_string = string(v)
             println("$(variables[v]):")
@@ -192,7 +182,7 @@ end
                     idp_bounds_delta_global[Symbol(v_string, "_max")])
         end
     end
-    if local_onesided
+    if local_onesided && !enabled_indicator
         for (variable, min_or_max) in limiter.local_onesided_variables_nonlinear
             variable_string = string(variable)
             minmax_string = string(min_or_max)
@@ -204,11 +194,18 @@ end
     end
     if positivity
         for v in limiter.positivity_variables_cons
-            if v in limiter.local_twosided_variables_cons
+            if (v in limiter.local_twosided_variables_cons) &&
+               !enabled_indicator
                 continue
             end
+            key = if (v in limiter.local_twosided_variables_cons) &&
+                     enabled_indicator
+                Symbol(string(v), "_min_positivity")
+            else
+                Symbol(string(v), "_min")
+            end
             println(string(variables[v]) * ":\n- positivity: ",
-                    idp_bounds_delta_global[Symbol(string(v), "_min")])
+                    idp_bounds_delta_global[key])
         end
         for variable in limiter.positivity_variables_nonlinear
             variable_string = string(variable)
@@ -226,17 +223,19 @@ end
     (; local_twosided, positivity, local_onesided) = limiter
     (; idp_bounds_delta_local) = limiter.cache
 
+    enabled_indicator = !isnothing(limiter.indicator)
+
     # Print to output file
     open(joinpath(output_directory, "deviations.txt"), "a") do f
         print(f, iter, ", ", time)
-        if local_twosided
+        if local_twosided && !enabled_indicator
             for v in limiter.local_twosided_variables_cons
                 v_string = string(v)
                 print(f, ", ", idp_bounds_delta_local[Symbol(v_string, "_min")],
                       ", ", idp_bounds_delta_local[Symbol(v_string, "_max")])
             end
         end
-        if local_onesided
+        if local_onesided && !enabled_indicator
             for (variable, min_or_max) in limiter.local_onesided_variables_nonlinear
                 key = Symbol(string(variable), "_", string(min_or_max))
                 print(f, ", ", idp_bounds_delta_local[key])
@@ -244,10 +243,17 @@ end
         end
         if positivity
             for v in limiter.positivity_variables_cons
-                if v in limiter.local_twosided_variables_cons
+                if (v in limiter.local_twosided_variables_cons) &&
+                   !enabled_indicator
                     continue
                 end
-                print(f, ", ", idp_bounds_delta_local[Symbol(string(v), "_min")])
+                key = if (v in limiter.local_twosided_variables_cons) &&
+                         enabled_indicator
+                    Symbol(string(v), "_min_positivity")
+                else
+                    Symbol(string(v), "_min")
+                end
+                print(f, ", ", idp_bounds_delta_local[key])
             end
             for variable in limiter.positivity_variables_nonlinear
                 print(f, ", ", idp_bounds_delta_local[Symbol(string(variable), "_min")])
