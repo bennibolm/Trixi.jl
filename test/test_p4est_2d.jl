@@ -1244,9 +1244,8 @@ end
 
     # Ensure that this test actually exercises mortars whose large-element face
     # is traversed in the opposite direction of the mortar nodes.
-    dg = semi.solver
-    cache = semi.cache
-    flipped_mortars = filter(Trixi.eachmortar(dg, cache)) do mortar
+    (; solver, cache) = semi
+    flipped_mortars = filter(Trixi.eachmortar(solver, cache)) do mortar
         :i_backward in cache.mortars.node_indices[2, mortar]
     end
     @test !isempty(flipped_mortars)
