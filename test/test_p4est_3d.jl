@@ -536,9 +536,8 @@ end
 
     # Ensure that this test actually exercises mortars whose large-element face
     # traverses at least one tangential coordinate backwards.
-    dg = semi.solver
-    cache = semi.cache
-    flipped_mortars = filter(Trixi.eachmortar(dg, cache)) do mortar
+    (; solver, cache) = semi.solver
+    flipped_mortars = filter(Trixi.eachmortar(solver, cache)) do mortar
         large_indices = cache.mortars.node_indices[2, mortar]
         :i_backward in large_indices || :j_backward in large_indices
     end
