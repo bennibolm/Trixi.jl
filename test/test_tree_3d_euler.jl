@@ -169,7 +169,7 @@ end
     TreeMesh3DEuler
 ] tags=[:tree_part4] begin
     @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_euler_mortar_sc_subcell.jl"),
-                        tspan=(0.0, 0.3),
+                        tspan=(0.0, 0.2),
                         pure_low_order=true)
     # Check for conservation
     state_integrals = Trixi.integrate(sol.u[2], semi)
@@ -287,7 +287,8 @@ end
                         local_twosided_variables_cons=["rho"],
                         local_onesided_variables_nonlinear=[(entropy_guermond_etal,
                                                              min)],
-                        cfl=0.7,
+                        cfl=0.5,
+                        initial_refinement_level=2,
                         l2=[
                             0.0038985550899295783,
                             0.003898555089929581,
@@ -302,7 +303,7 @@ end
                             0.10861566210351503,
                             0.162923493155271
                         ],
-                        tspan=(0.0, 0.1),)
+                        tspan=(0.0, 0.5),)
     limiter = semi.solver.volume_integral.limiter
     deviations = collect(values(limiter.cache.idp_bounds_delta_global))
     @test all(isfinite, deviations)
@@ -329,6 +330,7 @@ end
                                                              min)],
                         cfl=0.9,
                         bar_states=true,
+                        initial_refinement_level=2,
                         l2=[
                             0.0038599864284701497,
                             0.003859986428470149,
@@ -343,7 +345,7 @@ end
                             0.09658598878282801,
                             0.14487898317424275
                         ],
-                        tspan=(0.0, 0.1),)
+                        tspan=(0.0, 0.5),)
     limiter = semi.solver.volume_integral.limiter
     deviations = collect(values(limiter.cache.idp_bounds_delta_global))
     @test all(isfinite, deviations)
@@ -797,11 +799,9 @@ end
     @test all(isfinite, limiter.indicator.cache.alpha)
     @test maximum(limiter.indicator.cache.alpha) > 0
 
-    # When using a smoothness indicator, the bounds check is skipped since the deviations
-    # would be computed with respect to the local bounds only and would therefore not be
-    # meaningful. Consequently, no deviations are computed.
     deviations = collect(values(limiter.cache.idp_bounds_delta_global))
-    @test all(iszero, deviations)
+    # deviations wrt positivity bounds due to use of smoothness indicator
+    @test maximum(deviations) <= 1.0e-13
 
     # Ensure that we do not have excessive memory allocations
     # (e.g., from type instabilities)

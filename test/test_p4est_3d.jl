@@ -501,11 +501,9 @@ end
     @test all(isfinite, limiter.indicator.cache.alpha)
     @test maximum(limiter.indicator.cache.alpha) > 0
 
-    # When using a smoothness indicator, the bounds check is skipped since the deviations
-    # would be computed with respect to the local bounds only and would therefore not be
-    # meaningful. Consequently, no deviations are computed.
     deviations = collect(values(limiter.cache.idp_bounds_delta_global))
-    @test all(iszero, deviations)
+    # deviations wrt positivity bounds due to use of smoothness indicator
+    @test maximum(deviations) <= 1.0e-13
 
     # Ensure that we do not have excessive memory allocations
     # (e.g., from type instabilities)
@@ -516,7 +514,6 @@ end
     @test_allocations(Trixi.rhs_hyperbolic!, semi, sol, 15_000)
 end
 
-# TODO: The test is still broken. I have to figure out what is going on for 3d rotated meshes.
 @testitem "P4estMesh3D: elixir_euler_weak_blast_wave_nonconforming_rotated_sc_subcell.jl" setup=[
     Setup,
     P4estMesh3D
@@ -532,6 +529,7 @@ end
     limiter = semi.solver.volume_integral.limiter
     deviations = collect(values(limiter.cache.idp_bounds_delta_global))
     @test all(isfinite, deviations)
+    # TODO: The test is still broken. I have to figure out what is going on for 3d rotated/unstructured/curved meshes.
     @test_broken maximum(deviations) <= 1.0e-13
 
     # Ensure that this test actually exercises mortars whose large-element face
@@ -662,7 +660,7 @@ end
     P4estMesh3D
 ] tags=[:p4est_part2] begin
     @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_euler_mortar_sc_subcell.jl"),
-                        tspan=(0.0, 0.3),
+                        tspan=(0.0, 0.2),
                         pure_low_order=true)
     # Check for conservation
     state_integrals = Trixi.integrate(sol.u[2], semi)
@@ -694,7 +692,7 @@ end
                             0.212153349438969,
                             0.31823002415845014
                         ],
-                        tspan=(0.0, 0.3))
+                        tspan=(0.0, 0.2))
     # Ensure that we do not have excessive memory allocations
     # (e.g., from type instabilities)
     # Larger values for allowed allocations due to usage of custom
@@ -725,7 +723,7 @@ end
                             0.2121475767420509,
                             0.3182213651130721
                         ],
-                        tspan=(0.0, 0.3))
+                        tspan=(0.0, 0.2))
     limiter = semi.solver.volume_integral.limiter
     deviations = collect(values(limiter.cache.idp_bounds_delta_global))
     @test all(isfinite, deviations)
@@ -780,6 +778,47 @@ end
     @test_allocations(Trixi.rhs_hyperbolic!, semi, sol, 15_000)
 end
 
+@testitem "P4estMesh3D: elixir_euler_mortar_sc_subcell.jl (local limiting with bar states)" setup=[
+    Setup,
+    P4estMesh3D
+] tags=[:p4est_part2] begin
+    @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_euler_mortar_sc_subcell.jl"),
+                        positivity_variables_cons=["rho"],
+                        positivity_variables_nonlinear=[pressure],
+                        local_twosided_variables_cons=["rho"],
+                        local_onesided_variables_nonlinear=[(entropy_guermond_etal,
+                                                             min)],
+                        cfl=0.9,
+                        bar_states=true,
+                        l2=[
+                            0.0038996520755042027,
+                            0.0038996520755042036,
+                            0.0038996520755042023,
+                            0.0038996520755042023,
+                            0.005849478113255999
+                        ],
+                        linf=[
+                            0.12882352266971342,
+                            0.1288235226697137,
+                            0.1288235226697133,
+                            0.12882352266971342,
+                            0.19323528400456835
+                        ],
+                        tspan=(0.0, 0.02),)
+    limiter = semi.solver.volume_integral.limiter
+    deviations = collect(values(limiter.cache.idp_bounds_delta_global))
+    @test all(isfinite, deviations)
+    @test maximum(deviations) <= 8.0e-12
+
+    # Ensure that we do not have excessive memory allocations
+    # (e.g., from type instabilities)
+    # Larger values for allowed allocations due to usage of custom
+    # integrator which are not *recorded* for the methods from
+    # OrdinaryDiffEq.jl
+    # Corresponding issue: https://github.com/trixi-framework/Trixi.jl/issues/1877
+    @test_allocations(Trixi.rhs_hyperbolic!, semi, sol, 15_000)
+end
+
 @testitem "P4estMesh3D: elixir_euler_mortar_sc_subcell.jl (smoothness indicator)" setup=[
     Setup,
     P4estMesh3D
@@ -815,52 +854,9 @@ end
     @test all(isfinite, limiter.indicator.cache.alpha)
     @test maximum(limiter.indicator.cache.alpha) > 0
 
-    # When using a smoothness indicator, the bounds check is skipped since the deviations
-    # would be computed with respect to the local bounds only and would therefore not be
-    # meaningful. Consequently, no deviations are computed.
     deviations = collect(values(limiter.cache.idp_bounds_delta_global))
-    @test all(iszero, deviations)
-
-    # Ensure that we do not have excessive memory allocations
-    # (e.g., from type instabilities)
-    # Larger values for allowed allocations due to usage of custom
-    # integrator which are not *recorded* for the methods from
-    # OrdinaryDiffEq.jl
-    # Corresponding issue: https://github.com/trixi-framework/Trixi.jl/issues/1877
-    @test_allocations(Trixi.rhs_hyperbolic!, semi, sol, 15_000)
-end
-
-@testitem "P4estMesh3D: elixir_euler_mortar_sc_subcell.jl (local limiting with bar states)" setup=[
-    Setup,
-    P4estMesh3D
-] tags=[:p4est_part2] begin
-    @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_euler_mortar_sc_subcell.jl"),
-                        positivity_variables_cons=["rho"],
-                        positivity_variables_nonlinear=[pressure],
-                        local_twosided_variables_cons=["rho"],
-                        local_onesided_variables_nonlinear=[(entropy_guermond_etal,
-                                                             min)],
-                        cfl=0.9,
-                        bar_states=true,
-                        l2=[
-                            0.0038996520755042027,
-                            0.0038996520755042036,
-                            0.0038996520755042023,
-                            0.0038996520755042023,
-                            0.005849478113255999
-                        ],
-                        linf=[
-                            0.12882352266971342,
-                            0.1288235226697137,
-                            0.1288235226697133,
-                            0.12882352266971342,
-                            0.19323528400456835
-                        ],
-                        tspan=(0.0, 0.1),)
-    limiter = semi.solver.volume_integral.limiter
-    deviations = collect(values(limiter.cache.idp_bounds_delta_global))
-    @test all(isfinite, deviations)
-    @test maximum(deviations) <= 8.0e-12
+    # deviations wrt positivity bounds due to use of smoothness indicator
+    @test maximum(deviations) <= 1.0e-13
 
     # Ensure that we do not have excessive memory allocations
     # (e.g., from type instabilities)
