@@ -12,9 +12,9 @@ function create_cache(typ::Type{LimiterType},
     return create_cache(typ, mesh_equations_solver_cache(semi)...)
 end
 
-@inline bar_states_as_static(bar_states::Bool) = bar_states ? True() : False()
-@inline bar_states_as_static(bar_states::True) = bar_states
-@inline bar_states_as_static(bar_states::False) = bar_states
+@inline as_static_bool(b::Bool) = b ? True() : False()
+@inline as_static_bool(b::True) = b
+@inline as_static_bool(b::False) = b
 
 """
     SubcellLimiterIDP(equations::AbstractEquations, basis;
@@ -81,7 +81,7 @@ respect to the positivity bounds.
 """
 struct SubcellLimiterIDP{RealT <: Real, LimitingVariablesNonlinear,
                          LimitingOnesidedVariablesNonlinear, Indicator, BarStates,
-                         Cache} <:
+                         SmallStencil, Cache} <:
        AbstractSubcellLimiter
     local_twosided::Bool
     local_twosided_variables_cons::Vector{Int}                 # Local two-sided limiting for conservative variables
@@ -93,7 +93,7 @@ struct SubcellLimiterIDP{RealT <: Real, LimitingVariablesNonlinear,
     local_onesided_variables_nonlinear::LimitingOnesidedVariablesNonlinear # Local one-sided limiting for nonlinear variables
     indicator::Indicator
     bar_states::BarStates
-    small_stencil::Bool                     # Use small stencil for computation of bar state bounds
+    small_stencil::SmallStencil             # Use small stencil for computation of bar state bounds
     cache::Cache
     max_iterations_newton::Int
     newton_tolerances::Tuple{RealT, RealT}  # Relative and absolute tolerances for Newton's method
@@ -181,7 +181,8 @@ function SubcellLimiterIDP(equations::AbstractEquations, basis;
         bound_keys = (bound_keys..., Symbol(string(variable), "_min"))
     end
 
-    bar_states = bar_states_as_static(bar_states)
+    bar_states = as_static_bool(bar_states)
+    small_stencil = as_static_bool(small_stencil)
     # Only cache the variable values when they are needed for the limiter.
     # This is the case when local one-sided limiting is used.
     cache_variable_values = local_onesided
@@ -195,6 +196,7 @@ function SubcellLimiterIDP(equations::AbstractEquations, basis;
                              typeof(local_onesided_variables_nonlinear_),
                              typeof(indicator),
                              typeof(bar_states),
+                             typeof(small_stencil),
                              typeof(cache)}(local_twosided,
                                             local_twosided_variables_cons_,
                                             positivity, positivity_variables_cons_,
@@ -272,7 +274,7 @@ function Base.show(io::IO, ::MIME"text/plain", limiter::SubcellLimiterIDP)
             push!(setup,
                   "Local bounds with" => (limiter.bar_states == true ? "Bar States" :
                                           "FV solution"))
-            if !(limiter.small_stencil)
+            if limiter.small_stencil == false
                 push!(setup, "" => "Large stencil for bar state bounds")
             end
         end
