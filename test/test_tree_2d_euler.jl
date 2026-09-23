@@ -700,6 +700,7 @@ end
     # Check the output of the `LimitingAnalysisCallback` at the mortars
     lines = readlines(joinpath("out", "mortar_limiting_factor.txt"))
     @test lines[1] == "# iter, simu_time, limiting_factor_max, limiting_factor_avg"
+    @test startswith(lines[end], "100")
 
     # Ensure that we do not have excessive memory allocations
     # (e.g., from type instabilities)

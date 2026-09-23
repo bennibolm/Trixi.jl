@@ -5,11 +5,13 @@
 @muladd begin
 #! format: noindent
 
-@inline function get_mortar_index(indices, i, j)
-    if indices[1] === :i_forward || indices[1] === :i_backward
-        return i
-    else # indices[2] === :i_forward || indices[2] === :i_backward
+@inline function get_large_surface_index(indices, i, j)
+    # Return the face-tangential element index, matching the layout of `surface_flux_values`
+    # (cf. `surface_indices` and `mortar_fluxes_to_elements!`).
+    if indices[1] === :begin || indices[1] === :end
         return j
+    else # indices[2] === :begin || indices[2] === :end
+        return i
     end
 end
 
@@ -82,6 +84,7 @@ end
     _, _, dg, cache = mesh_equations_solver_cache(semi)
 
     (; neighbor_ids, node_indices) = cache.mortars
+    mortar_weights = get_mortar_weights(dg.mortar)
     index_range = eachnode(dg)
 
     # `mortar_weights` is defined in mortar reference coordinates, so it has to be
@@ -125,7 +128,7 @@ end
             j_large_inner = j_large_start
             for j in eachnode(dg)
                 # values of large element to lower element
-                if l2_mortars || dg.mortar.mortar_weights[i, j, 1] > 0
+                if l2_mortars || mortar_weights[i, j, 1] > 0
                     var_min[i_small_inner, j_small_inner, lower_element] = min(var_min[i_small_inner,
                                                                                        j_small_inner,
                                                                                        lower_element],
@@ -136,7 +139,7 @@ end
                                                                                var_large)
                 end
                 # values of lower element to large element
-                if l2_mortars || dg.mortar.mortar_weights[j, i, 1] > 0
+                if l2_mortars || mortar_weights[j, i, 1] > 0
                     var_min[i_large_inner, j_large_inner, large_element] = min(var_min[i_large_inner,
                                                                                        j_large_inner,
                                                                                        large_element],
@@ -147,7 +150,7 @@ end
                                                                                var_lower)
                 end
                 # values of large element to upper element
-                if l2_mortars || dg.mortar.mortar_weights[i, j, 2] > 0
+                if l2_mortars || mortar_weights[i, j, 2] > 0
                     var_min[i_small_inner, j_small_inner, upper_element] = min(var_min[i_small_inner,
                                                                                        j_small_inner,
                                                                                        upper_element],
@@ -158,7 +161,7 @@ end
                                                                                var_large)
                 end
                 # values of upper element to large element
-                if l2_mortars || dg.mortar.mortar_weights[j, i, 2] > 0
+                if l2_mortars || mortar_weights[j, i, 2] > 0
                     var_min[i_large_inner, j_large_inner, large_element] = min(var_min[i_large_inner,
                                                                                        j_large_inner,
                                                                                        large_element],
@@ -301,6 +304,7 @@ end
     _, equations, dg, cache = mesh_equations_solver_cache(semi)
 
     (; neighbor_ids, node_indices) = cache.mortars
+    mortar_weights = get_mortar_weights(dg.mortar)
     index_range = eachnode(dg)
 
     # `mortar_weights` is defined in mortar reference coordinates, so it has to be
@@ -347,28 +351,28 @@ end
             j_large_inner = j_large_start
             for j in eachnode(dg)
                 # values of large element to lower element
-                if l2_mortars || dg.mortar.mortar_weights[i, j, 1] > 0
+                if l2_mortars || mortar_weights[i, j, 1] > 0
                     var_minmax[i_small_inner, j_small_inner, lower_element] = minmax(var_minmax[i_small_inner,
                                                                                                 j_small_inner,
                                                                                                 lower_element],
                                                                                      var_large)
                 end
                 # values of lower element to large element
-                if l2_mortars || dg.mortar.mortar_weights[j, i, 1] > 0
+                if l2_mortars || mortar_weights[j, i, 1] > 0
                     var_minmax[i_large_inner, j_large_inner, large_element] = minmax(var_minmax[i_large_inner,
                                                                                                 j_large_inner,
                                                                                                 large_element],
                                                                                      var_lower)
                 end
                 # values of large element to upper element
-                if l2_mortars || dg.mortar.mortar_weights[i, j, 2] > 0
+                if l2_mortars || mortar_weights[i, j, 2] > 0
                     var_minmax[i_small_inner, j_small_inner, upper_element] = minmax(var_minmax[i_small_inner,
                                                                                                 j_small_inner,
                                                                                                 upper_element],
                                                                                      var_large)
                 end
                 # values of upper element to large element
-                if l2_mortars || dg.mortar.mortar_weights[j, i, 2] > 0
+                if l2_mortars || mortar_weights[j, i, 2] > 0
                     var_minmax[i_large_inner, j_large_inner, large_element] = minmax(var_minmax[i_large_inner,
                                                                                                 j_large_inner,
                                                                                                 large_element],
@@ -549,7 +553,7 @@ end
             # Large element
             # Map the mortar node to the large-element face since its orientation may be flipped.
             # The small-element face needs no mapping because it is always traversed forward.
-            large_node = get_mortar_index(large_indices, i_large, j_large)
+            large_node = get_large_surface_index(large_indices, i_large, j_large)
             Q = zalesak_limiting_twosided(u, var_index, i_large, j_large, large_element,
                                           large_node, large_direction, factor, dt,
                                           var_min, var_max, n_mortars_per_node,
@@ -631,7 +635,7 @@ end
             # Large element
             # Map the mortar node to the large-element face since its orientation may be flipped.
             # The small-element face needs no mapping because it is always traversed forward.
-            large_node = get_mortar_index(large_indices, i_large, j_large)
+            large_node = get_large_surface_index(large_indices, i_large, j_large)
             newton_loop_mortar!(limiting_factor, mortar, u,
                                 i_large, j_large, large_element,
                                 large_node, large_direction, factor, dt,
@@ -735,7 +739,7 @@ end
             # Large element
             # Map the mortar node to the large-element face since its orientation may be flipped.
             # The small-element face needs no mapping because it is always traversed forward.
-            large_node = get_mortar_index(large_indices, i_large, j_large)
+            large_node = get_large_surface_index(large_indices, i_large, j_large)
             Q = zalesak_limiting_onesided(u, var_index, i_large, j_large, large_element,
                                           large_node, large_direction, factor, dt,
                                           var_min, n_mortars_per_node,
@@ -819,7 +823,7 @@ end
             # Large element
             # Map the mortar node to the large-element face since its orientation may be flipped.
             # The small-element face needs no mapping because it is always traversed forward.
-            large_node = get_mortar_index(large_indices, i_large, j_large)
+            large_node = get_large_surface_index(large_indices, i_large, j_large)
             newton_loop_mortar!(limiting_factor, mortar, u,
                                 i_large, j_large, large_element,
                                 large_node, large_direction, factor, dt,
