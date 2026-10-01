@@ -166,13 +166,12 @@ basis = LobattoLegendreBasis(polydeg)
 indicator = IndicatorHennemannGassner(equations, basis,
                                       alpha_max = 1.0, alpha_min = 0.001,
                                       alpha_smooth = false,
-                                      variable = pressure)
+                                      variable = density_pressure)
 
 # shock capturing necessary for this tough example
 limiter_idp = SubcellLimiterIDP(equations, basis;
                                 positivity_variables_cons = ["rho"],
                                 positivity_variables_nonlinear = [pressure],
-                                positivity_correction_factor = 0.1,
                                 local_twosided_variables_cons = ["rho"],
                                 local_onesided_variables_nonlinear = [(entropy_guermond_etal,
                                                                        min)],
@@ -247,15 +246,8 @@ amr_callback = AMRCallback(semi, amr_controller,
                            adapt_initial_condition_only_refine = true,
                            limiter! = positivity_limiter)
 
-# old cfl number
-# function cfl(t)
-#     if t < 4.5e-7
-#         return 0.001
-#     else
-#         return 0.5
-#     end
-# end
-cfl(t) = t == 0.0 ? 0.001 : 0.5
+cfl_ = 0.5
+cfl(t) = t == 0.0 ? 0.001 : cfl_
 stepsize_callback = StepsizeCallback(cfl = cfl)
 
 callbacks = CallbackSet(summary_callback,

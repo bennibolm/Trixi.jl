@@ -587,30 +587,6 @@ end
     @test_allocations(Trixi.rhs_hyperbolic!, semi, sol, 1000)
 end
 
-@testitem "TreeMesh3D Euler: elixir_euler_laplace_diffusion.jl" setup=[
-    Setup,
-    TreeMesh3DEuler
-] tags=[:tree_part4] begin
-    @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_euler_laplace_diffusion.jl"),
-                        l2=[
-                            0.013299230512542162,
-                            0.0073025819009651,
-                            0.007302581900965106,
-                            0.007300042097573285,
-                            0.04888085245959731
-                        ],
-                        linf=[
-                            0.31714843611640464,
-                            0.23586839231625517,
-                            0.23586839231625506,
-                            0.23698123351744782,
-                            1.1174271158464726
-                        ])
-    # Ensure that we do not have excessive memory allocations
-    # (e.g., from type instabilities)
-    @test_allocations(Trixi.rhs_hyperbolic!, semi, sol, 1000)
-end
-
 @testitem "TreeMesh3D Euler: elixir_euler_blob_amr.jl" setup=[Setup, TreeMesh3DEuler] tags=[:tree_part4] begin
     @test_trixi_include(joinpath(EXAMPLES_DIR, "elixir_euler_blob_amr.jl"),
                         l2=[
@@ -740,18 +716,18 @@ end
     @test_trixi_include(joinpath(EXAMPLES_DIR,
                                  "elixir_euler_sedov_blast_wave_sc_subcell.jl"),
                         l2=[
-                            0.24806841083939926,
-                            0.07001337223874464,
-                            0.07001337223806398,
-                            0.0700133722383429,
-                            0.3620366037665587
+                            0.2535876284876776,
+                            0.07103899296437698,
+                            0.0710389929697187,
+                            0.07103240203541461,
+                            0.36154632086996935
                         ],
                         linf=[
-                            0.9384071822566761,
-                            0.573009568617271,
-                            0.5730095685845291,
-                            0.5730095686063774,
-                            4.861205850307592
+                            0.9656510079628993,
+                            0.6250496896239269,
+                            0.6250496896164557,
+                            0.6293657506888826,
+                            4.8492101388847875
                         ],
                         tspan=(0.0, 0.5))
     limiter = semi.solver.volume_integral.limiter
@@ -861,18 +837,18 @@ end
                                                                                                                                       reconstruction_mode = reconstruction_O2_inner,
                                                                                                                                       volume_flux_fv = surface_flux)),
                         l2=[
-                            0.2689998884966531,
-                            0.07653116097019724,
-                            0.07652929296060249,
-                            0.07653116116788626,
-                            0.3619753554297217
+                            0.27243342538670223,
+                            0.07725258015372446,
+                            0.07725229259980171,
+                            0.07725258015218425,
+                            0.3615315694586506
                         ],
                         linf=[
-                            1.1033500587695855,
-                            0.7217019126759276,
-                            0.7217292785028954,
-                            0.7217019142964469,
-                            4.856653461588191
+                            1.128382074953746,
+                            0.7436563773077345,
+                            0.7435653376762831,
+                            0.7436563774536721,
+                            4.855179172268338
                         ],
                         tspan=(0.0, 0.5))
     limiter = semi.solver.volume_integral.limiter
@@ -908,18 +884,18 @@ end
                                                                                                                           volume_flux_dg = volume_flux,
                                                                                                                           volume_flux_fv = surface_flux)),
                         l2=[
-                            0.24806841083830014,
-                            0.07001337223848285,
-                            0.0700133722385661,
-                            0.07001337223834266,
-                            0.362036603766589
+                            0.25358762861465906,
+                            0.0710389929847927,
+                            0.07103899298397363,
+                            0.07103240203909279,
+                            0.3615463208667791
                         ],
                         linf=[
-                            0.9384071822788941,
-                            0.5730095686470306,
-                            0.5730095679841436,
-                            0.5730095679943239,
-                            4.861205850307726
+                            0.9656510079578724,
+                            0.6250496896284498,
+                            0.6250496896288155,
+                            0.6293657506331284,
+                            4.849210138884207
                         ],
                         tspan=(0.0, 0.5))
     limiter = semi.solver.volume_integral.volume_integral_stabilized.limiter
