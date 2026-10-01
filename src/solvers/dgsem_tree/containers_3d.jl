@@ -718,7 +718,8 @@ end
 # Left and right are used *both* for the numbering of the mortar faces *and* for the position of the
 # elements with respect to the axis orthogonal to the mortar.
 
-mutable struct IDPMortarContainer3D{uEltype <: Real} <: AbstractTreeL2MortarContainer
+mutable struct TreeIDPMortarContainer3D{uEltype <: Real} <:
+               AbstractTreeL2MortarContainer
     u_upper_left::Array{uEltype, 5}  # [leftright, variables, i, j, mortars]
     u_upper_right::Array{uEltype, 5} # [leftright, variables, i, j, mortars]
     u_lower_left::Array{uEltype, 5}  # [leftright, variables, i, j, mortars]
@@ -739,11 +740,11 @@ mutable struct IDPMortarContainer3D{uEltype <: Real} <: AbstractTreeL2MortarCont
     _neighbor_ids::Vector{Int}
 end
 
-nvariables(mortars::IDPMortarContainer3D) = size(mortars.u_upper_left, 2)
-nnodes(mortars::IDPMortarContainer3D) = size(mortars.u_upper_left, 3)
+nvariables(mortars::TreeIDPMortarContainer3D) = size(mortars.u_upper_left, 2)
+nnodes(mortars::TreeIDPMortarContainer3D) = size(mortars.u_upper_left, 3)
 
 # See explanation of Base.resize! for the element container
-function Base.resize!(mortars::IDPMortarContainer3D, capacity)
+function Base.resize!(mortars::TreeIDPMortarContainer3D, capacity)
     n_nodes = nnodes(mortars)
     n_variables = nvariables(mortars)
     @unpack _u_upper_left, _u_upper_right, _u_lower_left, _u_lower_right, _u_large, _neighbor_ids,
@@ -783,8 +784,8 @@ function Base.resize!(mortars::IDPMortarContainer3D, capacity)
     return nothing
 end
 
-function IDPMortarContainer3D{uEltype}(capacity::Integer, n_variables,
-                                       n_nodes) where {uEltype <: Real}
+function TreeIDPMortarContainer3D{uEltype}(capacity::Integer, n_variables,
+                                           n_nodes) where {uEltype <: Real}
     nan = convert(uEltype, NaN)
 
     # Initialize fields with defaults
@@ -819,18 +820,18 @@ function IDPMortarContainer3D{uEltype}(capacity::Integer, n_variables,
     limiting_factor = fill(nan, capacity)
     limiting_factor_local = fill(nan, capacity)
 
-    return IDPMortarContainer3D{uEltype}(u_upper_left, u_upper_right,
-                                         u_lower_left, u_lower_right,
-                                         u_large, neighbor_ids,
-                                         large_sides, orientations,
-                                         limiting_factor, limiting_factor_local,
-                                         _u_upper_left, _u_upper_right,
-                                         _u_lower_left, _u_lower_right,
-                                         _u_large, _neighbor_ids)
+    return TreeIDPMortarContainer3D{uEltype}(u_upper_left, u_upper_right,
+                                             u_lower_left, u_lower_right,
+                                             u_large, neighbor_ids,
+                                             large_sides, orientations,
+                                             limiting_factor, limiting_factor_local,
+                                             _u_upper_left, _u_upper_right,
+                                             _u_lower_left, _u_lower_right,
+                                             _u_large, _neighbor_ids)
 end
 
 # Allow printing container contents
-function Base.show(io::IO, ::MIME"text/plain", c::IDPMortarContainer3D)
+function Base.show(io::IO, ::MIME"text/plain", c::TreeIDPMortarContainer3D)
     @nospecialize c # reduce precompilation time
 
     println(io, '*'^20)
@@ -856,15 +857,50 @@ function Base.show(io::IO, ::MIME"text/plain", c::IDPMortarContainer3D)
     print(io, '*'^20)
 end
 
+# Check whether the arrays in `mortars` have the axes we assume it must have in the inner loops
+# of Trixi.jl.
+function check_axes(mortars::TreeIDPMortarContainer3D, equations, solver::DG, cache)
+    u_mortar_axes = (Base.OneTo(2), eachvariable(equations),
+                     eachnode(solver), eachnode(solver),
+                     eachmortar(solver, cache))
+    check_axes(mortars.u_lower_left, u_mortar_axes)
+    check_axes(mortars.u_lower_right, u_mortar_axes)
+    check_axes(mortars.u_upper_left, u_mortar_axes)
+    check_axes(mortars.u_upper_right, u_mortar_axes)
+    check_axes(mortars.u_large,
+               (eachvariable(equations),
+                eachnode(solver), eachnode(solver),
+                eachmortar(solver, cache)))
+    check_axes(mortars.neighbor_ids, (Base.OneTo(5), eachmortar(solver, cache)))
+    check_axes(mortars.large_sides, (eachmortar(solver, cache),))
+    check_axes(mortars.orientations, (eachmortar(solver, cache),))
+    check_axes(mortars.limiting_factor, (eachmortar(solver, cache),))
+    check_axes(mortars.limiting_factor_local, (eachmortar(solver, cache),))
+
+    # Thread-local storage used for the mortar fluxes and projections
+    fstar_axes = (eachvariable(equations),
+                  eachnode(solver), eachnode(solver))
+    check_axes_threaded(cache.fstar_primary_upper_left_threaded, fstar_axes)
+    check_axes_threaded(cache.fstar_primary_upper_right_threaded, fstar_axes)
+    check_axes_threaded(cache.fstar_primary_lower_left_threaded, fstar_axes)
+    check_axes_threaded(cache.fstar_primary_lower_right_threaded, fstar_axes)
+    check_axes_threaded(cache.fstar_secondary_upper_left_threaded, fstar_axes)
+    check_axes_threaded(cache.fstar_secondary_upper_right_threaded, fstar_axes)
+    check_axes_threaded(cache.fstar_secondary_lower_left_threaded, fstar_axes)
+    check_axes_threaded(cache.fstar_secondary_lower_right_threaded, fstar_axes)
+    check_axes_threaded(cache.fstar_tmp1_threaded, fstar_axes)
+    return nothing
+end
+
 # Create mortar container and initialize mortar data in `elements`.
 function init_mortars(cell_ids, mesh::TreeMesh3D,
                       elements::TreeElementContainer3D,
                       mortar::LobattoLegendreMortarIDP)
     # Initialize containers
     n_mortars = count_required_mortars(mesh, cell_ids)
-    mortars = IDPMortarContainer3D{eltype(elements)}(n_mortars,
-                                                     nvariables(elements),
-                                                     nnodes(elements))
+    mortars = TreeIDPMortarContainer3D{eltype(elements)}(n_mortars,
+                                                         nvariables(elements),
+                                                         nnodes(elements))
 
     # Connect elements with mortars
     init_mortars!(mortars, elements, mesh)
