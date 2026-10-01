@@ -864,64 +864,64 @@ end
                                 if small_direction == 1
                                     for v in eachvariable(equations)
                                         bar_states1[v, i_small, j_small, k_small, small_element] += lambda_small *
-                                                                                                     bar_state[v]
+                                                                                                    bar_state[v]
                                     end
                                 elseif small_direction == 2
                                     for v in eachvariable(equations)
                                         bar_states1[v, i_small + 1, j_small, k_small, small_element] += lambda_small *
-                                                                                                         bar_state[v]
+                                                                                                        bar_state[v]
                                     end
                                 elseif small_direction == 3
                                     for v in eachvariable(equations)
                                         bar_states2[v, i_small, j_small, k_small, small_element] += lambda_small *
-                                                                                                     bar_state[v]
+                                                                                                    bar_state[v]
                                     end
                                 elseif small_direction == 4
                                     for v in eachvariable(equations)
                                         bar_states2[v, i_small, j_small + 1, k_small, small_element] += lambda_small *
-                                                                                                         bar_state[v]
+                                                                                                        bar_state[v]
                                     end
                                 elseif small_direction == 5
                                     for v in eachvariable(equations)
                                         bar_states3[v, i_small, j_small, k_small, small_element] += lambda_small *
-                                                                                                     bar_state[v]
+                                                                                                    bar_state[v]
                                     end
                                 else # small_direction == 6
                                     for v in eachvariable(equations)
                                         bar_states3[v, i_small, j_small, k_small + 1, small_element] += lambda_small *
-                                                                                                         bar_state[v]
+                                                                                                        bar_state[v]
                                     end
                                 end
 
                                 if large_direction == 1
                                     for v in eachvariable(equations)
                                         bar_states1[v, i_large, j_large, k_large, large_element] += lambda_large *
-                                                                                                     bar_state[v]
+                                                                                                    bar_state[v]
                                     end
                                 elseif large_direction == 2
                                     for v in eachvariable(equations)
                                         bar_states1[v, i_large + 1, j_large, k_large, large_element] += lambda_large *
-                                                                                                         bar_state[v]
+                                                                                                        bar_state[v]
                                     end
                                 elseif large_direction == 3
                                     for v in eachvariable(equations)
                                         bar_states2[v, i_large, j_large, k_large, large_element] += lambda_large *
-                                                                                                     bar_state[v]
+                                                                                                    bar_state[v]
                                     end
                                 elseif large_direction == 4
                                     for v in eachvariable(equations)
                                         bar_states2[v, i_large, j_large + 1, k_large, large_element] += lambda_large *
-                                                                                                         bar_state[v]
+                                                                                                        bar_state[v]
                                     end
                                 elseif large_direction == 5
                                     for v in eachvariable(equations)
                                         bar_states3[v, i_large, j_large, k_large, large_element] += lambda_large *
-                                                                                                     bar_state[v]
+                                                                                                    bar_state[v]
                                     end
                                 else # large_direction == 6
                                     for v in eachvariable(equations)
                                         bar_states3[v, i_large, j_large, k_large + 1, large_element] += lambda_large *
-                                                                                                         bar_state[v]
+                                                                                                        bar_state[v]
                                     end
                                 end
                             end
@@ -982,7 +982,8 @@ end
                     normalize_mortar_bar_states!(bar_states1, bar_states2, bar_states3,
                                                  lambda1, lambda2, lambda3,
                                                  small_direction, equations,
-                                                 i_small, j_small, k_small, small_element)
+                                                 i_small, j_small, k_small,
+                                                 small_element)
                 end
                 normalize_mortar_bar_states!(bar_states1, bar_states2, bar_states3,
                                              lambda1, lambda2, lambda3,
