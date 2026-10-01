@@ -151,3 +151,4 @@ end
 end # @muladd
 
 include("limiting_analysis_2d.jl")
+include("limiting_analysis_3d.jl")
