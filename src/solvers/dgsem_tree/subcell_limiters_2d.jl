@@ -369,15 +369,19 @@ end
             Pp = inverse_jacobian * Pp
             Pm = inverse_jacobian * Pm
 
-            # Compute blending coefficient avoiding division by zero
-            # (as in paper of [Guermond, Nazarov, Popov, Thomas] (4.8))
-            Qp = abs(Qp) /
-                 (abs(Pp) + eps(typeof(Qp)) * 100 * abs(var_max[i, j, element]))
-            Qm = abs(Qm) /
-                 (abs(Pm) + eps(typeof(Qm)) * 100 * abs(var_max[i, j, element]))
+            # Compute blending coefficients `R = min(1, Q / P)`.
+            # If `|P| <= |Q|` (e.g., for `P = 0`), there is nothing to limit and `R = 1`.
+            # This matters since `alpha` limits antidiffusive fluxes of both signs.
+            # A regularized denominator, e.g., `Q / (P + eps)`, would give `R = 0` for
+            # `P = Q = 0`, i.e., pure low-order fluxes although there is nothing to limit.
+            # Note: Zalesak (1979) sets `R = 0` for `P = 0`, which works there since the
+            # coefficient of each flux is selected depending on its sign.
+            # Note: `Pp` and `Qp` are nonnegative.
+            Rp = Pp > Qp ? Qp / Pp : one(Qp)
+            Rm = abs(Pm) > abs(Qm) ? abs(Qm) / abs(Pm) : one(Qm)
 
             # Calculate alpha at nodes
-            alpha[i, j, element] = max(alpha[i, j, element], 1 - min(1, Qp, Qm))
+            alpha[i, j, element] = max(alpha[i, j, element], 1 - min(Rp, Rm))
         end
     end
 
@@ -474,12 +478,13 @@ end
                  min(0, val_flux2_local) + min(0, val_flux2_local_jp1)
             Pm = inverse_jacobian * Pm
 
-            # Compute blending coefficient avoiding division by zero
-            # (as in paper of [Guermond, Nazarov, Popov, Thomas] (4.8))
-            Qm = abs(Qm) / (abs(Pm) + eps(typeof(Qm)) * 100)
+            # Compute blending coefficient `R = min(1, Q / P)`.
+            # If `|P| <= |Q|` (e.g., for `P = 0`), there is nothing to limit and `R = 1`,
+            # see `idp_local_twosided!`.
+            Rm = abs(Pm) > abs(Qm) ? abs(Qm) / abs(Pm) : one(Qm)
 
             # Calculate alpha
-            alpha[i, j, element] = max(alpha[i, j, element], 1 - Qm)
+            alpha[i, j, element] = max(alpha[i, j, element], 1 - Rm)
         end
     end
 
